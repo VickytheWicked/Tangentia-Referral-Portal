@@ -57,7 +57,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
           <div>
             <h1 className="brand-name">Tangentia</h1>
-            <span className="brand-tag">Referral Portal</span>
+            <span className="brand-tag">{isHR ? 'Talent Acquisition' : 'Referral Portal'}</span>
           </div>
         </div>
 
@@ -194,55 +194,23 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
 
           <div className="navbar-right">
-            {/* Quick Links Between Portals */}
+            {/* Active Site / Workspace Badge */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                background: 'rgba(20, 25, 38, 0.9)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '10px',
-                padding: '4px',
-                gap: '4px',
-              }}
-            >
-              <button
-                className={`btn btn-sm ${!isHR ? 'btn-primary' : 'btn-outline'}`}
-                style={{ fontSize: '0.75rem', padding: '5px 12px', gap: '6px' }}
-                onClick={() => navigate('/employee/dashboard')}
-                title="Go to Employee Portal (/employee)"
-              >
-                <UserIcon size={13} />
-                <span>Employee Portal</span>
-              </button>
-              <button
-                className={`btn btn-sm ${isHR ? 'btn-primary' : 'btn-outline'}`}
-                style={{ fontSize: '0.75rem', padding: '5px 12px', gap: '6px' }}
-                onClick={() => navigate('/hr/dashboard')}
-                title="Go to HR Admin Portal (/hr)"
-              >
-                <ShieldCheck size={13} />
-                <span>HR Portal</span>
-              </button>
-            </div>
-
-            {/* Current Portal Badge */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '5px 12px',
+                gap: '8px',
+                padding: '6px 14px',
                 borderRadius: '8px',
                 background: isHR ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.15)',
                 border: `1px solid ${isHR ? 'rgba(139, 92, 246, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
                 color: isHR ? '#c084fc' : '#60a5fa',
-                fontSize: '0.78rem',
+                fontSize: '0.8rem',
                 fontWeight: 600,
               }}
             >
-              {isHR ? <ShieldCheck size={14} /> : <UserIcon size={14} />}
-              <span>{isHR ? 'HR Administration' : 'Employee Workspace'}</span>
+              {isHR ? <ShieldCheck size={15} /> : <UserIcon size={15} />}
+              <span>{isHR ? 'HR Administration Hub' : 'Employee Workspace'}</span>
             </div>
           </div>
         </header>
