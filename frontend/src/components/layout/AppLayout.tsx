@@ -8,8 +8,6 @@ import {
   BarChart3,
   Briefcase,
   Layers,
-  ShieldCheck,
-  User as UserIcon,
   Sparkles,
 } from 'lucide-react';
 
@@ -191,27 +189,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         <header className="top-navbar">
           <div className="navbar-left">
             <h2 className="page-title">{getPageTitle()}</h2>
-          </div>
-
-          <div className="navbar-right">
-            {/* Active Site / Workspace Badge */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '6px 14px',
-                borderRadius: '8px',
-                background: isHR ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                border: `1px solid ${isHR ? 'rgba(139, 92, 246, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
-                color: isHR ? '#c084fc' : '#60a5fa',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-              }}
-            >
-              {isHR ? <ShieldCheck size={15} /> : <UserIcon size={15} />}
-              <span>{isHR ? 'HR Administration Hub' : 'Employee Workspace'}</span>
-            </div>
           </div>
         </header>
 
