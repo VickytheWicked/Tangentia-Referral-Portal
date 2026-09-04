@@ -160,6 +160,7 @@ def seed_database():
                     referral_note=ref_info["note"],
                     position_id=job.id,
                     referred_by_user_id=employee_user.id,
+                    referred_by_name=employee_user.name,
                     status=ref_info["status"],
                     sharepoint_drive_id="mock-drive-tangentia-cvs",
                     sharepoint_item_id=f"item-{ref_info['number']}",

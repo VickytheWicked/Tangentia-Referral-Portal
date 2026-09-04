@@ -58,6 +58,7 @@ async def list_all_referrals(
                 Referral.candidate_name.ilike(term),
                 Referral.candidate_email.ilike(term),
                 Referral.candidate_phone.ilike(term),
+                Referral.referred_by_name.ilike(term),
                 User.name.ilike(term),
                 JobPosition.title.ilike(term),
             )

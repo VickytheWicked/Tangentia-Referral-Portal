@@ -16,6 +16,7 @@ class ReferralCreateForm(BaseModel):
     relationship: str = Field(..., min_length=2, max_length=100)
     referral_note: str = Field(..., min_length=10, max_length=5000)
     position_id: str
+    referred_by_name: Optional[str] = Field(None, max_length=255)
     candidate_consent: bool = Field(..., description="Must be true")
 
 

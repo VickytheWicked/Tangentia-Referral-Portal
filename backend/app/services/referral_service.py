@@ -69,7 +69,7 @@ def check_duplicate_candidate(
             reasons.append("Matching Name & Job Position")
 
         if reasons:
-            referrer_name = ref.referred_by.name if ref.referred_by else "Unknown Employee"
+            referrer_name = ref.referred_by_name or (ref.referred_by.name if ref.referred_by else "Unknown Employee")
             pos_title = ref.position.title if ref.position else "General Position"
             matches.append(
                 DuplicateMatch(
@@ -154,6 +154,7 @@ async def create_referral_with_cv(
 
     # Step 2: Save to Database
     try:
+        referral_referrer = (form_data.referred_by_name.strip() if form_data.referred_by_name else None) or (current_user.name if current_user else "Employee")
         referral = Referral(
             referral_number=ref_number,
             candidate_name=form_data.candidate_name.strip(),
@@ -166,6 +167,7 @@ async def create_referral_with_cv(
             referral_note=form_data.referral_note.strip(),
             position_id=position.id,
             referred_by_user_id=current_user.id,
+            referred_by_name=referral_referrer,
             status=ReferralStatus.SUBMITTED.value,
             sharepoint_drive_id=upload_result.drive_id,
             sharepoint_item_id=upload_result.item_id,
@@ -184,7 +186,7 @@ async def create_referral_with_cv(
             old_status=None,
             new_status=ReferralStatus.SUBMITTED.value,
             changed_by_user_id=current_user.id,
-            comment=f"Referral submitted by employee {current_user.name}.",
+            comment=f"Referral submitted by {referral_referrer}.",
         )
         db.add(history_entry)
         db.commit()

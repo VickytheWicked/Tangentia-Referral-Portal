@@ -42,7 +42,7 @@ def format_referral_summary(ref: Referral) -> ReferralSummaryResponse:
         position_title=ref.position.title if ref.position else "N/A",
         position_department=ref.position.department if ref.position else "N/A",
         referred_by_id=ref.referred_by_user_id,
-        referred_by_name=ref.referred_by.name if ref.referred_by else "N/A",
+        referred_by_name=ref.referred_by_name or (ref.referred_by.name if ref.referred_by else "N/A"),
         referred_by_email=ref.referred_by.email if ref.referred_by else "N/A",
         original_filename=ref.original_filename,
         created_at=ref.created_at,
@@ -73,6 +73,8 @@ async def submit_referral(
     candidate_name: str = Form(...),
     candidate_email: str = Form(...),
     candidate_phone: str = Form(...),
+    referred_by: Optional[str] = Form(None),
+    referred_by_name: Optional[str] = Form(None),
     linkedin_url: Optional[str] = Form(None),
     github_url: Optional[str] = Form(None),
     years_of_experience: float = Form(0.0),
@@ -89,10 +91,12 @@ async def submit_referral(
     CV is uploaded to SharePoint document library via Microsoft Graph API.
     Metadata is saved to PostgreSQL.
     """
+    ref_by = (referred_by_name or referred_by or "").strip() or None
     form_data = ReferralCreateForm(
         candidate_name=candidate_name,
         candidate_email=candidate_email,
         candidate_phone=candidate_phone,
+        referred_by_name=ref_by,
         linkedin_url=linkedin_url,
         github_url=github_url,
         years_of_experience=years_of_experience,

@@ -25,6 +25,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
   const [candidateName, setCandidateName] = useState<string>('');
   const [candidateEmail, setCandidateEmail] = useState<string>('');
   const [candidatePhone, setCandidatePhone] = useState<string>('');
+  const [referredByName, setReferredByName] = useState<string>('');
   const [linkedinUrl, setLinkedinUrl] = useState<string>('');
   const [githubUrl, setGithubUrl] = useState<string>('');
   const [positionId, setPositionId] = useState<string>('');
@@ -129,6 +130,11 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
     e.preventDefault();
     setErrorMessage(null);
 
+    if (!referredByName.trim()) {
+      setErrorMessage('Please specify who this candidate is referred by.');
+      return;
+    }
+
     if (!selectedFile) {
       setErrorMessage('Please upload the candidate’s CV document.');
       return;
@@ -152,6 +158,8 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       formData.append('candidate_name', candidateName);
       formData.append('candidate_email', candidateEmail);
       formData.append('candidate_phone', candidatePhone);
+      formData.append('referred_by_name', referredByName.trim());
+      formData.append('referred_by', referredByName.trim());
       if (linkedinUrl) formData.append('linkedin_url', linkedinUrl);
       if (githubUrl) formData.append('github_url', githubUrl);
       formData.append('position_id', positionId);
@@ -369,6 +377,20 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                   onChange={(e) => setGithubUrl(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '16px' }}>
+              <label className="form-label">
+                Referred By <span className="required">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                className="form-input"
+                placeholder="e.g. Employee Full Name (e.g. Rahul Sharma)"
+                value={referredByName}
+                onChange={(e) => setReferredByName(e.target.value)}
+              />
             </div>
           </div>
 
