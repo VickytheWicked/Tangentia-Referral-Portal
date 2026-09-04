@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
@@ -134,3 +134,21 @@ async def api_get_hr_notes(
         )
         for n in ref.hr_notes
     ]
+
+
+@router.get("/excel-export")
+async def export_excel_workbook(
+    hr_user: User = Depends(require_hr_admin),
+):
+    """Download the current live Microsoft Excel workbook (HR Admin only)"""
+    from app.services.excel import get_excel_service
+    excel_svc = get_excel_service()
+    content = excel_svc.get_workbook_bytes()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Excel workbook not found.")
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="Tangentia_Referrals.xlsx"'},
+    )

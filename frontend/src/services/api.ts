@@ -173,6 +173,25 @@ export const api = {
     document.body.removeChild(a);
   },
 
+  // Excel Export
+  async downloadExcelExport(): Promise<void> {
+    const res = await fetch(`${API_BASE}/hr/referrals/excel-export`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error('Failed to export Microsoft Excel workbook.');
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Tangentia_Referrals.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
   async getStatusHistory(id: string): Promise<StatusHistory[]> {
     const res = await fetch(`${API_BASE}/referrals/${id}/status-history`, {
       headers: getHeaders(),

@@ -191,6 +191,35 @@ async def create_referral_with_cv(
         db.add(history_entry)
         db.commit()
         db.refresh(referral)
+
+        # Write-through to Microsoft Excel
+        try:
+            from app.services.excel import get_excel_service
+            excel_svc = get_excel_service()
+            excel_svc.append_referral({
+                "id": referral.id,
+                "referral_number": referral.referral_number,
+                "candidate_name": referral.candidate_name,
+                "candidate_email": referral.candidate_email,
+                "candidate_phone": referral.candidate_phone,
+                "referred_by_name": referral.referred_by_name,
+                "years_of_experience": referral.years_of_experience,
+                "relationship": referral.relationship,
+                "position_title": position.title if position else "N/A",
+                "position_id": position.id,
+                "referred_by_user_id": current_user.id,
+                "status": referral.status,
+                "linkedin_url": referral.linkedin_url,
+                "github_url": referral.github_url,
+                "original_filename": referral.original_filename,
+                "sharepoint_file_url": referral.sharepoint_file_url,
+                "referral_note": referral.referral_note,
+                "created_at": referral.created_at.strftime("%Y-%m-%d %H:%M:%S") if referral.created_at else "",
+                "updated_at": referral.updated_at.strftime("%Y-%m-%d %H:%M:%S") if referral.updated_at else "",
+            })
+        except Exception as excel_err:
+            logger.warning(f"Excel write-through failed: {excel_err}")
+
         return referral
 
     except Exception as db_err:
@@ -245,6 +274,20 @@ def update_referral_status(
     db.add(history)
     db.commit()
     db.refresh(referral)
+
+    # Write-through to Microsoft Excel
+    try:
+        from app.services.excel import get_excel_service
+        get_excel_service().update_referral_status(
+            referral_id=referral.id,
+            referral_number=referral.referral_number,
+            new_status=new_status,
+            comment=comment,
+            changed_by=current_user.name,
+        )
+    except Exception as excel_err:
+        logger.warning(f"Excel status update write-through failed: {excel_err}")
+
     return referral
 
 
@@ -282,6 +325,20 @@ def withdraw_referral(
     db.add(history)
     db.commit()
     db.refresh(referral)
+
+    # Write-through to Microsoft Excel
+    try:
+        from app.services.excel import get_excel_service
+        get_excel_service().update_referral_status(
+            referral_id=referral.id,
+            referral_number=referral.referral_number,
+            new_status=ReferralStatus.WITHDRAWN.value,
+            comment=comment or f"Referral withdrawn by {current_user.name}.",
+            changed_by=current_user.name,
+        )
+    except Exception as excel_err:
+        logger.warning(f"Excel withdrawal write-through failed: {excel_err}")
+
     return referral
 
 
@@ -304,6 +361,19 @@ def add_hr_note(
     db.add(hr_note)
     db.commit()
     db.refresh(hr_note)
+
+    # Write-through to Microsoft Excel
+    try:
+        from app.services.excel import get_excel_service
+        get_excel_service().append_hr_note(
+            referral_id=referral.id,
+            referral_number=referral.referral_number,
+            note=note_text.strip(),
+            created_by=current_user.name,
+        )
+    except Exception as excel_err:
+        logger.warning(f"Excel HR note write-through failed: {excel_err}")
+
     return hr_note
 
 

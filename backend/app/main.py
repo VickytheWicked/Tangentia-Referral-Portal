@@ -26,6 +26,21 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
+@app.on_event("startup")
+async def startup_event():
+    from app.database import SessionLocal
+    from app.services.excel import get_excel_service
+    from app.services.excel.sync import initialize_and_sync_excel
+
+    db = SessionLocal()
+    try:
+        excel_svc = get_excel_service()
+        initialize_and_sync_excel(db, excel_svc)
+    except Exception as e:
+        logger.error(f"Failed to synchronize with Microsoft Excel workbook on startup: {e}", exc_info=True)
+    finally:
+        db.close()
+
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,

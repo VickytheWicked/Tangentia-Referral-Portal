@@ -13,8 +13,16 @@ class Settings(BaseSettings):
     # API Prefix
     API_V1_STR: str = "/api"
 
-    # Database
-    DATABASE_URL: str = "sqlite:///./referrals.db"  # SQLite default for local zero-config testing; set to postgresql://user:pass@host:5432/db in production
+    # Database (In-Memory Query Engine; Persistent Storage is Microsoft Excel)
+    DATABASE_URL: str = "sqlite:///:memory:"
+
+    # Microsoft Excel Online Storage
+    EXCEL_STORAGE_TYPE: str = Field(default="mock", description="'graph' for real Microsoft Graph Excel Online, 'mock' for local development Excel file")
+    EXCEL_FILE_PATH: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "Tangentia_Referrals.xlsx")
+    EXCEL_SITE_ID: str = Field(default="", description="SharePoint Site ID for Excel workbook")
+    EXCEL_DRIVE_ID: str = Field(default="", description="Drive ID where the Excel workbook is stored")
+    EXCEL_FILE_ITEM_ID: str = Field(default="", description="Microsoft Graph item ID for the Excel workbook")
+    EXCEL_WORKBOOK_NAME: str = Field(default="Tangentia_Referrals.xlsx", description="Name of the Excel workbook file")
     
     # Microsoft Entra ID (Azure AD)
     AZURE_TENANT_ID: str = Field(default="common", description="Azure AD Tenant ID")

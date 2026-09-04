@@ -18,6 +18,7 @@ import {
   User,
   Calendar,
   CheckCircle2,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface AllReferralsPageProps {
@@ -45,6 +46,20 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
 
   // Status Change Modal
   const [statusModalRef, setStatusModalRef] = useState<ReferralSummary | null>(null);
+
+  // Excel Export State
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      await api.downloadExcelExport();
+    } catch (err: any) {
+      alert(err.message || 'Failed to export Microsoft Excel workbook.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const loadData = async () => {
     setIsLoading(true);
@@ -124,9 +139,22 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
             </p>
           </div>
 
-          <span style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-            Showing <strong>{filteredReferrals.length}</strong> of <strong>{referrals.length}</strong> referrals
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleExportExcel}
+              disabled={isExporting}
+              title="Download Microsoft Excel Online Workbook (.xlsx)"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <FileSpreadsheet size={15} color="#10b981" />
+              <span>{isExporting ? 'Exporting...' : 'Export to Excel'}</span>
+            </button>
+
+            <span style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+              Showing <strong>{filteredReferrals.length}</strong> of <strong>{referrals.length}</strong> referrals
+            </span>
+          </div>
         </div>
 
         {/* Filters Grid */}

@@ -41,6 +41,8 @@ referrals.db
 storage/mock_sharepoint/
 backend/storage/mock_sharepoint/*
 !backend/storage/mock_sharepoint/.gitkeep
+backend/data/*.xlsx
+!backend/data/.gitkeep
 postgres_data/
 
 # Environment Secrets

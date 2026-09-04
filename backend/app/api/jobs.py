@@ -58,6 +58,22 @@ async def create_job_position(
     db.add(job)
     db.commit()
     db.refresh(job)
+
+    try:
+        from app.services.excel import get_excel_service
+        get_excel_service().save_job_position({
+            "id": job.id,
+            "title": job.title,
+            "department": job.department,
+            "location": job.location,
+            "employment_type": job.employment_type,
+            "is_active": job.is_active,
+            "description": job.description,
+            "created_at": job.created_at.strftime("%Y-%m-%d %H:%M:%S") if job.created_at else "",
+        })
+    except Exception as e:
+        logger.warning(f"Excel job sync failed: {e}")
+
     return job
 
 
@@ -80,4 +96,20 @@ async def update_job_position(
 
     db.commit()
     db.refresh(job)
+
+    try:
+        from app.services.excel import get_excel_service
+        get_excel_service().save_job_position({
+            "id": job.id,
+            "title": job.title,
+            "department": job.department,
+            "location": job.location,
+            "employment_type": job.employment_type,
+            "is_active": job.is_active,
+            "description": job.description,
+            "created_at": job.created_at.strftime("%Y-%m-%d %H:%M:%S") if job.created_at else "",
+        })
+    except Exception as e:
+        logger.warning(f"Excel job sync failed: {e}")
+
     return job
