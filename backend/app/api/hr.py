@@ -36,7 +36,7 @@ async def list_all_referrals(
     Search and filter all referrals across the enterprise.
     Restricted strictly to HR Admins.
     """
-    query = db.query(Referral).join(Referral.position).join(Referral.referred_by)
+    query = db.query(Referral).outerjoin(Referral.position).outerjoin(Referral.referred_by)
 
     if status_filter:
         query = query.filter(Referral.status == status_filter)

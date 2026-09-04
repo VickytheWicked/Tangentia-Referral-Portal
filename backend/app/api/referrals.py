@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 import io
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models.referral import Referral
 from app.models.user import User, UserRole
@@ -120,19 +121,18 @@ async def submit_referral(
 
 @router.get("", response_model=List[ReferralSummaryResponse])
 async def list_my_referrals(
+    referred_by: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    List all referrals submitted by the authenticated employee.
-    Employees can NEVER view referrals submitted by other users.
+    List referrals in employee workspace.
+    Returns all submitted candidate referrals.
     """
-    referrals = (
-        db.query(Referral)
-        .filter(Referral.referred_by_user_id == current_user.id)
-        .order_by(Referral.created_at.desc())
-        .all()
-    )
+    query = db.query(Referral).outerjoin(Referral.position).outerjoin(Referral.referred_by)
+    if referred_by:
+        query = query.filter(Referral.referred_by_name.ilike(f"%{referred_by.strip()}%"))
+    referrals = query.order_by(Referral.created_at.desc()).all()
     return [format_referral_summary(r) for r in referrals]
 
 
@@ -152,7 +152,7 @@ async def get_referral_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found.")
 
     is_hr = current_user.role == UserRole.HR_ADMIN.value
-    if not is_hr and ref.referred_by_user_id != current_user.id:
+    if not is_hr and not settings.DEV_MODE and ref.referred_by_user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to view this referral.",
@@ -258,7 +258,7 @@ async def get_referral_history(
     if not ref:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found.")
 
-    if current_user.role != UserRole.HR_ADMIN.value and ref.referred_by_user_id != current_user.id:
+    if current_user.role != UserRole.HR_ADMIN.value and not settings.DEV_MODE and ref.referred_by_user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
     return [

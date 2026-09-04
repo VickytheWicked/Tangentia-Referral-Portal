@@ -14,6 +14,9 @@ from app.models.referral import Referral, ReferralStatus
 from app.services.sharepoint.mock_service import MockSharePointService
 from app.services.sharepoint import get_sharepoint_service
 
+from app.services.excel.local_excel_service import LocalExcelService
+import app.services.excel as excel_module
+
 # Use in-memory SQLite for fast, isolated testing
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
@@ -23,6 +26,17 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def isolate_excel_for_tests(tmp_path):
+    test_excel_path = str(tmp_path / "test_tangentia_referrals.xlsx")
+    mock_excel_svc = LocalExcelService(file_path=test_excel_path)
+    mock_excel_svc.initialize_workbook()
+    original_instance = excel_module._excel_service_instance
+    excel_module._excel_service_instance = mock_excel_svc
+    yield mock_excel_svc
+    excel_module._excel_service_instance = original_instance
 
 
 @pytest.fixture(scope="session", autouse=True)

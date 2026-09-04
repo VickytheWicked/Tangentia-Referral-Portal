@@ -220,9 +220,26 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
         db.merge(hr_user)
         db.merge(emp_user)
 
+        # Merge any users from Excel Users sheet
+        for u_row in data.get("Users", []):
+            u_id = str(u_row.get("User ID") or "").strip()
+            if u_id:
+                u_role = str(u_row.get("Role") or UserRole.EMPLOYEE.value)
+                u_obj = User(
+                    id=u_id,
+                    name=str(u_row.get("Name") or "Employee"),
+                    email=str(u_row.get("Email") or f"{u_id[:8]}@tangentia.com"),
+                    role=u_role,
+                    department=str(u_row.get("Department") or "Engineering"),
+                    entra_user_id=str(u_row.get("Entra User ID") or f"entra-{u_id[:8]}"),
+                )
+                db.merge(u_obj)
+        db.commit()
+
         # 2. Load Jobs
+        existing_job_ids = set()
         for row in data.get("JobPositions", []):
-            job_id = str(row.get("Job ID") or uuid.uuid4())
+            job_id = str(row.get("Job ID") or uuid.uuid4()).strip()
             is_act = str(row.get("Is Active") or "Yes").strip().lower() in ["yes", "true", "1"]
             job = JobPosition(
                 id=job_id,
@@ -234,43 +251,189 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 is_active=is_act,
             )
             db.merge(job)
+            existing_job_ids.add(job_id)
 
-        # 3. Load Referrals
-        for row in data.get("Referrals", []):
-            ref_id = str(row.get("Referral ID") or uuid.uuid4())
-            ref_num = str(row.get("Referral Number") or f"REF-{datetime.now().year}-{ref_id[:6]}")
-            cand_name = str(row.get("Candidate Name") or "Candidate")
-            cand_email = str(row.get("Candidate Email") or "candidate@example.com")
-            cand_phone = str(row.get("Candidate Phone") or "+1000000000")
-            pos_id = str(row.get("Position ID") or "job-001")
-            referred_by = str(row.get("Referred By") or "Employee")
-            ref_by_uid = str(row.get("Referred By User ID") or "user-emp-001")
-            status_val = str(row.get("Status") or "Submitted")
-            exp = float(row.get("Years Experience") or 0.0)
-            rel = str(row.get("Relationship") or "Professional Network")
-            note = str(row.get("Referral Note") or "Referred via portal.")
-            orig_file = str(row.get("Original CV Filename") or "resume.pdf")
-            sp_url = str(row.get("SharePoint CV URL") or "")
-
-            ref = Referral(
-                id=ref_id,
-                referral_number=ref_num,
-                candidate_name=cand_name,
-                candidate_email=cand_email,
-                candidate_phone=cand_phone,
-                referred_by_name=referred_by,
-                years_of_experience=exp,
-                relationship=rel,
-                position_id=pos_id,
-                referred_by_user_id=ref_by_uid,
-                status=status_val,
-                original_filename=orig_file,
-                stored_filename=orig_file,
-                sharepoint_file_url=sp_url,
-                referral_note=note,
-                candidate_consent=True,
-            )
-            db.merge(ref)
-
+        # Merge any sample jobs that aren't yet in the database
+        for s_job in SAMPLE_JOBS:
+            if s_job["id"] not in existing_job_ids:
+                job = JobPosition(
+                    id=s_job["id"],
+                    title=s_job["title"],
+                    department=s_job["department"],
+                    description=s_job["description"],
+                    location=s_job["location"],
+                    employment_type=s_job["employment_type"],
+                    is_active=s_job["is_active"],
+                )
+                db.merge(job)
+                existing_job_ids.add(s_job["id"])
         db.commit()
-        logger.info(f"Loaded {len(data.get('Referrals', []))} referrals from Microsoft Excel into runtime engine.")
+
+        # 3. Load Referrals with collision resolution and foreign key safety
+        valid_job_ids = {j.id for j in db.query(JobPosition.id).all()}
+        valid_user_ids = {u.id for u in db.query(User.id).all()}
+        seen_ref_numbers = set()
+        seen_ids = set()
+
+        current_year = datetime.now(timezone.utc).year
+        max_seq = 0
+        for r_row in data.get("Referrals", []):
+            raw_num = str(r_row.get("Referral Number") or "").strip()
+            if raw_num.startswith(f"REF-{current_year}-"):
+                try:
+                    num_val = int(raw_num.split("-")[-1])
+                    if num_val > max_seq:
+                        max_seq = num_val
+                except (ValueError, IndexError):
+                    pass
+
+        loaded_count = 0
+        for row in data.get("Referrals", []):
+            try:
+                raw_id = str(row.get("Referral ID") or "").strip()
+                if not raw_id or raw_id in seen_ids:
+                    ref_id = str(uuid.uuid4())
+                else:
+                    ref_id = raw_id
+                seen_ids.add(ref_id)
+
+                raw_num = str(row.get("Referral Number") or "").strip()
+                if not raw_num or raw_num in seen_ref_numbers:
+                    max_seq += 1
+                    ref_num = f"REF-{current_year}-{max_seq:06d}"
+                else:
+                    ref_num = raw_num
+                seen_ref_numbers.add(ref_num)
+
+                cand_name = str(row.get("Candidate Name") or "Candidate").strip()
+                cand_email = str(row.get("Candidate Email") or f"candidate_{ref_id[:6]}@example.com").strip()
+                cand_phone = str(row.get("Candidate Phone") or "+1000000000").strip()
+                referred_by = str(row.get("Referred By") or "Vansh Rupesh").strip()
+
+                pos_id = str(row.get("Position ID") or "").strip()
+                pos_title = str(row.get("Position Title") or "General Position").strip()
+                if not pos_id or pos_id not in valid_job_ids:
+                    if pos_id:
+                        new_job = JobPosition(
+                            id=pos_id,
+                            title=pos_title,
+                            department="Engineering",
+                            description=f"Role: {pos_title}",
+                            location="Toronto, Canada (Hybrid)",
+                            employment_type="Full-time",
+                            is_active=True,
+                        )
+                        db.merge(new_job)
+                        db.commit()
+                        valid_job_ids.add(pos_id)
+                    else:
+                        pos_id = "job-001"
+
+                ref_by_uid = str(row.get("Referred By User ID") or "").strip()
+                if not ref_by_uid or ref_by_uid not in valid_user_ids:
+                    if ref_by_uid:
+                        new_user = User(
+                            id=ref_by_uid,
+                            name=referred_by or "Tangentia Employee",
+                            email=f"{ref_by_uid[:8]}@tangentia.com",
+                            role=UserRole.EMPLOYEE.value,
+                            department="Engineering",
+                            entra_user_id=f"entra-{ref_by_uid}",
+                        )
+                        db.merge(new_user)
+                        db.commit()
+                        valid_user_ids.add(ref_by_uid)
+                    else:
+                        ref_by_uid = "user-emp-001"
+
+                status_val = str(row.get("Status") or "Submitted").strip()
+                try:
+                    exp = float(row.get("Years Experience") or 0.0)
+                except (ValueError, TypeError):
+                    exp = 0.0
+                rel = str(row.get("Relationship") or "Former Colleague").strip()
+                note = str(row.get("Referral Note") or "Referred candidate.").strip()
+                orig_file = str(row.get("Original CV Filename") or "resume.pdf").strip()
+                sp_url = str(row.get("SharePoint CV URL") or "").strip()
+                li_url = str(row.get("LinkedIn URL") or "").strip() or None
+                gh_url = str(row.get("GitHub URL") or "").strip() or None
+
+                created_at_dt = datetime.now(timezone.utc)
+                created_at_raw = row.get("Created At")
+                if created_at_raw:
+                    try:
+                        created_at_dt = datetime.fromisoformat(str(created_at_raw))
+                    except Exception:
+                        try:
+                            created_at_dt = datetime.strptime(str(created_at_raw), "%Y-%m-%d %H:%M:%S")
+                        except Exception:
+                            pass
+
+                ref = Referral(
+                    id=ref_id,
+                    referral_number=ref_num,
+                    candidate_name=cand_name,
+                    candidate_email=cand_email,
+                    candidate_phone=cand_phone,
+                    referred_by_name=referred_by,
+                    years_of_experience=exp,
+                    relationship=rel,
+                    position_id=pos_id,
+                    referred_by_user_id=ref_by_uid,
+                    status=status_val,
+                    original_filename=orig_file,
+                    stored_filename=orig_file,
+                    sharepoint_file_url=sp_url,
+                    linkedin_url=li_url,
+                    github_url=gh_url,
+                    referral_note=note,
+                    candidate_consent=True,
+                    created_at=created_at_dt,
+                    updated_at=created_at_dt,
+                )
+                db.merge(ref)
+                db.commit()
+                loaded_count += 1
+            except Exception as row_err:
+                db.rollback()
+                logger.warning(f"Error loading referral row: {row_err}")
+
+        # 4. Load Status History if present
+        for h_row in data.get("StatusHistory", []):
+            h_id = str(h_row.get("History ID") or "").strip()
+            r_id = str(h_row.get("Referral ID") or "").strip()
+            if h_id and r_id and r_id in seen_ids:
+                try:
+                    c_by = str(h_row.get("Changed By") or "user-hr-001")
+                    history = ReferralStatusHistory(
+                        id=h_id,
+                        referral_id=r_id,
+                        old_status=str(h_row.get("Old Status") or ""),
+                        new_status=str(h_row.get("New Status") or "Submitted"),
+                        changed_by_user_id=c_by if c_by in valid_user_ids else "user-hr-001",
+                        comment=str(h_row.get("Comment") or ""),
+                    )
+                    db.merge(history)
+                except Exception:
+                    pass
+        db.commit()
+
+        # 5. Load HR Notes if present
+        for n_row in data.get("HRNotes", []):
+            n_id = str(n_row.get("Note ID") or "").strip()
+            r_id = str(n_row.get("Referral ID") or "").strip()
+            if n_id and r_id and r_id in seen_ids:
+                try:
+                    c_by = str(n_row.get("Created By") or "user-hr-001")
+                    note_obj = HRNote(
+                        id=n_id,
+                        referral_id=r_id,
+                        created_by_user_id=c_by if c_by in valid_user_ids else "user-hr-001",
+                        note=str(n_row.get("Note") or ""),
+                    )
+                    db.merge(note_obj)
+                except Exception:
+                    pass
+        db.commit()
+
+        logger.info(f"Loaded {loaded_count} referrals from Microsoft Excel into runtime engine.")
