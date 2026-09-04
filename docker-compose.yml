@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Relational Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: tangentia-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: referral_portal
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tangentia-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PROJECT_NAME=Tangentia Employee Referral Portal
+      - ENVIRONMENT=production
+      - DEBUG=False
+      - DEV_MODE=False
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/referral_portal
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      - AZURE_HR_GROUP_ID=${AZURE_HR_GROUP_ID}
+      - SHAREPOINT_STORAGE_TYPE=graph
+      - SHAREPOINT_SITE_ID=${SHAREPOINT_SITE_ID}
+      - SHAREPOINT_DRIVE_ID=${SHAREPOINT_DRIVE_ID}
+      - SHAREPOINT_ROOT_FOLDER=Referral-CVs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Frontend Web Client
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tangentia-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
