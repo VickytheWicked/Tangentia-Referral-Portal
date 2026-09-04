@@ -121,7 +121,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
       <div className="metric-grid">
         <div className="metric-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span className="metric-label">My Total Referrals</span>
+            <span className="metric-label">Total Referrals</span>
             <Users size={20} color="#3b82f6" />
           </div>
           <span className="metric-value">{total}</span>
@@ -166,10 +166,10 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
         >
           <div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              My Submitted Referrals
+              Candidate Referrals
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Candidates you have recommended to open positions
+              Candidates recommended to open positions across Tangentia
             </p>
           </div>
 
@@ -194,17 +194,17 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
 
         {isLoading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Loading your referrals...
+            Loading referrals...
           </div>
         ) : filteredReferrals.length === 0 ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
             <FileText size={40} color="var(--text-muted)" style={{ margin: '0 auto 12px auto' }} />
             <h4 style={{ color: 'var(--text-secondary)', marginBottom: '6px' }}>No referrals found</h4>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '18px' }}>
-              You haven't submitted any candidate referrals matching this criteria yet.
+              No candidate referrals matching this criteria found.
             </p>
             <button className="btn btn-primary btn-sm" onClick={() => onNavigate('submit-referral')}>
-              <PlusCircle size={14} /> Submit Your First Referral
+              <PlusCircle size={14} /> Submit New Referral
             </button>
           </div>
         ) : (
@@ -215,6 +215,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
                   <th>Referral ID</th>
                   <th>Candidate</th>
                   <th>Position</th>
+                  <th>Referred By</th>
                   <th>Experience</th>
                   <th>Submitted Date</th>
                   <th>Status</th>
@@ -236,6 +237,16 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
                     <td>
                       <div style={{ color: 'var(--text-secondary)' }}>{r.position_title}</div>
                       <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{r.position_department}</div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                        {r.referred_by_name || 'N/A'}
+                      </div>
+                      {r.referred_by_email && (
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                          {r.referred_by_email}
+                        </div>
+                      )}
                     </td>
                     <td>{r.years_of_experience} yrs</td>
                     <td>{new Date(r.created_at).toLocaleDateString()}</td>

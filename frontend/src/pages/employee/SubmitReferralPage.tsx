@@ -244,7 +244,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
           </button>
 
           <button className="btn btn-primary" onClick={onReferralCreated}>
-            View My Referrals
+            View Referrals
           </button>
         </div>
       </div>

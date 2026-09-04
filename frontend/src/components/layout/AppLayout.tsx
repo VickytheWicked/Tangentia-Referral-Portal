@@ -36,7 +36,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const getPageTitle = () => {
     const path = location.pathname;
     if (path.includes('/employee/submit')) return 'Submit New Referral';
-    if (path.includes('/employee/my-referrals')) return 'My Submitted Referrals';
+    if (path.includes('/employee/referrals') || path.includes('/employee/my-referrals')) return 'Candidate Referrals';
     if (path.startsWith('/employee')) return 'Employee Dashboard';
     if (path.includes('/hr/referrals')) return 'Enterprise Candidate Database';
     if (path.includes('/hr/jobs')) return 'Job Openings Management';
@@ -87,11 +87,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               </div>
 
               <div
-                className={`nav-item ${location.pathname === '/employee/my-referrals' ? 'active' : ''}`}
-                onClick={() => navigate('/employee/my-referrals')}
+                className={`nav-item ${
+                  location.pathname === '/employee/referrals' || location.pathname === '/employee/my-referrals'
+                    ? 'active'
+                    : ''
+                }`}
+                onClick={() => navigate('/employee/referrals')}
               >
                 <Users size={18} />
-                <span>My Referrals</span>
+                <span>Referrals</span>
               </div>
             </>
           ) : (

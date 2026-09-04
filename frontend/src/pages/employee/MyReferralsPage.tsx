@@ -91,10 +91,10 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
         >
           <div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-              My Referral Portfolio
+              Candidate Referrals
             </h3>
             <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-              Manage and track all candidates you have recommended across Tangentia
+              Manage and track candidate referrals recommended across Tangentia
             </p>
           </div>
 
@@ -143,7 +143,7 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
         {/* Table */}
         {isLoading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Loading your referrals...
+            Loading referrals...
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center' }}>
@@ -161,6 +161,7 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
                   <th>Referral ID</th>
                   <th>Candidate</th>
                   <th>Job Opening</th>
+                  <th>Referred By</th>
                   <th>Experience</th>
                   <th>Relationship</th>
                   <th>Date Submitted</th>
@@ -183,6 +184,16 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
                     <td>
                       <div style={{ color: 'var(--text-secondary)' }}>{r.position_title}</div>
                       <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{r.position_department}</div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                        {r.referred_by_name || 'N/A'}
+                      </div>
+                      {r.referred_by_email && (
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                          {r.referred_by_email}
+                        </div>
+                      )}
                     </td>
                     <td>{r.years_of_experience} yrs</td>
                     <td>{r.relationship}</td>

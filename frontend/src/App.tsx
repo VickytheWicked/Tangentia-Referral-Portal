@@ -54,7 +54,7 @@ const MainPortalContent: React.FC = () => {
             <EmployeeDashboard
               onNavigate={(tab) => {
                 if (tab === 'submit-referral') navigate('/employee/submit');
-                else if (tab === 'my-referrals') navigate('/employee/my-referrals');
+                else if (tab === 'my-referrals' || tab === 'referrals') navigate('/employee/referrals');
               }}
             />
           }
@@ -63,12 +63,12 @@ const MainPortalContent: React.FC = () => {
           path="/employee/submit"
           element={
             <SubmitReferralPage
-              onReferralCreated={() => navigate('/employee/my-referrals')}
+              onReferralCreated={() => navigate('/employee/referrals')}
             />
           }
         />
         <Route
-          path="/employee/my-referrals"
+          path="/employee/referrals"
           element={
             <MyReferralsPage
               onNavigate={(tab) => {
@@ -78,6 +78,7 @@ const MainPortalContent: React.FC = () => {
             />
           }
         />
+        <Route path="/employee/my-referrals" element={<Navigate to="/employee/referrals" replace />} />
 
         {/* ================================================================ */}
         {/* HR Administration Hub Routes                                      */}
