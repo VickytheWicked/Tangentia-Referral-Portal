@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
@@ -10,18 +11,9 @@ import { JobPositionsPage } from './pages/hr/JobPositionsPage';
 import { AnalyticsPage } from './pages/hr/AnalyticsPage';
 
 const MainPortalContent: React.FC = () => {
-  const { user, role, isLoading } = useAuth();
-  const [currentTab, setCurrentTab] = useState<string>(role === 'hr_admin' ? 'hr-dashboard' : 'employee-dashboard');
+  const { isLoading } = useAuth();
+  const navigate = useNavigate();
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
-
-  // Sync default tab when role switches
-  useEffect(() => {
-    if (role === 'hr_admin') {
-      setCurrentTab('hr-dashboard');
-    } else {
-      setCurrentTab('employee-dashboard');
-    }
-  }, [role]);
 
   if (isLoading) {
     return (
@@ -43,54 +35,93 @@ const MainPortalContent: React.FC = () => {
 
   const handleOpenCandidate = (candidateId: string) => {
     setSelectedCandidateId(candidateId);
-    setCurrentTab('all-referrals');
+    navigate('/hr/referrals');
   };
 
   return (
-    <AppLayout currentTab={currentTab} onNavigate={setCurrentTab}>
-      {/* Employee Navigation */}
-      {role === 'employee' && (
-        <>
-          {currentTab === 'employee-dashboard' && (
-            <EmployeeDashboard onNavigate={setCurrentTab} />
-          )}
-          {currentTab === 'submit-referral' && (
-            <SubmitReferralPage onReferralCreated={() => setCurrentTab('my-referrals')} />
-          )}
-          {currentTab === 'my-referrals' && (
-            <MyReferralsPage onNavigate={setCurrentTab} />
-          )}
-        </>
-      )}
+    <AppLayout>
+      <Routes>
+        {/* Default Landing -> Redirects to Employee Dashboard */}
+        <Route path="/" element={<Navigate to="/employee/dashboard" replace />} />
 
-      {/* HR Admin Navigation */}
-      {role === 'hr_admin' && (
-        <>
-          {currentTab === 'hr-dashboard' && (
+        {/* ================================================================ */}
+        {/* Employee Workspace Routes                                         */}
+        {/* ================================================================ */}
+        <Route path="/employee" element={<Navigate to="/employee/dashboard" replace />} />
+        <Route
+          path="/employee/dashboard"
+          element={
+            <EmployeeDashboard
+              onNavigate={(tab) => {
+                if (tab === 'submit-referral') navigate('/employee/submit');
+                else if (tab === 'my-referrals') navigate('/employee/my-referrals');
+              }}
+            />
+          }
+        />
+        <Route
+          path="/employee/submit"
+          element={
+            <SubmitReferralPage
+              onReferralCreated={() => navigate('/employee/my-referrals')}
+            />
+          }
+        />
+        <Route
+          path="/employee/my-referrals"
+          element={
+            <MyReferralsPage
+              onNavigate={(tab) => {
+                if (tab === 'submit-referral') navigate('/employee/submit');
+                else if (tab === 'employee-dashboard') navigate('/employee/dashboard');
+              }}
+            />
+          }
+        />
+
+        {/* ================================================================ */}
+        {/* HR Administration Hub Routes                                      */}
+        {/* ================================================================ */}
+        <Route path="/hr" element={<Navigate to="/hr/dashboard" replace />} />
+        <Route
+          path="/hr/dashboard"
+          element={
             <HRDashboard
-              onNavigate={setCurrentTab}
+              onNavigate={(tab) => {
+                if (tab === 'all-referrals') navigate('/hr/referrals');
+                else if (tab === 'job-positions') navigate('/hr/jobs');
+                else if (tab === 'analytics') navigate('/hr/analytics');
+              }}
               onOpenCandidate={handleOpenCandidate}
             />
-          )}
-          {currentTab === 'all-referrals' && (
+          }
+        />
+        <Route
+          path="/hr/referrals"
+          element={
             <AllReferralsPage
               initialSelectedId={selectedCandidateId}
               onClearInitialId={() => setSelectedCandidateId(null)}
             />
-          )}
-          {currentTab === 'job-positions' && <JobPositionsPage />}
-          {currentTab === 'analytics' && <AnalyticsPage />}
-        </>
-      )}
+          }
+        />
+        <Route path="/hr/jobs" element={<JobPositionsPage />} />
+        <Route path="/hr/analytics" element={<AnalyticsPage />} />
+
+        {/* Catch-all fallback */}
+        <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
+      </Routes>
     </AppLayout>
   );
 };
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <MainPortalContent />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <MainPortalContent />
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 

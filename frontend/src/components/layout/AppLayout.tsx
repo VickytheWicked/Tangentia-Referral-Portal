@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import {
   Users,
@@ -13,19 +14,38 @@ import {
 } from 'lucide-react';
 
 interface AppLayoutProps {
-  currentTab: string;
-  onNavigate: (tab: string) => void;
   children: React.ReactNode;
 }
 
-export const AppLayout: React.FC<AppLayoutProps> = ({
-  currentTab,
-  onNavigate,
-  children,
-}) => {
+export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { user, role, switchRole, isDevMode } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const isHR = role === 'hr_admin';
+  const isHR = location.pathname.startsWith('/hr');
+
+  // Automatically sync dev role if DEV_MODE is enabled when route changes
+  useEffect(() => {
+    if (isDevMode) {
+      if (isHR && role !== 'hr_admin') {
+        switchRole('hr_admin');
+      } else if (!isHR && role !== 'employee') {
+        switchRole('employee');
+      }
+    }
+  }, [isHR, isDevMode, role, switchRole]);
+
+  const getPageTitle = () => {
+    const path = location.pathname;
+    if (path.includes('/employee/submit')) return 'Submit New Referral';
+    if (path.includes('/employee/my-referrals')) return 'My Submitted Referrals';
+    if (path.startsWith('/employee')) return 'Employee Dashboard';
+    if (path.includes('/hr/referrals')) return 'Enterprise Candidate Database';
+    if (path.includes('/hr/jobs')) return 'Job Openings Management';
+    if (path.includes('/hr/analytics')) return 'Referral Funnel & Analytics';
+    if (path.startsWith('/hr')) return 'HR Referral Overview';
+    return 'Tangentia Referral Portal';
+  };
 
   return (
     <div className="app-container">
@@ -49,24 +69,28 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           {!isHR ? (
             <>
               <div
-                className={`nav-item ${currentTab === 'employee-dashboard' ? 'active' : ''}`}
-                onClick={() => onNavigate('employee-dashboard')}
+                className={`nav-item ${
+                  location.pathname === '/employee' || location.pathname === '/employee/dashboard'
+                    ? 'active'
+                    : ''
+                }`}
+                onClick={() => navigate('/employee/dashboard')}
               >
                 <Layers size={18} />
                 <span>Dashboard</span>
               </div>
 
               <div
-                className={`nav-item ${currentTab === 'submit-referral' ? 'active' : ''}`}
-                onClick={() => onNavigate('submit-referral')}
+                className={`nav-item ${location.pathname === '/employee/submit' ? 'active' : ''}`}
+                onClick={() => navigate('/employee/submit')}
               >
                 <PlusCircle size={18} />
                 <span>Submit Referral</span>
               </div>
 
               <div
-                className={`nav-item ${currentTab === 'my-referrals' ? 'active' : ''}`}
-                onClick={() => onNavigate('my-referrals')}
+                className={`nav-item ${location.pathname === '/employee/my-referrals' ? 'active' : ''}`}
+                onClick={() => navigate('/employee/my-referrals')}
               >
                 <Users size={18} />
                 <span>My Referrals</span>
@@ -75,32 +99,36 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           ) : (
             <>
               <div
-                className={`nav-item ${currentTab === 'hr-dashboard' ? 'active' : ''}`}
-                onClick={() => onNavigate('hr-dashboard')}
+                className={`nav-item ${
+                  location.pathname === '/hr' || location.pathname === '/hr/dashboard'
+                    ? 'active'
+                    : ''
+                }`}
+                onClick={() => navigate('/hr/dashboard')}
               >
                 <Layers size={18} />
                 <span>HR Dashboard</span>
               </div>
 
               <div
-                className={`nav-item ${currentTab === 'all-referrals' ? 'active' : ''}`}
-                onClick={() => onNavigate('all-referrals')}
+                className={`nav-item ${location.pathname === '/hr/referrals' ? 'active' : ''}`}
+                onClick={() => navigate('/hr/referrals')}
               >
                 <FolderKanban size={18} />
                 <span>All Referrals</span>
               </div>
 
               <div
-                className={`nav-item ${currentTab === 'job-positions' ? 'active' : ''}`}
-                onClick={() => onNavigate('job-positions')}
+                className={`nav-item ${location.pathname === '/hr/jobs' ? 'active' : ''}`}
+                onClick={() => navigate('/hr/jobs')}
               >
                 <Briefcase size={18} />
                 <span>Job Openings</span>
               </div>
 
               <div
-                className={`nav-item ${currentTab === 'analytics' ? 'active' : ''}`}
-                onClick={() => onNavigate('analytics')}
+                className={`nav-item ${location.pathname === '/hr/analytics' ? 'active' : ''}`}
+                onClick={() => navigate('/hr/analytics')}
               >
                 <BarChart3 size={18} />
                 <span>Analytics</span>
@@ -110,13 +138,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         </nav>
 
         <div className="sidebar-footer">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
               style={{
                 width: '34px',
                 height: '34px',
                 borderRadius: '8px',
-                background: isHR ? 'linear-gradient(135deg, #8b5cf6, #ec4899)' : 'linear-gradient(135deg, #3b82f6, #06b6d4)',
+                background: isHR
+                  ? 'linear-gradient(135deg, #8b5cf6, #ec4899)'
+                  : 'linear-gradient(135deg, #3b82f6, #06b6d4)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -128,10 +158,27 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
               {user?.name ? user.name[0].toUpperCase() : 'U'}
             </div>
             <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              <div
+                style={{
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                }}
+              >
                 {user?.name || 'Loading user...'}
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              <div
+                style={{
+                  fontSize: '0.72rem',
+                  color: 'var(--text-muted)',
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                }}
+              >
                 {user?.email || 'authenticated'}
               </div>
             </div>
@@ -143,57 +190,43 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       <div className="main-wrapper">
         <header className="top-navbar">
           <div className="navbar-left">
-            <h2 className="page-title">
-              {currentTab === 'employee-dashboard' && 'Employee Dashboard'}
-              {currentTab === 'submit-referral' && 'Submit New Referral'}
-              {currentTab === 'my-referrals' && 'My Submitted Referrals'}
-              {currentTab === 'hr-dashboard' && 'HR Referral Overview'}
-              {currentTab === 'all-referrals' && 'Enterprise Candidate Database'}
-              {currentTab === 'job-positions' && 'Job Openings Management'}
-              {currentTab === 'analytics' && 'Referral Funnel & Analytics'}
-            </h2>
+            <h2 className="page-title">{getPageTitle()}</h2>
           </div>
 
           <div className="navbar-right">
-            {/* Dev Mode Role Switcher Toggle */}
-            {isDevMode && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  background: 'rgba(20, 25, 38, 0.9)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '10px',
-                  padding: '4px',
-                  gap: '4px',
-                }}
+            {/* Quick Links Between Portals */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: 'rgba(20, 25, 38, 0.9)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '10px',
+                padding: '4px',
+                gap: '4px',
+              }}
+            >
+              <button
+                className={`btn btn-sm ${!isHR ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.75rem', padding: '5px 12px', gap: '6px' }}
+                onClick={() => navigate('/employee/dashboard')}
+                title="Go to Employee Portal (/employee)"
               >
-                <button
-                  className={`btn btn-sm ${!isHR ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ fontSize: '0.75rem', padding: '4px 10px' }}
-                  onClick={() => {
-                    switchRole('employee');
-                    onNavigate('employee-dashboard');
-                  }}
-                >
-                  <UserIcon size={12} />
-                  Employee View
-                </button>
-                <button
-                  className={`btn btn-sm ${isHR ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ fontSize: '0.75rem', padding: '4px 10px' }}
-                  onClick={() => {
-                    switchRole('hr_admin');
-                    onNavigate('hr-dashboard');
-                  }}
-                >
-                  <ShieldCheck size={12} />
-                  HR Admin View
-                </button>
-              </div>
-            )}
+                <UserIcon size={13} />
+                <span>Employee Portal</span>
+              </button>
+              <button
+                className={`btn btn-sm ${isHR ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.75rem', padding: '5px 12px', gap: '6px' }}
+                onClick={() => navigate('/hr/dashboard')}
+                title="Go to HR Admin Portal (/hr)"
+              >
+                <ShieldCheck size={13} />
+                <span>HR Portal</span>
+              </button>
+            </div>
 
-            {/* Current Role Badge */}
+            {/* Current Portal Badge */}
             <div
               style={{
                 display: 'flex',
@@ -209,14 +242,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
               }}
             >
               {isHR ? <ShieldCheck size={14} /> : <UserIcon size={14} />}
-              <span>{isHR ? 'HR Administrator' : 'Company Employee'}</span>
+              <span>{isHR ? 'HR Administration' : 'Employee Workspace'}</span>
             </div>
           </div>
         </header>
 
-        <main className="content-area">
-          {children}
-        </main>
+        <main className="content-area">{children}</main>
       </div>
     </div>
   );
