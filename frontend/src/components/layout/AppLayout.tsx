@@ -16,7 +16,7 @@ interface AppLayoutProps {
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const { user, role, switchRole, isDevMode } = useAuth();
+  const { role, switchRole, isDevMode } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -134,54 +134,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             </>
           )}
         </nav>
-
-        <div className="sidebar-footer">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '8px',
-                background: isHR
-                  ? 'linear-gradient(135deg, #8b5cf6, #ec4899)'
-                  : 'linear-gradient(135deg, #3b82f6, #06b6d4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-              }}
-            >
-              {user?.name ? user.name[0].toUpperCase() : 'U'}
-            </div>
-            <div style={{ overflow: 'hidden' }}>
-              <div
-                style={{
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  whiteSpace: 'nowrap',
-                  textOverflow: 'ellipsis',
-                  overflow: 'hidden',
-                }}
-              >
-                {user?.name || 'Loading user...'}
-              </div>
-              <div
-                style={{
-                  fontSize: '0.72rem',
-                  color: 'var(--text-muted)',
-                  whiteSpace: 'nowrap',
-                  textOverflow: 'ellipsis',
-                  overflow: 'hidden',
-                }}
-              >
-                {user?.email || 'authenticated'}
-              </div>
-            </div>
-          </div>
-        </div>
       </aside>
 
       {/* Main Content Area */}
