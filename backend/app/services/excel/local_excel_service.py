@@ -334,3 +334,45 @@ class LocalExcelService(ExcelServiceInterface):
                 return b""
             with open(self.file_path, "rb") as fp:
                 return fp.read()
+
+    def delete_referral(self, referral_id: str) -> None:
+        """Delete referral row from Referrals sheet and cleanup its history/notes in Excel"""
+        with self._lock:
+            if not os.path.exists(self.file_path):
+                return
+            wb = openpyxl.load_workbook(self.file_path)
+
+            # 1. Delete from Referrals sheet
+            if "Referrals" in wb.sheetnames:
+                ws = wb["Referrals"]
+                row_to_delete = None
+                for r in range(2, ws.max_row + 1):
+                    if str(ws.cell(row=r, column=10).value or "").strip() == str(referral_id).strip():
+                        row_to_delete = r
+                        break
+                if row_to_delete:
+                    ws.delete_rows(row_to_delete)
+
+            # 2. Clean up StatusHistory sheet
+            if "StatusHistory" in wb.sheetnames:
+                ws_h = wb["StatusHistory"]
+                rows_to_del = []
+                for r in range(2, ws_h.max_row + 1):
+                    if str(ws_h.cell(row=r, column=2).value or "").strip() == str(referral_id).strip():
+                        rows_to_del.append(r)
+                for r in reversed(rows_to_del):
+                    ws_h.delete_rows(r)
+
+            # 3. Clean up HRNotes sheet
+            if "HRNotes" in wb.sheetnames:
+                ws_n = wb["HRNotes"]
+                rows_to_del = []
+                for r in range(2, ws_n.max_row + 1):
+                    if str(ws_n.cell(row=r, column=2).value or "").strip() == str(referral_id).strip():
+                        rows_to_del.append(r)
+                for r in reversed(rows_to_del):
+                    ws_n.delete_rows(r)
+
+            wb.save(self.file_path)
+            wb.close()
+            logger.info(f"Deleted referral {referral_id} from Microsoft Excel workbook.")

@@ -227,6 +227,23 @@ export const api = {
     return handleResponse<ReferralSummary>(res);
   },
 
+  async archiveReferral(referralId: string, comment?: string): Promise<ReferralSummary> {
+    const query = comment ? `?comment=${encodeURIComponent(comment)}` : '';
+    const res = await fetch(`${API_BASE}/hr/referrals/${referralId}/archive${query}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+    });
+    return handleResponse<ReferralSummary>(res);
+  },
+
+  async deleteReferral(referralId: string): Promise<{ message: string; id: string }> {
+    const res = await fetch(`${API_BASE}/hr/referrals/${referralId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return handleResponse<{ message: string; id: string }>(res);
+  },
+
   async addHRNote(referralId: string, note: string): Promise<HRNote> {
     const res = await fetch(`${API_BASE}/hr/referrals/${referralId}/notes`, {
       method: 'POST',

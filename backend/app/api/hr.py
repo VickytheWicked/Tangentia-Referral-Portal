@@ -1,8 +1,11 @@
+import logging
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models.referral import Referral, ReferralStatus
@@ -84,6 +87,61 @@ async def api_update_status(
         current_user=hr_user,
     )
     return format_referral_summary(ref)
+
+
+@router.put("/{referral_id}/archive", response_model=ReferralSummaryResponse)
+async def api_archive_referral(
+    referral_id: str,
+    comment: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    hr_user: User = Depends(require_hr_admin),
+):
+    """
+    Archive a candidate referral record as historical documentation.
+    Can be applied from any status (including Rejected or Withdrawn).
+    """
+    ref = update_referral_status(
+        db=db,
+        referral_id=referral_id,
+        new_status=ReferralStatus.ARCHIVED.value,
+        comment=comment or f"Referral archived by {hr_user.name}.",
+        current_user=hr_user,
+    )
+    return format_referral_summary(ref)
+
+
+@router.delete("/{referral_id}", status_code=status.HTTP_200_OK)
+async def api_delete_referral(
+    referral_id: str,
+    db: Session = Depends(get_db),
+    hr_user: User = Depends(require_hr_admin),
+):
+    """
+    Permanently delete candidate referral and its audit trail, HR notes, and Excel records.
+    Restricted strictly to HR Admins.
+    """
+    ref = db.query(Referral).filter(Referral.id == referral_id).first()
+    if not ref:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found.")
+
+    ref_num = ref.referral_number
+    cand_name = ref.candidate_name
+
+    # Delete from database (cascades to status_history and hr_notes)
+    db.delete(ref)
+    db.commit()
+
+    # Delete from Microsoft Excel
+    try:
+        from app.services.excel import get_excel_service
+        get_excel_service().delete_referral(referral_id)
+    except Exception as e:
+        logger.warning(f"Failed to delete referral {referral_id} from Microsoft Excel storage: {e}")
+
+    return {
+        "message": f"Referral {ref_num} for {cand_name} has been permanently deleted.",
+        "id": referral_id,
+    }
 
 
 @router.post("/{referral_id}/notes", response_model=HRNoteResponse, status_code=status.HTTP_201_CREATED)

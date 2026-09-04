@@ -70,3 +70,10 @@ class ExcelServiceInterface(ABC):
         Retrieve raw binary bytes of the Excel workbook for download/export.
         """
         pass
+
+    @abstractmethod
+    def delete_referral(self, referral_id: str) -> None:
+        """
+        Delete candidate referral and related entries from Microsoft Excel storage.
+        """
+        pass

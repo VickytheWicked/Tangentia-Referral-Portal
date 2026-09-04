@@ -423,6 +423,13 @@ body {
 }
 .badge-withdrawn .badge-dot { background: var(--status-withdrawn); }
 
+.badge-archived {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+.badge-archived .badge-dot { background: #94a3b8; }
+
 /* Forms & Inputs */
 .form-group {
   display: flex;

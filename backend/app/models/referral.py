@@ -15,6 +15,7 @@ class ReferralStatus(str, Enum):
     HIRED = "Hired"
     REJECTED = "Rejected"
     WITHDRAWN = "Withdrawn"
+    ARCHIVED = "Archived"
 
 
 class Referral(Base):

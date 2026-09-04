@@ -40,7 +40,8 @@ async def get_referral_analytics(
     hired_count = counts.get(ReferralStatus.HIRED.value, 0)
     rejected_count = counts.get(ReferralStatus.REJECTED.value, 0)
     withdrawn_count = counts.get(ReferralStatus.WITHDRAWN.value, 0)
-    active_count = total - (hired_count + rejected_count + withdrawn_count)
+    archived_count = counts.get(ReferralStatus.ARCHIVED.value, 0)
+    active_count = max(0, total - (hired_count + rejected_count + withdrawn_count + archived_count))
 
     # Pipeline Funnel
     funnel_stages = [

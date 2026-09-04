@@ -19,6 +19,8 @@ import {
   Calendar,
   CheckCircle2,
   FileSpreadsheet,
+  Archive,
+  Trash2,
 } from 'lucide-react';
 
 interface AllReferralsPageProps {
@@ -46,6 +48,20 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
 
   // Status Change Modal
   const [statusModalRef, setStatusModalRef] = useState<ReferralSummary | null>(null);
+
+  // Delete Confirmation Modal
+  const [deletingReferral, setDeletingReferral] = useState<{ id: string; name: string; number: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  // Archive Confirmation Modal
+  const [archivingReferral, setArchivingReferral] = useState<{
+    id: string;
+    name: string;
+    number: string;
+    currentStatus: string;
+  } | null>(null);
+  const [archiveComment, setArchiveComment] = useState<string>('');
+  const [isArchiving, setIsArchiving] = useState<boolean>(false);
 
   // Excel Export State
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -105,6 +121,44 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
       await api.downloadCV(refId, filename);
     } catch (err: any) {
       alert(err.message || 'Failed to download CV');
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingReferral) return;
+    setIsDeleting(true);
+    try {
+      await api.deleteReferral(deletingReferral.id);
+      setReferrals((prev) => prev.filter((r) => r.id !== deletingReferral.id));
+      if (selectedReferral && selectedReferral.id === deletingReferral.id) {
+        setSelectedReferral(null);
+      }
+      setDeletingReferral(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete referral');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!archivingReferral) return;
+    setIsArchiving(true);
+    try {
+      const updated = await api.archiveReferral(
+        archivingReferral.id,
+        archiveComment || `Archived record (${archivingReferral.currentStatus})`
+      );
+      setReferrals((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      if (selectedReferral && selectedReferral.id === archivingReferral.id) {
+        setSelectedReferral((prev) => (prev ? { ...prev, status: updated.status } : null));
+      }
+      setArchivingReferral(null);
+      setArchiveComment('');
+    } catch (err: any) {
+      alert(err.message || 'Failed to archive referral');
+    } finally {
+      setIsArchiving(false);
     }
   };
 
@@ -190,6 +244,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
               <option value="Hired">Hired</option>
               <option value="Rejected">Rejected</option>
               <option value="Withdrawn">Withdrawn</option>
+              <option value="Archived">Archived</option>
             </select>
           </div>
 
@@ -282,7 +337,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
                       </button>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                         <button
                           className="btn btn-primary btn-sm"
                           onClick={() => openCandidateDetail(r.id)}
@@ -296,6 +351,36 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
                           title="Change Status"
                         >
                           <Edit size={14} />
+                        </button>
+                        {r.status !== 'Archived' && (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ color: '#94a3b8' }}
+                            onClick={() =>
+                              setArchivingReferral({
+                                id: r.id,
+                                name: r.candidate_name,
+                                number: r.referral_number,
+                                currentStatus: r.status,
+                              })
+                            }
+                            title="Archive Record"
+                          >
+                            <Archive size={14} />
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() =>
+                            setDeletingReferral({
+                              id: r.id,
+                              name: r.candidate_name,
+                              number: r.referral_number,
+                            })
+                          }
+                          title="Delete Referral Permanently"
+                        >
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -315,13 +400,43 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
           title={`Candidate Profile: ${selectedReferral.candidate_name}`}
           maxWidth="850px"
           footer={
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setStatusModalRef(selectedReferral)}
-              >
-                <Edit size={14} /> Change Status ({selectedReferral.status})
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setStatusModalRef(selectedReferral)}
+                >
+                  <Edit size={14} /> Change Status ({selectedReferral.status})
+                </button>
+                {selectedReferral.status !== 'Archived' && (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    style={{ color: '#94a3b8' }}
+                    onClick={() =>
+                      setArchivingReferral({
+                        id: selectedReferral.id,
+                        name: selectedReferral.candidate_name,
+                        number: selectedReferral.referral_number,
+                        currentStatus: selectedReferral.status,
+                      })
+                    }
+                  >
+                    <Archive size={14} /> Archive Record
+                  </button>
+                )}
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() =>
+                    setDeletingReferral({
+                      id: selectedReferral.id,
+                      name: selectedReferral.candidate_name,
+                      number: selectedReferral.referral_number,
+                    })
+                  }
+                >
+                  <Trash2 size={14} /> Delete Referral
+                </button>
+              </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
@@ -464,6 +579,125 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
             }
           }}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingReferral && (
+        <Modal
+          isOpen={true}
+          onClose={() => !isDeleting && setDeletingReferral(null)}
+          title="Delete Referral Permanently"
+          maxWidth="520px"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setDeletingReferral(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Permanently Delete'}
+              </button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', padding: '6px 0' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Trash2 size={22} color="#ef4444" />
+            </div>
+            <div>
+              <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px', fontSize: '1.05rem' }}>
+                Delete {deletingReferral.name}?
+              </h4>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '12px' }}>
+                Are you sure you want to permanently delete referral <strong style={{ fontFamily: 'var(--font-mono)' }}>{deletingReferral.number}</strong> for <strong>{deletingReferral.name}</strong>?
+              </p>
+              <p style={{ color: '#f87171', fontSize: '0.82rem', lineHeight: '1.4', background: 'rgba(239, 68, 68, 0.08)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                ⚠️ <strong>Warning:</strong> This will delete candidate information, all internal confidential HR notes, status history audit logs, and remove the record from Microsoft Excel. This action cannot be undone.
+              </p>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Archive Confirmation Modal */}
+      {archivingReferral && (
+        <Modal
+          isOpen={true}
+          onClose={() => !isArchiving && setArchivingReferral(null)}
+          title="Archive Candidate Referral"
+          maxWidth="520px"
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => setArchivingReferral(null)}
+                disabled={isArchiving}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleConfirmArchive}
+                disabled={isArchiving}
+              >
+                {isArchiving ? 'Archiving...' : 'Archive Record'}
+              </button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', padding: '6px 0' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: 'rgba(148, 163, 184, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Archive size={22} color="#94a3b8" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ color: 'var(--text-primary)', marginBottom: '8px', fontSize: '1.05rem' }}>
+                Archive {archivingReferral.name}
+              </h4>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: '1.5', marginBottom: '14px' }}>
+                Current Status: <strong>{archivingReferral.currentStatus}</strong>. Archiving preserves this candidate referral as an inactive historical record (even if previously rejected or withdrawn).
+              </p>
+              <div className="form-group">
+                <label className="form-label">Archive Note / Reason (Optional)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Preserving record for future talent pool matching..."
+                  value={archiveComment}
+                  onChange={(e) => setArchiveComment(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

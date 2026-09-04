@@ -8,7 +8,8 @@ export type ReferralStatusType =
   | 'Selected'
   | 'Hired'
   | 'Rejected'
-  | 'Withdrawn';
+  | 'Withdrawn'
+  | 'Archived';
 
 export interface User {
   id: string;

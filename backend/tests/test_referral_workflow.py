@@ -140,3 +140,51 @@ def test_cv_download_authorization(client, seeded_job):
     cv_hr_res = client.get(f"/api/referrals/{ref_id}/cv", headers=hr_headers)
     assert cv_hr_res.status_code == 200
     assert cv_hr_res.content == pdf_content
+
+
+def test_hr_archive_and_delete_workflow(client, seeded_job):
+    emp_headers = {"Authorization": "Bearer dev-employee-token"}
+    hr_headers = {"Authorization": "Bearer dev-hr-token"}
+
+    pdf_content = b"%PDF-1.4\n1 0 obj\n<< /Title (Candidate CV) >>\nendobj\ntrailer\n<<>>\n%%EOF"
+    submit_data = {
+        "candidate_name": "Archive Test Candidate",
+        "candidate_email": "archive.test@example.com",
+        "candidate_phone": "+14165558888",
+        "relationship": "Colleague",
+        "referral_note": "Solid developer candidate.",
+        "position_id": seeded_job.id,
+        "candidate_consent": True,
+    }
+    files = {"file": ("archive_candidate_cv.pdf", io.BytesIO(pdf_content), "application/pdf")}
+
+    res = client.post("/api/referrals", headers=emp_headers, data=submit_data, files=files)
+    assert res.status_code == 201
+    ref_id = res.json()["id"]
+
+    # 1. Update to Rejected first
+    reject_res = client.put(
+        f"/api/hr/referrals/{ref_id}/status",
+        headers=hr_headers,
+        json={"status": ReferralStatus.REJECTED.value, "comment": "Not a fit right now."},
+    )
+    assert reject_res.status_code == 200
+    assert reject_res.json()["status"] == ReferralStatus.REJECTED.value
+
+    # 2. Archive the referral even though it is Rejected
+    archive_res = client.put(f"/api/hr/referrals/{ref_id}/archive?comment=Archived+rejected+record", headers=hr_headers)
+    assert archive_res.status_code == 200
+    assert archive_res.json()["status"] == ReferralStatus.ARCHIVED.value
+
+    # 3. Employee should NOT be able to delete referral (forbidden)
+    emp_delete_res = client.delete(f"/api/hr/referrals/{ref_id}", headers=emp_headers)
+    assert emp_delete_res.status_code == 403
+
+    # 4. HR Admin permanently deletes the referral
+    hr_delete_res = client.delete(f"/api/hr/referrals/{ref_id}", headers=hr_headers)
+    assert hr_delete_res.status_code == 200
+    assert "permanently deleted" in hr_delete_res.json()["message"]
+
+    # 5. Verify referral is gone
+    get_res = client.get(f"/api/referrals/{ref_id}", headers=hr_headers)
+    assert get_res.status_code == 404

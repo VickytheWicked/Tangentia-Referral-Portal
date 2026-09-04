@@ -22,6 +22,7 @@ const ALL_STATUSES: ReferralStatusType[] = [
   'Hired',
   'Rejected',
   'Withdrawn',
+  'Archived',
 ];
 
 export const StatusChangeModal: React.FC<StatusChangeModalProps> = ({

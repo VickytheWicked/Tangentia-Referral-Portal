@@ -24,6 +24,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
         return 'badge-rejected';
       case 'Withdrawn':
         return 'badge-withdrawn';
+      case 'Archived':
+        return 'badge-archived';
       default:
         return 'badge-submitted';
     }
