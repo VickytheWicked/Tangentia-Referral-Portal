@@ -1,256 +1,330 @@
 # Tangentia Employee Referral Portal
 
-A production-ready internal **Employee Referral Portal** built for enterprise security, seamless corporate Microsoft Entra ID (Azure AD) authentication, and automated CV document archival into **Microsoft SharePoint Online** document libraries via the **Microsoft Graph API**.
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB.svg?style=flat&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-3178C6.svg?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-8.2+-646CFF.svg?style=flat&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Microsoft Graph](https://img.shields.io/badge/Microsoft%20Graph-API-0078D4.svg?style=flat&logo=microsoft&logoColor=white)](https://learn.microsoft.com/en-us/graph/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
+
+A production-ready internal **Employee Referral Portal** engineered for enterprise security, seamless corporate Microsoft Entra ID (Azure AD) authentication, and automated candidate CV document archival into **Microsoft SharePoint Online** document libraries via the **Microsoft Graph API**.
 
 ---
 
-## 1. System Architecture
+## 📑 Table of Contents
+
+- [System Architecture](#-system-architecture)
+- [Key Features](#-key-features)
+- [Tech Stack](#-tech-stack)
+- [Repository Structure](#-repository-structure)
+- [Quick Start (Local Development)](#-quick-start-local-development)
+- [Configuration Guide (`.env`)](#-configuration-guide-env)
+- [Microsoft Entra ID & SharePoint Setup](#-microsoft-entra-id--sharepoint-setup)
+- [API Reference](#-api-reference)
+- [Production Deployment (Docker)](#-production-deployment-docker)
+- [Security & Compliance Highlights](#-security--compliance-highlights)
+- [Contributing & Maintainers](#-maintainer)
+
+---
+
+## 🏛 System Architecture
 
 ```text
-┌────────────────────────────────────────────────────────┐
-│               Frontend (React + TypeScript)            │
-│         Single Sign-On via Microsoft Entra ID          │
-└──────────────────────────┬─────────────────────────────┘
-                           │ HTTPS / Authorization: Bearer <Token>
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│             Backend API (FastAPI + Python)             │
-│  - Token Verification & Identity Synchronization       │
-│  - Role-Based Access Control (Employee vs. HR Admin)   │
-│  - Duplicate Candidate Detection Engine                │
-│  - Atomic Transactions & SharePoint Rollback Manager   │
-└──────────────┬───────────────────────────┬─────────────┘
-               │                           │
-  Microsoft Graph API                      │ SQLAlchemy 2.0 ORM
-  (OAuth2 Client Credentials)              │
-               ▼                           ▼
-┌──────────────────────────────┐ ┌─────────────────────────────┐
-│   Microsoft SharePoint       │ │     PostgreSQL Database     │
-│   Document Library           │ │  - Users & Security Roles   │
-│   (Referral-CVs/{YEAR}/...)  │ │  - Active Job Openings      │
-│   *Source of Truth for CVs*  │ │  - Candidate Referrals      │
-│                              │ │  - Status History Audit Log │
-│                              │ │  - Confidential HR Notes    │
-└──────────────────────────────┘ └─────────────────────────────┘
+                           ┌─────────────────────────────────────────┐
+                           │      Frontend (React 19 + TypeScript)   │
+                           │   - Vite SPA + Enterprise Dark UI       │
+                           │   - MSAL Microsoft Entra ID SSO         │
+                           └────────────────────┬────────────────────┘
+                                                │ HTTPS / Bearer JWT
+                                                ▼
+                           ┌─────────────────────────────────────────┐
+                           │      Backend API (FastAPI + Python)     │
+                           │   - Entra ID JWKS Token Verifier        │
+                           │   - Role-Based Access Control (RBAC)    │
+                           │   - Duplicate Candidate Engine          │
+                           │   - Atomic SharePoint Rollback Manager  │
+                           └──────────┬───────────────────┬──────────┘
+                                      │                   │
+             Microsoft Graph API      │                   │ SQLAlchemy 2.0 ORM
+             (OAuth2 Client Creds)    │                   │
+                                      ▼                   ▼
+                 ┌───────────────────────────┐   ┌───────────────────────────┐
+                 │  SharePoint Online Drive  │   │    PostgreSQL / SQLite    │
+                 │  - Referral-CVs/{YEAR}/   │   │  - Users & Permissions    │
+                 │  - Zero DB BLOB Storage   │   │  - Job Openings Reqs      │
+                 │  - Secure CV Proxy Stream │   │  - Referrals & Audit Logs │
+                 │                           │   │  - Confidential HR Notes  │
+                 └───────────────────────────┘   └───────────────────────────┘
 ```
 
 ---
 
-## 2. Key Features
+## ✨ Key Features
 
-- **Microsoft Entra ID (Azure AD) Authentication:**
-  - Authenticates users with corporate Microsoft accounts.
-  - Zero custom passwords stored or managed.
-  - User identity (name, email, entra_user_id) validated and synchronized directly from verified cryptographic JWT tokens.
-- **Microsoft SharePoint Document Library CV Storage:**
-  - CVs are **never** stored in PostgreSQL binary columns or arbitrary local disks.
-  - Resumes are streamed through the backend and uploaded directly to Microsoft SharePoint Online via Microsoft Graph API.
-  - Automated directory organization: `Referral-CVs/{YEAR}/REF-{YEAR}-{NUMBER}_{Candidate}_{Position}.pdf`.
-  - Transaction safety: If PostgreSQL commit fails, the uploaded SharePoint file is immediately rolled back to prevent orphaned storage.
-- **Role-Based Access Control (RBAC):**
-  - **Employee:**
-    - Submit referrals with PDF / DOCX resumes.
-    - Real-time duplicate candidate detection warning modal.
-    - View their own submitted referrals and timeline status.
-    - Withdraw submitted referrals before review.
-    - Strictly forbidden from viewing other employees' referrals, HR notes, or admin tools.
-  - **HR Admin:**
-    - Full candidate referral data grid with advanced filtering (status, department, position, date, search).
-    - One-click secure CV download streamed through the backend.
-    - Change referral status (`Submitted` → `Under Review` → `Shortlisted` → `Interview` → `Selected` → `Hired` / `Rejected`).
-    - Confidential Internal HR Notes thread (completely hidden from employees).
-    - Manage active/archived corporate job requisitions.
-    - Visual hiring funnel analytics, department breakdown, and top referrers leaderboard.
-- **Duplicate Candidate Detection:**
-  - Multi-attribute matching (candidate email, normalized phone, candidate name + target position).
-  - Pre-submission alerts showing matching referral numbers, previous status, and referrer details.
-- **AI-Readiness Layer:**
-  - Decoupled `AIServiceInterface` for future integration with Azure OpenAI or Anthropic (resume parsing, job fit scoring, candidate summaries).
+### 👤 Employee Experience
+- **Instant Dashboard Landing**: Direct zero-friction access to metrics (Total, In Review, Interviewing, Hired) and recent submissions.
+- **Submit Candidate Referrals**: Multi-field submission including target requisition, experience, candidate contact, relationship, and recommendation note.
+- **Drag-and-Drop CV Uploader**: Validates `.pdf` and `.docx` files with client-side & server-side magic-byte inspection and 10MB size capping.
+- **Real-Time Duplicate Warning Modal**: Instant pre-submission alerts matching candidate email, normalized phone, or candidate name + target position.
+- **Referral Portfolio (`My Referrals`)**: Filterable data table with candidate status badges, secure CV streaming download, and themed **Referral Withdrawal Modal** (with optional withdrawal rationale).
+
+### 🛡️ HR Administrator Hub
+- **Executive Hiring Pipeline Overview**: Real-time conversion funnel metrics and status breakdowns.
+- **Enterprise Candidate Database**: Multi-dimensional filtering by status, department, position, search query, and submission date.
+- **Candidate Profile Reviewer**: Full candidate dossier, direct SharePoint CV download, status progression manager (`Submitted` → `Under Review` → `Shortlisted` → `Interview` → `Selected` → `Hired` / `Rejected`), and complete status transition audit timeline.
+- **Confidential Internal HR Notes**: Private candidate evaluation and recruiter notes thread, completely isolated and hidden from regular employees.
+- **Requisition Manager**: Create, toggle, and manage active and archived corporate job positions.
+
+### ☁️ Cloud & Enterprise Integrations
+- **Microsoft Entra ID (Azure AD)**: Server-side cryptographic token verification using Entra ID public keys (`/discovery/v2.0/keys`), client audience, and issuer validation.
+- **Microsoft SharePoint Online**: Resumes are uploaded directly to your corporate document library via Microsoft Graph API with year partitioning (`Referral-CVs/{YEAR}/{filename}`).
+- **Zero-Orphan Transaction Rollback**: If a database commit fails after a CV upload, the uploaded file in SharePoint is automatically removed via `delete_cv` to eliminate orphaned files.
+- **Zero-Trust Proxied Streaming**: Microsoft Graph access tokens and SharePoint URLs are never exposed to client browsers; CV downloads are securely proxied through authenticated backend streams.
+- **AI-Ready Abstraction**: Pre-built `AIServiceInterface` prepared for zero-downtime integration with Azure OpenAI or Anthropic for resume parsing and candidate-job matching.
 
 ---
 
-## 3. Microsoft Entra ID App Registration Guide
+## 🛠 Tech Stack
 
-### Step 1: Register the Application in Azure Portal
-1. Navigate to **Microsoft Entra admin center** (or Azure Portal > Microsoft Entra ID).
-2. Go to **App registrations** > **New registration**.
-3. Name: `Tangentia Employee Referral Portal`.
-4. Supported account types: `Accounts in this organizational directory only (Single tenant)`.
-5. Redirect URI:
-   - Platform: `Single-page application (SPA)`
-   - URI: `http://localhost:3000` (and your production domain).
-6. Click **Register**.
-
-### Step 2: Note Core Identifiers
-From the Overview tab, record:
-- **Application (client) ID**: `AZURE_CLIENT_ID`
-- **Directory (tenant) ID**: `AZURE_TENANT_ID`
-
-### Step 3: Create Client Secret
-1. Go to **Certificates & secrets** > **Client secrets** > **New client secret**.
-2. Add a description (e.g. `Referral Portal Backend`) and select an expiration.
-3. Copy the **Value** immediately: `AZURE_CLIENT_SECRET`.
-
-### Step 4: Configure Microsoft Graph API Permissions
-1. Go to **API permissions** > **Add a permission** > **Microsoft Graph**.
-2. Select **Application permissions** (required for backend server-to-server SharePoint operations).
-3. Add the following permissions:
-   - `Sites.ReadWrite.All` or `Files.ReadWrite.All` (for SharePoint document library uploads and downloads).
-   - `User.Read.All` (optional, for directory lookups).
-4. Click **Grant admin consent for [Your Organization]** (Status must display green checkmarks).
-
-### Step 5: Define App Roles or Security Groups (for HR Admins)
-1. Go to **App roles** > **Create app role**.
-   - Display name: `HR Administrator`
-   - Allowed member types: `Users/Groups`
-   - Value: `HR_Admin`
-   - Description: `Full administrative access to referral candidate pipeline and HR notes`
-2. Assign your HR team members or security group to this role under **Enterprise applications**.
-3. (Optional) Alternatively, supply `AZURE_HR_GROUP_ID` with the Object ID of your HR security group.
+| Layer | Technologies |
+| :--- | :--- |
+| **Backend** | Python 3.11+, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2, MSAL Python, PyJWT, HTTPX |
+| **Frontend** | React 19, TypeScript, Vite 8, Lucide Icons, Vanilla CSS Design System, MSAL React |
+| **Storage & DB**| SQLite (Development) / PostgreSQL 16 (Production), Microsoft SharePoint Online Document Libraries |
+| **Infrastructure** | Docker, Docker Compose, Nginx |
 
 ---
 
-## 4. Microsoft SharePoint Document Library Configuration
+## 📂 Repository Structure
 
-1. Create or select a dedicated SharePoint site (e.g. `https://tangentia.sharepoint.com/sites/HumanResources`).
-2. Inside the site, create a Document Library named `Referral-CVs`.
-3. To obtain the `SHAREPOINT_SITE_ID` and `SHAREPOINT_DRIVE_ID`:
-   - Run a Graph Explorer query:
-     ```http
-     GET https://graph.microsoft.com/v1.0/sites/tangentia.sharepoint.com:/sites/HumanResources
-     ```
-     The returned `id` is your `SHAREPOINT_SITE_ID` (format: `tenant.sharepoint.com,site-guid,web-guid`).
-   - Query drives for that site:
-     ```http
-     GET https://graph.microsoft.com/v1.0/sites/{site_id}/drives
-     ```
-     Locate the drive with name `Referral-CVs` and record its `id` as `SHAREPOINT_DRIVE_ID`.
+```text
+Tangentia-Referral-Portal/
+├── backend/
+│   ├── alembic_migrations/         # Database migration revisions
+│   ├── app/
+│   │   ├── api/                    # FastAPI routes (auth, jobs, referrals, hr, analytics)
+│   │   ├── models/                 # SQLAlchemy 2.0 ORM database models
+│   │   ├── schemas/                # Pydantic v2 request/response schemas
+│   │   ├── services/
+│   │   │   ├── sharepoint/         # Graph API client & local mock storage adapter
+│   │   │   ├── auth_service.py     # Microsoft Entra ID JWT verification engine
+│   │   │   ├── referral_service.py # Business logic & duplicate detection engine
+│   │   │   └── ai_service.py       # Extensible LLM / AI resume parsing interface
+│   │   ├── utils/                  # CV file validation & filename sanitization
+│   │   ├── config.py               # Pydantic settings management
+│   │   ├── database.py             # Database engine & session maker
+│   │   └── main.py                 # FastAPI application entry point
+│   ├── storage/mock_sharepoint/    # Local offline SharePoint mock document library
+│   ├── tests/                      # Pytest integration & role authorization test suite
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── seed.py                     # Database seeder with sample jobs & candidates
+├── frontend/
+│   ├── src/
+│   │   ├── auth/                   # MSAL config & React AuthContext
+│   │   ├── components/             # Reusable UI components (Modal, StatusBadge, WithdrawModal, Timeline)
+│   │   ├── pages/
+│   │   │   ├── employee/           # Dashboard, Submit Referral, My Referrals
+│   │   │   └── hr/                 # HR Dashboard, Candidate Database, Job Openings, Analytics
+│   │   ├── services/api.ts         # Centralized API service & dev token injector
+│   │   ├── types/                  # TypeScript data interfaces
+│   │   └── index.css               # Curated enterprise dark theme design system
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── package.json
+├── docker-compose.yml              # Production multi-container composition
+└── README.md
+```
 
 ---
 
-## 5. Local Development Setup
+## 🚀 Quick Start (Local Development)
 
-The application features an isolated **Dev Mode** (`DEV_MODE=True` and `SHAREPOINT_STORAGE_TYPE=mock`) allowing developers to test the full application immediately without requiring live Azure tenant credentials or a local PostgreSQL server.
+The repository features an isolated **Development Mode** (`DEV_MODE=True` and `SHAREPOINT_STORAGE_TYPE=mock`) allowing instantaneous local execution without needing live Azure tenant credentials or a local PostgreSQL server.
 
 ### Prerequisites
 - **Python 3.11+**
-- **Node.js 20+** & **npm 10+**
+- **Node.js 20+** and **npm 10+**
 
-### Backend Setup
-
+### 1. Clone & Configure
 ```bash
-# 1. Navigate to backend directory
+git clone https://github.com/VickytheWicked/Tangentia-Referral-Portal.git
+cd Tangentia-Referral-Portal
+
+# Copy environment configuration templates
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+### 2. Start the Backend API
+```bash
 cd backend
 
-# 2. Create and activate virtual environment
+# Create & activate virtual environment
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# 3. Install dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# 4. Configure environment
-cp .env.example .env
-# Edit .env as needed. By default, it uses SQLite and Mock SharePoint for zero-config local testing.
-
-# 5. Seed sample job openings and initial referrals
+# Seed sample jobs and initial test referrals
 python seed.py
 
-# 6. Run automated test suite
-PYTHONPATH=. pytest tests/ -v
-
-# 7. Start FastAPI development server
+# Run the backend API server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-API Documentation will be accessible at: `http://localhost:8000/api/docs`
+- **Backend API**: [http://localhost:8000](http://localhost:8000)
+- **Interactive Swagger Docs**: [http://localhost:8000/api/docs](http://localhost:8000/api/docs)
 
-### Frontend Setup
-
+### 3. Start the Frontend Web Portal
+Open a **new terminal tab**:
 ```bash
-# 1. Navigate to frontend directory (in a new terminal)
 cd frontend
 
-# 2. Install dependencies
+# Install dependencies
 npm install
 
-# 3. Configure environment
-cp .env.example .env
-
-# 4. Start Vite dev server
+# Start Vite dev server
 npm run dev
 ```
-The Web Portal will be live at: `http://localhost:5173`
+- **Web Portal**: [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 6. Testing & Verifying User Workflows
+## ⚙️ Configuration Guide (`.env`)
 
-### Employee Workflow:
-1. Open `http://localhost:5173`.
-2. Click **"Employee View"** (or login as Sarah Jenkins).
-3. Notice the **Employee Dashboard** showing metrics and recent submissions.
-4. Click **"Submit Referral"**:
-   - Fill in candidate details (e.g. `Aniket Verma`, `aniket@example.com`, `+14165550188`).
-   - Select the target job opening and your relationship to the candidate.
-   - Upload a sample PDF resume (`.pdf` or `.docx`).
-   - Check the mandatory **Candidate Consent Confirmation**.
-   - Click **"Submit Referral & Upload CV"**.
-   - Notice the generated referral ID (`REF-2026-00000X`) and confirmation screen.
-5. In **"My Referrals"**, view the submitted referral and click **"Download"** to test secure CV streaming.
+### `backend/.env`
+```env
+# Application Settings
+PROJECT_NAME="Tangentia Employee Referral Portal"
+ENVIRONMENT=development
+DEBUG=True
+DEV_MODE=True  # Set to False to enforce live Microsoft Entra ID JWT verification
 
-### Duplicate Detection Verification:
-- Try submitting a referral with the same email (`aniket@example.com`).
-- The portal immediately displays the **Duplicate Candidate Alert Dialog** with previous referral number, status, and referrer information before allowing you to proceed.
+# Database (SQLite for dev, PostgreSQL for production)
+DATABASE_URL=sqlite:///./referrals.db
+# DATABASE_URL=postgresql://postgres:password@localhost:5432/referral_portal
 
-### HR Administrator Workflow:
-1. Click **"HR Admin View"** in the top navigation bar.
-2. The UI instantly transitions to the **HR & Talent Acquisition Hub**.
-3. Go to **"All Referrals"**:
-   - Search by candidate name, filter by department or status.
-   - Click **"Profile"** on any candidate to open the comprehensive review drawer.
-   - Click **"Change Status"**: Select `Interview` and enter an interview scheduling note.
-   - Under **"Confidential Internal HR Notes"**, enter a private note (e.g. `Strong system design performance. Advancing to director round.`).
-4. Switch back to **"Employee View"**:
-   - Observe that the candidate status reflects `Interview`, but the **HR Notes remain completely hidden** from the employee!
+# Microsoft Entra ID (Azure AD)
+AZURE_TENANT_ID=your-azure-tenant-id-or-common
+AZURE_CLIENT_ID=your-azure-client-id
+AZURE_CLIENT_SECRET=your-azure-client-secret
+AZURE_HR_GROUP_ID=your-entra-security-group-id-for-hr-admins
 
----
+# Microsoft SharePoint Online (via Graph API)
+# Set to 'graph' for real SharePoint; 'mock' for local offline storage
+SHAREPOINT_STORAGE_TYPE=mock
+SHAREPOINT_SITE_ID=yourtenant.sharepoint.com,site-guid,web-guid
+SHAREPOINT_DRIVE_ID=b!your-drive-id-from-graph
+SHAREPOINT_ROOT_FOLDER=Referral-CVs
+```
 
-## 7. Production Deployment (Docker Orchestration)
+### `frontend/.env`
+```env
+VITE_API_BASE_URL=http://localhost:8000/api
+VITE_AZURE_CLIENT_ID=your-azure-client-id
+VITE_AZURE_TENANT_ID=your-azure-tenant-id
+```
 
-To deploy the portal to production with a real PostgreSQL database:
-
-1. Create a root `.env` file containing your production secrets:
-   ```env
-   AZURE_TENANT_ID=your-azure-tenant-id
-   AZURE_CLIENT_ID=your-azure-client-id
-   AZURE_CLIENT_SECRET=your-azure-client-secret
-   AZURE_HR_GROUP_ID=your-entra-security-group-id-for-hr-admins
-   SHAREPOINT_STORAGE_TYPE=graph
-   SHAREPOINT_SITE_ID=your-tenant.sharepoint.com,site-id,web-id
-   SHAREPOINT_DRIVE_ID=your-sharepoint-drive-id
-   SHAREPOINT_ROOT_FOLDER=Referral-CVs
-   ```
-
-2. Launch all services via Docker Compose:
-   ```bash
-   docker-compose up -d --build
-   ```
-
-3. Run database migrations:
-   ```bash
-   docker-compose exec backend alembic upgrade head
-   ```
-
-Services:
-- **Web Portal:** `http://your-server-ip:3000` (Nginx + React SPA)
-- **API Server:** `http://your-server-ip:8000` (FastAPI)
-- **Database:** PostgreSQL on port 5432
+> [!TIP]
+> **Can I use real SharePoint in Dev Mode?**
+> **Yes!** You can set `SHAREPOINT_STORAGE_TYPE=graph` while keeping `DEV_MODE=True`. This allows you to test real SharePoint uploads/downloads without requiring users to log in via Microsoft Entra ID SSO. Furthermore, **no paid Azure subscription** is required—SharePoint storage uses your organization's Microsoft 365 license.
 
 ---
 
-## 8. Security Highlights
+## 🔐 Microsoft Entra ID & SharePoint Setup
 
-- **Server-Side Token Verification:** All incoming requests validate Microsoft Entra ID public signing keys (JWKS) and client audiences. Email addresses from frontend headers are never trusted.
-- **Strict Role-Based Authorization:** HR routes (`/api/hr/*`) enforce `require_hr_admin`. Regular employees can only query their own referrals (`referred_by_user_id == current_user.id`).
-- **CV Stream Proxying:** Microsoft Graph tokens and SharePoint access secrets are never exposed to client browsers. CV downloads are securely proxied through authenticated backend streaming.
-- **File Validation & Anti-Traversal:** All CV uploads are validated using file magic byte signatures (`%PDF-`, `PK\x03\x04`), max file size enforcement (10MB), and sanitized filenames.
+### 1. Register Entra ID Application
+1. Navigate to the **[Microsoft Entra Admin Center](https://entra.microsoft.com)** > **App registrations** > **New registration**.
+2. Name: `Tangentia Employee Referral Portal`.
+3. Supported account types: `Accounts in this organizational directory only (Single tenant)`.
+4. Redirect URI: Platform `Single-page application (SPA)`, URI: `http://localhost:5173` (and production domain).
+5. Under **Certificates & secrets**, create a new **Client secret** and copy its value to `AZURE_CLIENT_SECRET`.
+
+### 2. Configure Microsoft Graph API Permissions
+1. Go to **API permissions** > **Add a permission** > **Microsoft Graph** > **Application permissions**.
+2. Add:
+   - `Sites.ReadWrite.All` or `Files.ReadWrite.All` (for SharePoint document uploads/downloads).
+   - `User.Read.All` (optional, for directory sync).
+3. Click **"Grant admin consent for [Your Organization]"**.
+
+### 3. Retrieve SharePoint Site ID & Drive ID
+1. Create a Document Library named `Referral-CVs` in your target SharePoint site.
+2. In [Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer), run:
+   ```http
+   GET https://graph.microsoft.com/v1.0/sites/{yourtenant}.sharepoint.com:/sites/{site-name}
+   ```
+   The returned `id` is your `SHAREPOINT_SITE_ID`.
+3. Query drives for that site:
+   ```http
+   GET https://graph.microsoft.com/v1.0/sites/{site_id}/drives
+   ```
+   Locate `Referral-CVs` and copy its `id` to `SHAREPOINT_DRIVE_ID`.
+
+---
+
+## 📡 API Reference
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/auth/config` | Public | Returns Entra ID public client parameters |
+| `GET` | `/api/auth/me` | Authenticated | Current user profile and role permissions |
+| `GET` | `/api/jobs` | Authenticated | List corporate job openings (`?include_inactive=bool`) |
+| `POST`| `/api/jobs` | HR Admin | Create a new job requisition |
+| `PUT` | `/api/jobs/{id}` | HR Admin | Update job requisition details or toggle active status |
+| `POST`| `/api/referrals/check-duplicate` | Employee | Pre-submission duplicate candidate detection |
+| `POST`| `/api/referrals` | Employee | Submit candidate referral with multipart CV document |
+| `GET` | `/api/referrals` | Employee | List current employee's submitted referrals |
+| `GET` | `/api/referrals/{id}` | Employee / HR | Retrieve candidate referral details |
+| `GET` | `/api/referrals/{id}/cv` | Employee / HR | Authenticated proxy download of candidate CV |
+| `PUT` | `/api/referrals/{id}/withdraw` | Referrer | Withdraw candidate referral from active review |
+| `GET` | `/api/hr/referrals` | HR Admin | Full candidate referral database with filters |
+| `PUT` | `/api/hr/referrals/{id}/status` | HR Admin | Update candidate referral pipeline status |
+| `POST`| `/api/hr/referrals/{id}/notes` | HR Admin | Add confidential internal HR evaluation note |
+| `GET` | `/api/hr/analytics` | HR Admin | Conversion funnel, department metrics, top referrers |
+
+---
+
+## 🐳 Production Deployment (Docker)
+
+To deploy the entire production stack (FastAPI backend + PostgreSQL 16 database + Nginx frontend SPA) using Docker Compose:
+
+```bash
+# 1. Start all containers
+docker-compose up -d --build
+
+# 2. Apply database migrations
+docker-compose exec backend alembic upgrade head
+```
+
+- **Web Portal**: `http://<your-server-ip>:3000`
+- **Backend API**: `http://<your-server-ip>:8000`
+- **PostgreSQL**: Port `5432`
+
+---
+
+## 🛡️ Security & Compliance Highlights
+
+- **Server-Side Signature Verification**: Tokens are cryptographically validated against Microsoft JWKS public keys. Client-supplied identity headers are never trusted in production.
+- **Strict Role Boundaries**: HR routes (`/api/hr/*`) enforce `require_hr_admin`. Employees are strictly restricted to their own submitted referrals (`referred_by_user_id == current_user.id`).
+- **Zero CV Data Leaks**: Internal SharePoint URLs and Graph access tokens are never exposed to client browsers. All downloads are proxied through authenticated backend streams.
+- **File Validation & Anti-Traversal**: Resumes are checked for valid PDF/DOCX magic bytes (`%PDF-`, `PK\x03\x04`), 10MB limits, and strict filename sanitization to eliminate path-traversal attacks.
+- **Consent Tracking**: Mandatory explicit candidate consent confirmation stored on every referral record for GDPR/compliance.
+
+---
+
+## 🧪 Running Automated Tests
+
+Run the comprehensive pytest test suite (100% passing):
+
+```bash
+cd backend
+PYTHONPATH=. .venv/bin/pytest tests/ -v
+```
+
+---
+
+## 👨‍💻 Maintainer
+
+Created and maintained by **[VickytheWicked](https://github.com/VickytheWicked)** (`rupeshvansh84@gmail.com`).
