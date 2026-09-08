@@ -1,4 +1,5 @@
 import os
+import json
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
@@ -63,6 +64,19 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
     ]
+    CORS_ORIGINS_EXTRA: str = Field(default="", description="Comma-separated extra CORS origins for production (appended to CORS_ORIGINS)")
+
+    @property
+    def all_cors_origins(self) -> List[str]:
+        """Merged CORS origins: defaults + extra production origins from env."""
+        extra = []
+        if self.CORS_ORIGINS_EXTRA:
+            raw = self.CORS_ORIGINS_EXTRA.strip()
+            if raw.startswith("["):
+                extra = json.loads(raw)
+            else:
+                extra = [o.strip() for o in raw.split(",") if o.strip()]
+        return list(set(self.CORS_ORIGINS + extra))
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore")
 

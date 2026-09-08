@@ -31,3 +31,14 @@ class JobPositionResponse(JobPositionBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SyncCatsResponse(BaseModel):
+    success: bool
+    message: str
+    total_scraped: int
+    created_count: int
+    updated_count: int
+    deactivated_count: int
+    jobs: list[JobPositionResponse]
+

@@ -8,6 +8,7 @@ import {
   DuplicateCheckResponse,
   AnalyticsResponse,
   UserRole,
+  SyncCatsResponse,
 } from '../types';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -103,6 +104,21 @@ export const api = {
       body: JSON.stringify(data),
     });
     return handleResponse<JobPosition>(res);
+  },
+
+  async syncCatsJobs(deactivateMissing: boolean = false): Promise<SyncCatsResponse> {
+    const res = await fetch(`${API_BASE}/jobs/sync-cats?deactivate_missing=${deactivateMissing}`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return handleResponse<SyncCatsResponse>(res);
+  },
+
+  async previewCatsJobs(): Promise<{ total_found: number; jobs: any[] }> {
+    const res = await fetch(`${API_BASE}/jobs/sync-cats/preview`, {
+      headers: getHeaders(),
+    });
+    return handleResponse<{ total_found: number; jobs: any[] }>(res);
   },
 
   // Duplicate Check

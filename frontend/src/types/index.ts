@@ -32,6 +32,17 @@ export interface JobPosition {
   created_at: string;
 }
 
+export interface SyncCatsResponse {
+  success: boolean;
+  message: string;
+  total_scraped: number;
+  created_count: number;
+  updated_count: number;
+  deactivated_count: number;
+  jobs: JobPosition[];
+}
+
+
 export interface StatusHistory {
   id: string;
   referral_id: string;

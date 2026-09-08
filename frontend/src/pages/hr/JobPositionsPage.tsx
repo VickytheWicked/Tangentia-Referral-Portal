@@ -11,12 +11,16 @@ import {
   CheckCircle2,
   XCircle,
   Building,
+  RefreshCw,
+  ExternalLink,
 } from 'lucide-react';
 
 export const JobPositionsPage: React.FC = () => {
   const [positions, setPositions] = useState<JobPosition[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [includeInactive, setIncludeInactive] = useState<boolean>(true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -47,6 +51,27 @@ export const JobPositionsPage: React.FC = () => {
   useEffect(() => {
     fetchJobs();
   }, [includeInactive]);
+
+  const handleSyncCats = async () => {
+    setIsSyncing(true);
+    setSyncFeedback(null);
+    try {
+      const res = await api.syncCatsJobs(false);
+      setSyncFeedback({
+        type: 'success',
+        message: `Successfully synchronized ${res.total_scraped} openings from Tangentia CATS Careers! (${res.created_count} added, ${res.updated_count} updated)`,
+      });
+      await fetchJobs();
+      setTimeout(() => setSyncFeedback(null), 8000);
+    } catch (err: any) {
+      setSyncFeedback({
+        type: 'error',
+        message: err.message || 'Failed to synchronize openings from Tangentia CATS Careers.',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const openCreateModal = () => {
     setEditingJob(null);
@@ -138,11 +163,47 @@ export const JobPositionsPage: React.FC = () => {
               Show archived positions
             </label>
 
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleSyncCats}
+              disabled={isSyncing}
+              title="Scrape and synchronize live open requisitions from Tangentia CATS Careers"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <RefreshCw size={15} className={isSyncing ? 'spin' : ''} />
+              {isSyncing ? 'Syncing CATS...' : 'Sync CATS ATS'}
+            </button>
+
             <button className="btn btn-primary btn-sm" onClick={openCreateModal}>
               <Plus size={16} /> Add New Opening
             </button>
           </div>
         </div>
+
+        {syncFeedback && (
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: '8px',
+              marginBottom: '20px',
+              fontSize: '0.86rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: syncFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+              color: syncFeedback.type === 'success' ? '#34d399' : '#f87171',
+              border: `1px solid ${syncFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            }}
+          >
+            <span>{syncFeedback.message}</span>
+            <button
+              onClick={() => setSyncFeedback(null)}
+              style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', padding: '2px 6px', fontSize: '0.9rem' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {isLoading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -150,7 +211,7 @@ export const JobPositionsPage: React.FC = () => {
           </div>
         ) : positions.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            No job openings found. Click "Add New Opening" to post a requisition.
+            No job openings found. Click "Add New Opening" or "Sync CATS ATS" to load requisitions.
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '18px' }}>
@@ -171,17 +232,35 @@ export const JobPositionsPage: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
                   <div>
-                    <span
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#60a5fa',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      {job.department}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          color: '#60a5fa',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        {job.department}
+                      </span>
+                      {job.id.startsWith('cats-') && (
+                        <span
+                          style={{
+                            fontSize: '0.66rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: 'rgba(59, 130, 246, 0.15)',
+                            color: '#93c5fd',
+                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                          }}
+                          title="Imported from Tangentia CATS Careers ATS"
+                        >
+                          CATS ATS
+                        </span>
+                      )}
+                    </div>
                     <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
                       {job.title}
                     </h4>
@@ -202,7 +281,20 @@ export const JobPositionsPage: React.FC = () => {
                   </span>
                 </div>
 
-                <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5, flex: 1 }}>
+                <p
+                  style={{
+                    fontSize: '0.84rem',
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.5,
+                    flex: 1,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                  title={job.description}
+                >
                   {job.description}
                 </p>
 
@@ -321,12 +413,12 @@ export const JobPositionsPage: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Role Description <span className="required">*</span></label>
+              <label className="form-label">Role Description (1–2 lines) <span className="required">*</span></label>
               <textarea
                 required
                 className="form-textarea"
-                rows={4}
-                placeholder="Key technical qualifications, responsibilities, and expected expertise..."
+                rows={2}
+                placeholder="Brief 1-2 line summary of role qualifications and core responsibilities..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />

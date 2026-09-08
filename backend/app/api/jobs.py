@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -5,8 +6,10 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.job_position import JobPosition
 from app.models.user import User
-from app.schemas.job_position import JobPositionCreate, JobPositionUpdate, JobPositionResponse
+from app.schemas.job_position import JobPositionCreate, JobPositionUpdate, JobPositionResponse, SyncCatsResponse
 from app.api.deps import get_current_user, require_hr_admin
+
+logger = logging.getLogger("referral_portal.jobs")
 
 router = APIRouter(prefix="/jobs", tags=["Job Openings"])
 
@@ -26,6 +29,51 @@ async def list_job_positions(
         query = query.filter(JobPosition.is_active == True)
     
     return query.order_by(JobPosition.created_at.desc()).all()
+
+
+@router.post("/sync-cats", response_model=SyncCatsResponse)
+async def sync_cats_jobs(
+    deactivate_missing: bool = False,
+    db: Session = Depends(get_db),
+    hr_user: User = Depends(require_hr_admin),
+):
+    """
+    Scrape and synchronize job openings from the Tangentia CATS Careers portal (HR Admin only).
+    """
+    from app.services.cats_scraper import sync_cats_jobs_with_db
+
+    try:
+        result = sync_cats_jobs_with_db(db, deactivate_missing=deactivate_missing)
+        return result
+    except Exception as e:
+        logger.error(f"CATS sync failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to synchronize jobs from Tangentia CATS portal: {str(e)}",
+        )
+
+
+@router.get("/sync-cats/preview")
+async def preview_cats_jobs(
+    hr_user: User = Depends(require_hr_admin),
+):
+    """
+    Preview live job openings from the Tangentia CATS Careers portal without saving (HR Admin only).
+    """
+    from app.services.cats_scraper import scrape_all_cats_jobs
+
+    try:
+        jobs = scrape_all_cats_jobs()
+        return {
+            "total_found": len(jobs),
+            "jobs": jobs,
+        }
+    except Exception as e:
+        logger.error(f"CATS preview scrape failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch job preview from Tangentia CATS portal: {str(e)}",
+        )
 
 
 @router.get("/{job_id}", response_model=JobPositionResponse)
