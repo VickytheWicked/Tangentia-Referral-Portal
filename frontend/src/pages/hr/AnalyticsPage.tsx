@@ -140,7 +140,7 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {/* Two Column Section: Department Breakdown & Top Referrers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '24px' }}>
         {/* Department Breakdown */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>

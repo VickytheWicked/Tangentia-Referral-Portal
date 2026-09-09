@@ -225,7 +225,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
           Referral ID: {successReferralNumber}
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             className="btn btn-secondary"
             onClick={() => {
@@ -290,7 +290,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               1. Candidate Information
             </h4>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="responsive-form-row">
               <div className="form-group">
                 <label className="form-label">
                   Candidate Full Name <span className="required">*</span>
@@ -322,7 +322,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="responsive-form-row">
               <div className="form-group">
                 <label className="form-label">
                   Candidate Phone Number <span className="required">*</span>
@@ -355,7 +355,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="responsive-form-row">
               <div className="form-group">
                 <label className="form-label">LinkedIn Profile URL</label>
                 <input
@@ -400,7 +400,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               2. Position & Referral Context
             </h4>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="responsive-form-row">
               <div className="form-group">
                 <label className="form-label">
                   Target Job Position <span className="required">*</span>
@@ -564,7 +564,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
           </div>
 
           {/* Action Button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '14px', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="btn btn-secondary"

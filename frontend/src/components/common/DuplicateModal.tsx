@@ -86,7 +86,7 @@ export const DuplicateModal: React.FC<DuplicateModalProps> = ({
                 <StatusBadge status={m.status} />
               </div>
 
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+              <div className="responsive-info-grid" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', gap: '6px' }}>
                 <div><strong>Position:</strong> {m.position_title}</div>
                 <div><strong>Referral ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{m.referral_number}</span></div>
                 <div><strong>Referred by:</strong> {m.referred_by_name}</div>

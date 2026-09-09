@@ -89,27 +89,24 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
       {/* Welcome Banner */}
       <div
-        className="card card-glass"
+        className="card card-glass responsive-banner"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '28px 32px',
+          padding: '24px 28px',
           background: 'linear-gradient(135deg, rgba(30, 58, 138, 0.25) 0%, rgba(15, 23, 42, 0.6) 100%)',
           borderColor: 'rgba(59, 130, 246, 0.25)',
         }}
       >
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>
-            Welcome back, {user?.name || 'Employee'}! 👋
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>
+            Welcome back! 👋
           </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', maxWidth: '600px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '640px', lineHeight: 1.5 }}>
             Help shape Tangentia's future by referring exceptional talent. Submit your candidate's CV directly to our SharePoint document repository and track their progress live.
           </p>
         </div>
         <button
           className="btn btn-primary"
-          style={{ padding: '12px 24px', fontSize: '0.95rem' }}
+          style={{ padding: '12px 22px', fontSize: '0.92rem', flexShrink: 0 }}
           onClick={() => onNavigate('submit-referral')}
         >
           <PlusCircle size={18} />
@@ -173,8 +170,8 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ position: 'relative', width: '260px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', maxWidth: '360px' }}>
+            <div style={{ position: 'relative', width: '100%' }}>
               <Search
                 size={16}
                 color="var(--text-muted)"
@@ -183,7 +180,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
               <input
                 type="text"
                 className="form-input"
-                style={{ paddingLeft: '36px' }}
+                style={{ paddingLeft: '36px', width: '100%' }}
                 placeholder="Search candidate or position..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -208,7 +205,11 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
             </button>
           </div>
         ) : (
-          <div className="table-container">
+          <>
+            <div className="table-scroll-hint">
+              <span>⇄ Swipe horizontally to view full table details</span>
+            </div>
+            <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
@@ -276,8 +277,9 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </>
+      )}
+    </div>
 
       {/* Referral Detail Modal */}
       {selectedReferral && (
@@ -287,36 +289,16 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
           title={`Candidate Profile: ${selectedReferral.candidate_name}`}
           maxWidth="700px"
           footer={
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              {['Submitted', 'Under Review'].includes(selectedReferral.status) ? (
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() =>
-                    setWithdrawingReferral({
-                      id: selectedReferral.id,
-                      candidateName: selectedReferral.candidate_name,
-                      referralNumber: selectedReferral.referral_number,
-                    })
-                  }
-                >
-                  Withdraw Referral
-                </button>
-              ) : (
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  In process ({selectedReferral.status})
-                </span>
-              )}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleDownloadCV(selectedReferral.id, selectedReferral.original_filename)}
-                >
-                  <Download size={14} /> Download CV Document
-                </button>
-                <button className="btn btn-primary btn-sm" onClick={() => setSelectedReferral(null)}>
-                  Done
-                </button>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => handleDownloadCV(selectedReferral.id, selectedReferral.original_filename)}
+              >
+                <Download size={14} /> Download CV Document
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={() => setSelectedReferral(null)}>
+                Done
+              </button>
             </div>
           }
         >
@@ -327,6 +309,8 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px',
                 padding: '16px',
                 background: 'var(--bg-secondary)',
                 borderRadius: '10px',
@@ -348,7 +332,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
             </div>
 
             {/* Candidate Details Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.86rem' }}>
+            <div className="responsive-info-grid" style={{ gap: '12px', fontSize: '0.86rem' }}>
               <div><strong>Email:</strong> {selectedReferral.candidate_email}</div>
               <div><strong>Phone:</strong> {selectedReferral.candidate_phone}</div>
               <div><strong>Experience:</strong> {selectedReferral.years_of_experience} years</div>

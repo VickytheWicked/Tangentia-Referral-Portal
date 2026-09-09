@@ -39,17 +39,17 @@ export const Modal: React.FC<ModalProps> = ({
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-content fade-in"
-        style={{ maxWidth }}
+        style={{ maxWidth: maxWidth || '600px', width: '100%' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginRight: '12px' }}>
             {title}
           </h3>
           <button
             className="btn btn-outline btn-sm"
             onClick={onClose}
-            style={{ padding: '6px', borderRadius: '50%' }}
+            style={{ padding: '6px', borderRadius: '50%', minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
             aria-label="Close modal"
           >
             <X size={18} />

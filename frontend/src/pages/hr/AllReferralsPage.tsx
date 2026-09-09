@@ -212,7 +212,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
         </div>
 
         {/* Filters Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '12px', marginBottom: '20px' }}>
           <div style={{ position: 'relative' }}>
             <Search
               size={16}
@@ -289,7 +289,11 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
             No candidate referrals match your search filters.
           </div>
         ) : (
-          <div className="table-container">
+          <>
+            <div className="table-scroll-hint">
+              <span>⇄ Swipe horizontally to view full candidate database</span>
+            </div>
+            <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
@@ -389,8 +393,9 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </>
+      )}
+    </div>
 
       {/* Comprehensive Candidate Profile Modal */}
       {selectedReferral && (
@@ -401,7 +406,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
           maxWidth="850px"
           footer={
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '12px' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={() => setStatusModalRef(selectedReferral)}
@@ -438,7 +443,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
                 </button>
               </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button
                   className="btn btn-secondary btn-sm"
                   onClick={() => handleDownloadCV(selectedReferral.id, selectedReferral.original_filename)}
@@ -459,6 +464,8 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
                 padding: '18px 20px',
                 background: 'var(--bg-secondary)',
                 borderRadius: '12px',
@@ -487,9 +494,8 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
 
             {/* Candidate & Referrer Info Grid */}
             <div
+              className="responsive-info-grid"
               style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
                 gap: '16px',
                 background: 'rgba(15, 19, 29, 0.4)',
                 padding: '16px',

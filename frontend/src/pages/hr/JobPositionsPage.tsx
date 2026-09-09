@@ -153,7 +153,7 @@ export const JobPositionsPage: React.FC = () => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -214,7 +214,7 @@ export const JobPositionsPage: React.FC = () => {
             No job openings found. Click "Add New Opening" or "Sync CATS ATS" to load requisitions.
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '18px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '18px' }}>
             {positions.map((job) => (
               <div
                 key={job.id}
@@ -372,7 +372,7 @@ export const JobPositionsPage: React.FC = () => {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="responsive-form-row">
               <div className="form-group">
                 <label className="form-label">Department <span className="required">*</span></label>
                 <input

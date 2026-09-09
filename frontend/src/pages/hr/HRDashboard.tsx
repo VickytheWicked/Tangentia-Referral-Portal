@@ -56,12 +56,9 @@ export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCand
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
       {/* Top Banner */}
       <div
-        className="card card-glass"
+        className="card card-glass responsive-banner"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '24px 32px',
+          padding: '24px 28px',
           background: 'linear-gradient(135deg, rgba(88, 28, 135, 0.3) 0%, rgba(15, 23, 42, 0.7) 100%)',
           borderColor: 'rgba(139, 92, 246, 0.3)',
         }}
@@ -70,12 +67,12 @@ export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCand
           <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>
             HR & Talent Acquisition Hub
           </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '640px', lineHeight: 1.5 }}>
             Review, evaluate, and track enterprise candidate referrals submitted by Tangentia employees.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button className="btn btn-secondary" onClick={() => onNavigate('job-positions')}>
             <Briefcase size={16} /> Manage Job Openings
           </button>
@@ -191,7 +188,11 @@ export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCand
             No submissions found.
           </div>
         ) : (
-          <div className="table-container">
+          <>
+            <div className="table-scroll-hint">
+              <span>⇄ Swipe horizontally to view candidate records</span>
+            </div>
+            <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
@@ -251,8 +252,9 @@ export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCand
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </>
+      )}
+    </div>
     </div>
   );
 };

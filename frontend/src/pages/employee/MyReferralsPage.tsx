@@ -104,8 +104,8 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
         </div>
 
         {/* Filters Bar */}
-        <div style={{ display: 'flex', gap: '14px', marginBottom: '20px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 220px' }}>
             <Search
               size={16}
               color="var(--text-muted)"
@@ -114,18 +114,19 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
             <input
               type="text"
               className="form-input"
-              style={{ paddingLeft: '36px' }}
+              style={{ paddingLeft: '36px', width: '100%' }}
               placeholder="Filter by candidate, email, ID, or position..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          <div style={{ width: '200px' }}>
+          <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
             <select
               className="form-select"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ width: '100%' }}
             >
               <option value="ALL">All Statuses</option>
               <option value="Submitted">Submitted</option>
@@ -154,7 +155,11 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
             </p>
           </div>
         ) : (
-          <div className="table-container">
+          <>
+            <div className="table-scroll-hint">
+              <span>⇄ Swipe horizontally to view full table details</span>
+            </div>
+            <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
@@ -217,7 +222,7 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
                         >
                           <Download size={14} />
                         </button>
-                        {['Submitted', 'Under Review'].includes(r.status) && (
+                        {/* {['Submitted', 'Under Review'].includes(r.status) && (
                           <button
                             className="btn btn-danger btn-sm"
                             onClick={() =>
@@ -231,7 +236,7 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
                           >
                             <RotateCcw size={14} />
                           </button>
-                        )}
+                        )} */}
                       </div>
                     </td>
                   </tr>
@@ -239,8 +244,9 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </>
+      )}
+    </div>
 
       {/* Referral Profile Modal */}
       {selectedReferral && (
@@ -250,32 +256,16 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
           title={`Candidate Details: ${selectedReferral.candidate_name}`}
           maxWidth="720px"
           footer={
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              {['Submitted', 'Under Review'].includes(selectedReferral.status) && (
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() =>
-                    setWithdrawingReferral({
-                      id: selectedReferral.id,
-                      candidateName: selectedReferral.candidate_name,
-                      referralNumber: selectedReferral.referral_number,
-                    })
-                  }
-                >
-                  Withdraw Referral
-                </button>
-              )}
-              <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleDownloadCV(selectedReferral.id, selectedReferral.original_filename)}
-                >
-                  <Download size={14} /> Download CV Document
-                </button>
-                <button className="btn btn-primary btn-sm" onClick={() => setSelectedReferral(null)}>
-                  Close
-                </button>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => handleDownloadCV(selectedReferral.id, selectedReferral.original_filename)}
+              >
+                <Download size={14} /> Download CV Document
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={() => setSelectedReferral(null)}>
+                Close
+              </button>
             </div>
           }
         >
@@ -285,6 +275,8 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px',
                 padding: '16px',
                 background: 'var(--bg-secondary)',
                 borderRadius: '10px',
@@ -305,7 +297,7 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
               <StatusBadge status={selectedReferral.status} />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.86rem' }}>
+            <div className="responsive-info-grid" style={{ gap: '12px', fontSize: '0.86rem' }}>
               <div><strong>Email:</strong> {selectedReferral.candidate_email}</div>
               <div><strong>Phone:</strong> {selectedReferral.candidate_phone}</div>
               <div><strong>Experience:</strong> {selectedReferral.years_of_experience} years</div>

@@ -90,8 +90,8 @@ export const StatusHistoryTimeline: React.FC<StatusHistoryTimelineProps> = ({ hi
             )}
 
             <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <User size={12} />
-              Changed by: <span style={{ color: 'var(--text-secondary)' }}>{item.changed_by_name || 'System / Admin'}</span>
+              {/* <User size={12} />
+              Changed by: <span style={{ color: 'var(--text-secondary)' }}>{item.changed_by_name || 'System / Admin'}</span> */}
             </div>
           </div>
         </div>

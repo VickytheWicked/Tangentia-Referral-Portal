@@ -21,7 +21,7 @@ export const LoginPage: React.FC = () => {
         style={{
           maxWidth: '480px',
           width: '100%',
-          padding: '40px 32px',
+          padding: 'clamp(24px, 5vw, 40px) clamp(16px, 4vw, 32px)',
           textAlign: 'center',
           boxShadow: 'var(--shadow-lg)',
         }}
