@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { JobPosition, DuplicateMatch } from '../../types';
 import { api } from '../../services/api';
 import { DuplicateModal } from '../../components/common/DuplicateModal';
@@ -18,17 +19,31 @@ interface SubmitReferralPageProps {
 }
 
 export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferralCreated }) => {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const preselectedJobId =
+    searchParams.get('positionId') ||
+    searchParams.get('jobId') ||
+    (location.state as any)?.positionId ||
+    (location.state as any)?.jobId ||
+    '';
+
   const [positions, setPositions] = useState<JobPosition[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState<boolean>(true);
 
   // Form Fields
-  const [candidateName, setCandidateName] = useState<string>('');
-  const [candidateEmail, setCandidateEmail] = useState<string>('');
-  const [candidatePhone, setCandidatePhone] = useState<string>('');
-  const [referredByName, setReferredByName] = useState<string>('');
+  // Employee Information
+  const [employeeName, setEmployeeName] = useState<string>('');
+  const [employeeEmail, setEmployeeEmail] = useState<string>('');
+  const [employeePhone, setEmployeePhone] = useState<string>('');
+
+  // Referral Information
+  const [referralName, setReferralName] = useState<string>('');
+  const [referralEmail, setReferralEmail] = useState<string>('');
+  const [referralPhone, setReferralPhone] = useState<string>('');
   const [linkedinUrl, setLinkedinUrl] = useState<string>('');
   const [githubUrl, setGithubUrl] = useState<string>('');
-  const [positionId, setPositionId] = useState<string>('');
+  const [positionId, setPositionId] = useState<string>(preselectedJobId);
   const [yearsOfExperience, setYearsOfExperience] = useState<number>(3.0);
   const [relationship, setRelationship] = useState<string>('Former Colleague');
   const [referralNote, setReferralNote] = useState<string>('');
@@ -55,7 +70,11 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
         const jobs = await api.getJobs(false);
         setPositions(jobs);
         if (jobs.length > 0) {
-          setPositionId(jobs[0].id);
+          if (preselectedJobId && jobs.some((j) => j.id === preselectedJobId)) {
+            setPositionId(preselectedJobId);
+          } else if (!positionId) {
+            setPositionId(jobs[0].id);
+          }
         }
       } catch (err) {
         console.error('Failed to load job positions:', err);
@@ -64,7 +83,9 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       }
     };
     fetchPositions();
-  }, []);
+  }, [preselectedJobId]);
+
+  const selectedJob = positions.find((p) => p.id === positionId);
 
   const handleFileChange = (file: File | null) => {
     if (!file) return;
@@ -105,20 +126,34 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
   };
 
   const performDuplicateCheck = async () => {
-    if (!candidateEmail || !candidateName || !candidatePhone || !positionId) return;
+    const emailToCheck = referralEmail.trim();
+    const phoneToCheck = referralPhone.trim();
+    const nameToCheck = referralName.trim();
+
+    if (!nameToCheck || !emailToCheck || !positionId) return false;
 
     try {
       const res = await api.checkDuplicate({
-        candidate_email: candidateEmail,
-        candidate_phone: candidatePhone,
-        candidate_name: candidateName,
+        candidate_email: emailToCheck,
+        candidate_phone: phoneToCheck || 'N/A',
+        candidate_name: nameToCheck,
         position_id: positionId,
       });
 
-      if (res.is_duplicate && res.matches.length > 0 && !duplicateConfirmed) {
+      if (res.is_duplicate && res.matches.length > 0) {
         setDuplicateMatches(res.matches);
-        setShowDuplicateModal(true);
-        return true;
+        if (!duplicateConfirmed) {
+          setShowDuplicateModal(true);
+          const matchReasons = res.matches
+            .map((m) => `[Referral #${m.referral_number}: ${m.match_reason}]`)
+            .join('; ');
+          setErrorMessage(
+            `Duplicate Referral Warning: Found ${res.matches.length} existing record(s) matching your input. Exact duplicate reason(s): ${matchReasons}. Trimmed values checked — Name: "${nameToCheck}", Email: "${emailToCheck}"${phoneToCheck ? `, Phone: "${phoneToCheck}"` : ''}. Review the modal or click 'Confirm & Proceed with Submission' to override.`
+          );
+          return true;
+        }
+      } else {
+        setDuplicateMatches([]);
       }
     } catch (err) {
       console.warn('Duplicate pre-check error:', err);
@@ -130,18 +165,50 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!referredByName.trim()) {
-      setErrorMessage('Please specify who this candidate is referred by.');
+    const cleanEmployeeName = employeeName.trim();
+    const cleanEmployeeEmail = employeeEmail.trim();
+    const cleanEmployeePhone = employeePhone.trim();
+    const cleanReferralName = referralName.trim();
+    const cleanReferralEmail = referralEmail.trim();
+    const cleanReferralPhone = referralPhone.trim();
+
+    if (!cleanEmployeeName) {
+      setErrorMessage('Please enter your Employee Full Name.');
+      return;
+    }
+
+    if (!cleanEmployeeEmail) {
+      setErrorMessage('Please enter your Employee Email Address.');
+      return;
+    }
+
+    if (!cleanEmployeePhone) {
+      setErrorMessage('Please enter your Employee Phone Number.');
+      return;
+    }
+
+    if (!cleanReferralName) {
+      setErrorMessage('Please enter the Name of the Referral.');
+      return;
+    }
+
+    if (!cleanReferralEmail) {
+      setErrorMessage('Please enter the Referral’s Email Address.');
+      return;
+    }
+
+    if (!cleanReferralPhone) {
+      setErrorMessage('Please enter the Referral’s Phone Number.');
       return;
     }
 
     if (!selectedFile) {
-      setErrorMessage('Please upload the candidate’s CV document.');
+      setErrorMessage('Please upload the referral candidate’s CV document.');
       return;
     }
 
     if (!candidateConsent) {
-      setErrorMessage('You must confirm that the candidate has agreed to be referred.');
+      setErrorMessage('You must confirm that the referral has agreed to be referred.');
       return;
     }
 
@@ -155,11 +222,15 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
     try {
       const formData = new FormData();
-      formData.append('candidate_name', candidateName);
-      formData.append('candidate_email', candidateEmail);
-      formData.append('candidate_phone', candidatePhone);
-      formData.append('referred_by_name', referredByName.trim());
-      formData.append('referred_by', referredByName.trim());
+      formData.append('candidate_name', cleanReferralName);
+      formData.append('candidate_email', cleanReferralEmail);
+      formData.append('candidate_phone', cleanReferralPhone);
+      formData.append('referred_by_name', cleanEmployeeName);
+      formData.append('referred_by', cleanEmployeeName);
+      formData.append('referred_by_email', cleanEmployeeEmail);
+      formData.append('employee_email', cleanEmployeeEmail);
+      formData.append('referred_by_phone', cleanEmployeePhone);
+      formData.append('employee_phone', cleanEmployeePhone);
       if (linkedinUrl) formData.append('linkedin_url', linkedinUrl);
       if (githubUrl) formData.append('github_url', githubUrl);
       formData.append('position_id', positionId);
@@ -230,9 +301,9 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
             className="btn btn-secondary"
             onClick={() => {
               setSuccessReferralNumber(null);
-              setCandidateName('');
-              setCandidateEmail('');
-              setCandidatePhone('');
+              setReferralName('');
+              setReferralEmail('');
+              setReferralPhone('');
               setLinkedinUrl('');
               setGithubUrl('');
               setReferralNote('');
@@ -240,7 +311,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               setDuplicateConfirmed(false);
             }}
           >
-            Submit Another Candidate
+            Submit Another Referral
           </button>
 
           <button className="btn btn-primary" onClick={onReferralCreated}>
@@ -256,10 +327,10 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       <div className="card">
         <div style={{ marginBottom: '24px' }}>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Candidate Referral Submission
+            Submit a Referral
           </h3>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            All resumes are uploaded directly to the corporate Microsoft SharePoint repository via Microsoft Graph API.
+            Provide your employee information and the referral's details. Resumes are stored directly in SharePoint and synced to Excel.
           </p>
         </div>
 
@@ -284,40 +355,38 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* Section 1: Candidate Basic Information */}
+          {/* Section 1: Employee Information */}
           <div style={{ marginBottom: '24px' }}>
             <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
-              1. Candidate Information
+              1. Employee Information
             </h4>
 
             <div className="responsive-form-row">
               <div className="form-group">
                 <label className="form-label">
-                  Candidate Full Name <span className="required">*</span>
+                  Employee Full Name <span className="required">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   className="form-input"
                   placeholder="e.g. Rahul Sharma"
-                  value={candidateName}
-                  onChange={(e) => setCandidateName(e.target.value)}
-                  onBlur={performDuplicateCheck}
+                  value={employeeName}
+                  onChange={(e) => setEmployeeName(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
                 <label className="form-label">
-                  Candidate Email Address <span className="required">*</span>
+                  Employee Email Address <span className="required">*</span>
                 </label>
                 <input
                   type="email"
                   required
                   className="form-input"
-                  placeholder="e.g. rahul.sharma@example.com"
-                  value={candidateEmail}
-                  onChange={(e) => setCandidateEmail(e.target.value)}
-                  onBlur={performDuplicateCheck}
+                  placeholder="e.g. rahul.sharma@tangentia.com"
+                  value={employeeEmail}
+                  onChange={(e) => setEmployeeEmail(e.target.value)}
                 />
               </div>
             </div>
@@ -325,85 +394,119 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
             <div className="responsive-form-row">
               <div className="form-group">
                 <label className="form-label">
-                  Candidate Phone Number <span className="required">*</span>
+                  Employee Phone Number <span className="required">*</span>
                 </label>
                 <input
                   type="tel"
                   required
                   className="form-input"
                   placeholder="e.g. +1 416-555-0192"
-                  value={candidatePhone}
-                  onChange={(e) => setCandidatePhone(e.target.value)}
-                  onBlur={performDuplicateCheck}
+                  value={employeePhone}
+                  onChange={(e) => setEmployeePhone(e.target.value)}
                 />
               </div>
 
               <div className="form-group">
                 <label className="form-label">
-                  Years of Relevant Experience <span className="required">*</span>
+                  Name of the Referral <span className="required">*</span>
                 </label>
                 <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="40"
+                  type="text"
                   required
                   className="form-input"
-                  value={yearsOfExperience}
-                  onChange={(e) => setYearsOfExperience(parseFloat(e.target.value) || 0)}
+                  placeholder="e.g. Priya Patel (Candidate being referred)"
+                  value={referralName}
+                  onChange={(e) => {
+                    setReferralName(e.target.value);
+                    setDuplicateConfirmed(false);
+                    if (errorMessage && errorMessage.includes('Duplicate Referral')) {
+                      setErrorMessage(null);
+                    }
+                  }}
+                  onBlur={performDuplicateCheck}
                 />
               </div>
-            </div>
-
-            <div className="responsive-form-row">
-              <div className="form-group">
-                <label className="form-label">LinkedIn Profile URL</label>
-                <input
-                  type="url"
-                  className="form-input"
-                  placeholder="https://linkedin.com/in/candidate"
-                  value={linkedinUrl}
-                  onChange={(e) => setLinkedinUrl(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">GitHub or Portfolio URL</label>
-                <input
-                  type="url"
-                  className="form-input"
-                  placeholder="https://github.com/candidate"
-                  value={githubUrl}
-                  onChange={(e) => setGithubUrl(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginTop: '16px' }}>
-              <label className="form-label">
-                Referred By <span className="required">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                className="form-input"
-                placeholder="e.g. Employee Full Name (e.g. Rahul Sharma)"
-                value={referredByName}
-                onChange={(e) => setReferredByName(e.target.value)}
-              />
             </div>
           </div>
 
-          {/* Section 2: Job Opening & Relationship */}
+          {/* Section 2: Position & Referral Context */}
           <div style={{ marginBottom: '24px' }}>
             <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
               2. Position & Referral Context
             </h4>
 
+            {preselectedJobId && selectedJob && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(30, 58, 138, 0.08) 100%)',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  borderRadius: '10px',
+                  marginBottom: '16px',
+                  flexWrap: 'wrap',
+                  gap: '10px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Building2 size={20} color="#60a5fa" />
+                  <div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Fixed Target Opening
+                    </span>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff' }}>
+                      {selectedJob.title}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      color: '#93c5fd',
+                    }}
+                  >
+                    {selectedJob.department}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.74rem',
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    {selectedJob.location} • {selectedJob.employment_type}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="responsive-form-row">
               <div className="form-group">
-                <label className="form-label">
-                  Target Job Position <span className="required">*</span>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Target Job Position <span className="required">*</span></span>
+                  {preselectedJobId && positions.some((p) => p.id === positionId) && (
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: '#60a5fa',
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        padding: '1px 8px',
+                        borderRadius: '4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      Target Role Fixed
+                    </span>
+                  )}
                 </label>
                 {isLoadingJobs ? (
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading positions...</div>
@@ -414,6 +517,10 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                     value={positionId}
                     onChange={(e) => {
                       setPositionId(e.target.value);
+                      setDuplicateConfirmed(false);
+                      if (errorMessage && errorMessage.includes('Duplicate Referral')) {
+                        setErrorMessage(null);
+                      }
                       performDuplicateCheck();
                     }}
                   >
@@ -428,7 +535,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
               <div className="form-group">
                 <label className="form-label">
-                  Your Relationship to Candidate <span className="required">*</span>
+                  Your Relationship to Referral <span className="required">*</span>
                 </label>
                 <select
                   className="form-select"
@@ -445,6 +552,90 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               </div>
             </div>
 
+            <div className="responsive-form-row">
+              <div className="form-group">
+                <label className="form-label">
+                  Referral's Email Address <span className="required">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  className="form-input"
+                  placeholder="e.g. priya.patel@example.com"
+                  value={referralEmail}
+                  onChange={(e) => {
+                    setReferralEmail(e.target.value);
+                    setDuplicateConfirmed(false);
+                    if (errorMessage && errorMessage.includes('Duplicate Referral')) {
+                      setErrorMessage(null);
+                    }
+                  }}
+                  onBlur={performDuplicateCheck}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Referral's Phone Number <span className="required">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  className="form-input"
+                  placeholder="e.g. +1 416-555-0199"
+                  value={referralPhone}
+                  onChange={(e) => {
+                    setReferralPhone(e.target.value);
+                    setDuplicateConfirmed(false);
+                    if (errorMessage && errorMessage.includes('Duplicate Referral')) {
+                      setErrorMessage(null);
+                    }
+                  }}
+                  onBlur={performDuplicateCheck}
+                />
+              </div>
+            </div>
+
+            <div className="responsive-form-row">
+              <div className="form-group">
+                <label className="form-label">
+                  Years of Relevant Experience <span className="required">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="40"
+                  required
+                  className="form-input"
+                  value={yearsOfExperience}
+                  onChange={(e) => setYearsOfExperience(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Referral's LinkedIn Profile URL</label>
+                <input
+                  type="url"
+                  className="form-input"
+                  placeholder="https://linkedin.com/in/referral"
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label className="form-label">Referral's GitHub or Portfolio URL</label>
+              <input
+                type="url"
+                className="form-input"
+                placeholder="https://github.com/referral"
+                value={githubUrl}
+                onChange={(e) => setGithubUrl(e.target.value)}
+              />
+            </div>
+
             <div className="form-group">
               <label className="form-label">
                 Referral Recommendation Note <span className="required">*</span>
@@ -453,7 +644,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                 required
                 className="form-textarea"
                 rows={4}
-                placeholder="Share why you believe this candidate is a great fit for Tangentia. Highlight their key technical strengths, work ethic, and past accomplishments..."
+                placeholder="Share why you believe this referral is a great fit for Tangentia. Highlight their key technical strengths, work ethic, and past accomplishments..."
                 value={referralNote}
                 onChange={(e) => setReferralNote(e.target.value)}
               />
@@ -466,7 +657,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
           {/* Section 3: CV Upload */}
           <div style={{ marginBottom: '28px' }}>
             <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
-              3. Candidate CV / Resume Upload
+              3. Referral CV / Resume Upload
             </h4>
 
             <input
@@ -492,7 +683,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                 <UploadCloud size={38} color="#3b82f6" />
                 <div>
                   <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Click to browse or drag and drop candidate CV
+                    Click to browse or drag and drop referral's CV
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                     Supported formats: PDF (.pdf) or Word (.docx) • Max size: 10 MB
@@ -559,7 +750,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               htmlFor="consent-checkbox"
               style={{ fontSize: '0.88rem', color: 'var(--text-primary)', cursor: 'pointer', lineHeight: 1.5 }}
             >
-              <strong>Candidate Consent Confirmation:</strong> I confirm that the candidate has explicitly agreed to be referred for employment at Tangentia and consented to their CV being stored in our company SharePoint document repository.
+              <strong>Referral Consent Confirmation:</strong> I confirm that the referral candidate has explicitly agreed to be referred for employment at Tangentia and consented to their CV being stored in our company SharePoint document repository.
             </label>
           </div>
 
@@ -601,10 +792,13 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
         isOpen={showDuplicateModal}
         onClose={() => setShowDuplicateModal(false)}
         matches={duplicateMatches}
-        candidateName={candidateName}
+        candidateName={referralName}
+        checkedEmail={referralEmail}
+        checkedPhone={referralPhone}
         onConfirmSubmit={() => {
           setDuplicateConfirmed(true);
           setShowDuplicateModal(false);
+          setErrorMessage(null);
         }}
       />
     </div>

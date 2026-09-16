@@ -17,6 +17,8 @@ class ReferralCreateForm(BaseModel):
     referral_note: str = Field(..., min_length=10, max_length=5000)
     position_id: str
     referred_by_name: Optional[str] = Field(None, max_length=255)
+    referred_by_email: Optional[str] = Field(None, max_length=255)
+    referred_by_phone: Optional[str] = Field(None, max_length=50)
     candidate_consent: bool = Field(..., description="Must be true")
 
 
@@ -44,6 +46,7 @@ class ReferralSummaryResponse(BaseModel):
     referred_by_id: str
     referred_by_name: Optional[str] = None
     referred_by_email: Optional[str] = None
+    referred_by_phone: Optional[str] = None
     original_filename: str
     created_at: datetime
     updated_at: datetime
@@ -59,5 +62,21 @@ class ReferralDetailResponse(ReferralSummaryResponse):
     position: Optional[JobPositionResponse] = None
     status_history: List[StatusHistoryResponse] = []
     hr_notes: List[HRNoteResponse] = []  # Only populated for HR Admins!
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HiredHistoryResponse(BaseModel):
+    id: str
+    referral_number: str
+    candidate_name: str
+    position_id: str
+    position_title: str
+    department: str
+    location: str
+    employment_type: Optional[str] = "Full-time"
+    referred_by_name: Optional[str] = None
+    hired_at: datetime
+    status: str = "Hired"
 
     model_config = ConfigDict(from_attributes=True)

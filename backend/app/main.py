@@ -1,5 +1,5 @@
 import logging
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -45,16 +45,23 @@ async def startup_event():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.all_cors_origins,
-    allow_origin_regex=r"https://.*\.trycloudflare\.com",
+    allow_origin_regex=r"https://.*\.trycloudflare\.com|https://.*\.azurestaticapps\.net",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 
 # Global Exception Handler to sanitize unexpected server errors and prevent credential/stack leakage
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=getattr(exc, "headers", None),
+        )
     logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

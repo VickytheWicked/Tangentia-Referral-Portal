@@ -34,11 +34,15 @@ class SharePointServiceInterface(ABC):
     @abstractmethod
     async def download_cv(
         self,
-        drive_id: str,
-        item_id: str,
+        drive_id: Optional[str] = None,
+        item_id: Optional[str] = None,
+        referral_number: Optional[str] = None,
+        stored_filename: Optional[str] = None,
+        original_filename: Optional[str] = None,
+        candidate_name: Optional[str] = None,
     ) -> Tuple[bytes, str, str]:
         """
-        Download CV file bytes from SharePoint for authorized proxy streaming.
+        Download CV file bytes from SharePoint / storage for authorized proxy streaming.
         Returns: (file_bytes, filename, content_type)
         """
         pass

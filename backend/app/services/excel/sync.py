@@ -84,23 +84,42 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
         # 1. Seed Users in DB and Excel
         hr_user = User(
             id="user-hr-001",
-            entra_user_id="entra-user-dev-hr-001",
+            entra_user_id="user-dev-hr-001",
             name="Marcus Vance",
             email="hr.lead@tangentia.com",
+            password="TangentiaHR@2026",
             role=UserRole.HR_ADMIN.value,
             department="Human Resources",
         )
         emp_user = User(
             id="user-emp-001",
-            entra_user_id="entra-user-dev-employee-001",
+            entra_user_id="user-dev-employee-001",
             name="Vansh Rupesh (Employee)",
             email="employee@tangentia.com",
+            password="",
             role=UserRole.EMPLOYEE.value,
             department="Cloud Engineering",
         )
         db.merge(hr_user)
         db.merge(emp_user)
         db.commit()
+
+        excel_svc.save_user({
+            "id": "user-hr-001",
+            "name": "Marcus Vance",
+            "email": "hr.lead@tangentia.com",
+            "password": "TangentiaHR@2026",
+            "role": UserRole.HR_ADMIN.value,
+            "department": "Human Resources",
+        })
+        excel_svc.save_user({
+            "id": "user-emp-001",
+            "name": "Vansh Rupesh (Employee)",
+            "email": "employee@tangentia.com",
+            "password": "",
+            "role": UserRole.EMPLOYEE.value,
+            "department": "Cloud Engineering",
+        })
 
         # 2. Seed Jobs in DB and Excel
         for j_data in SAMPLE_JOBS:
@@ -200,40 +219,77 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
         # Load records from Excel into in-memory DB
         logger.info("Hydrating in-memory engine from Microsoft Excel workbook...")
 
-        # 1. Ensure default users exist
-        hr_user = User(
+        # 1. Ensure default users exist — commit them first to populate the identity map
+        db.merge(User(
             id="user-hr-001",
-            entra_user_id="entra-user-dev-hr-001",
+            entra_user_id="user-dev-hr-001",
             name="Marcus Vance",
             email="hr.lead@tangentia.com",
+            password="TangentiaHR@2026",
             role=UserRole.HR_ADMIN.value,
             department="Human Resources",
-        )
-        emp_user = User(
+        ))
+        db.merge(User(
             id="user-emp-001",
-            entra_user_id="entra-user-dev-employee-001",
+            entra_user_id="user-dev-employee-001",
             name="Vansh Rupesh (Employee)",
             email="employee@tangentia.com",
+            password="",
             role=UserRole.EMPLOYEE.value,
             department="Cloud Engineering",
-        )
-        db.merge(hr_user)
-        db.merge(emp_user)
+        ))
+        db.commit()  # Commit defaults first so email UNIQUE index is populated
 
-        # Merge any users from Excel Users sheet
+        # Collect emails already in DB to avoid UNIQUE constraint on email
+        existing_emails = {u.email.lower() for u in db.query(User).all()}
+        existing_ids = {u.id for u in db.query(User).all()}
+
+        # Check if Excel Users sheet is empty, seed default HR user
+        if len(data.get("Users", [])) == 0:
+            excel_svc.save_user({
+                "id": "user-hr-001",
+                "name": "Marcus Vance",
+                "email": "hr.lead@tangentia.com",
+                "password": "TangentiaHR@2026",
+                "role": UserRole.HR_ADMIN.value,
+                "department": "Human Resources",
+            })
+            data = excel_svc.load_all_data()
+
+        # Merge users from Excel Users sheet, skipping any already loaded by ID or email
         for u_row in data.get("Users", []):
             u_id = str(u_row.get("User ID") or "").strip()
-            if u_id:
-                u_role = str(u_row.get("Role") or UserRole.EMPLOYEE.value)
-                u_obj = User(
-                    id=u_id,
-                    name=str(u_row.get("Name") or "Employee"),
-                    email=str(u_row.get("Email") or f"{u_id[:8]}@tangentia.com"),
-                    role=u_role,
-                    department=str(u_row.get("Department") or "Engineering"),
-                    entra_user_id=str(u_row.get("Entra User ID") or f"entra-{u_id[:8]}"),
-                )
+            u_email = str(u_row.get("Email") or "").strip().lower()
+            if not u_id:
+                continue
+            # Use merge (upsert by PK) — it safely updates existing rows without duplicate inserts
+            u_role = str(u_row.get("Role") or UserRole.EMPLOYEE.value)
+            u_pass = str(u_row.get("Password") or "").strip()
+            # Preserve a stable entra_user_id if user already exists
+            entra_id = str(u_row.get("Entra User ID") or "").strip()
+            if not entra_id:
+                if u_id in existing_ids:
+                    existing_user = db.query(User).filter(User.id == u_id).first()
+                    entra_id = existing_user.entra_user_id or f"user-{u_id[:8]}"
+                else:
+                    entra_id = f"user-{u_id[:8]}"
+            u_obj = User(
+                id=u_id,
+                name=str(u_row.get("Name") or "Employee"),
+                email=u_email or f"{u_id[:8]}@tangentia.com",
+                password=u_pass,
+                role=u_role,
+                department=str(u_row.get("Department") or "Engineering"),
+                entra_user_id=entra_id,
+            )
+            try:
                 db.merge(u_obj)
+                db.flush()
+                existing_emails.add(u_email)
+                existing_ids.add(u_id)
+            except Exception as ue:
+                db.rollback()
+                logger.warning(f"Skipping duplicate user {u_id} ({u_email}): {ue}")
         db.commit()
 
         # 2. Load Jobs
@@ -369,6 +425,20 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                         except Exception:
                             pass
 
+                sp_drive_id = None
+                sp_item_id = None
+                stored_file = orig_file
+                if sp_url:
+                    if "/referral-cvs/" in sp_url:
+                        blob_path = sp_url.split("/referral-cvs/")[-1]
+                        sp_item_id = f"blob:{blob_path}"
+                        sp_drive_id = "blob:referral-cvs"
+                        stored_file = blob_path.split("/")[-1]
+                    elif "sharepoint.com" in sp_url:
+                        parts = sp_url.rstrip("/").split("/")
+                        if parts:
+                            stored_file = parts[-1]
+
                 ref = Referral(
                     id=ref_id,
                     referral_number=ref_num,
@@ -382,7 +452,9 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                     referred_by_user_id=ref_by_uid,
                     status=status_val,
                     original_filename=orig_file,
-                    stored_filename=orig_file,
+                    stored_filename=stored_file,
+                    sharepoint_drive_id=sp_drive_id,
+                    sharepoint_item_id=sp_item_id,
                     sharepoint_file_url=sp_url,
                     linkedin_url=li_url,
                     github_url=gh_url,
@@ -434,6 +506,29 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                     db.merge(note_obj)
                 except Exception:
                     pass
-        db.commit()
-
         logger.info(f"Loaded {loaded_count} referrals from Microsoft Excel into runtime engine.")
+
+    # Ensure all Hired referrals in DB are synchronized to HiredHistory worksheet in Excel
+    try:
+        hired_refs = db.query(Referral).outerjoin(Referral.position).filter(
+            Referral.status == ReferralStatus.HIRED.value
+        ).all()
+        for hr in hired_refs:
+            pos = hr.position
+            excel_svc.save_hired_record({
+                "id": hr.id,
+                "referral_number": hr.referral_number,
+                "candidate_name": hr.candidate_name,
+                "candidate_email": hr.candidate_email,
+                "position_id": hr.position_id,
+                "position_title": pos.title if pos else "Unknown Position",
+                "department": pos.department if pos else "General",
+                "location": pos.location if pos else "Tangentia Office",
+                "employment_type": pos.employment_type if pos else "Full-time",
+                "referred_by_name": hr.referred_by_name or (hr.referred_by.name if hr.referred_by else "Employee"),
+                "hired_at": hr.updated_at or hr.created_at,
+                "status": "Hired",
+            })
+    except Exception as sync_hired_err:
+        logger.warning(f"Error synchronizing HiredHistory sheet in Excel: {sync_hired_err}")
+

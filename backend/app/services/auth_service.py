@@ -1,191 +1,162 @@
 import logging
-import httpx
-from typing import Dict, Any, Optional
-from jose import jwt, jwk
-from jose.exceptions import JWTError, ExpiredSignatureError
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Any, Optional, Tuple
+from jose import jwt, JWTError, ExpiredSignatureError
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.user import User, UserRole
+from app.services.excel import get_excel_service
 
 logger = logging.getLogger(__name__)
 
-# Cached JWKS keys
-_jwks_cache: Optional[Dict[str, Any]] = None
+JWT_SECRET_KEY = getattr(settings, "JWT_SECRET_KEY", "tangentia-portal-super-secret-jwt-key-2026")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_DAYS = 7
 
 
-async def get_entra_jwks() -> Dict[str, Any]:
-    """Fetch and cache Microsoft Entra ID public signing keys (JWKS)"""
-    global _jwks_cache
-    if _jwks_cache:
-        return _jwks_cache
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(settings.AZURE_JWKS_URL)
-            if response.status_code == 200:
-                _jwks_cache = response.json()
-                return _jwks_cache
-            else:
-                logger.error(f"Failed to fetch JWKS from Entra ID: {response.status_code}")
-    except Exception as e:
-        logger.error(f"Error connecting to Entra ID JWKS endpoint: {e}")
-
-    return {"keys": []}
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Create a signed JWT access token for authenticated HR sessions"""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=JWT_EXPIRATION_DAYS))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
-async def verify_microsoft_token(token: str) -> Dict[str, Any]:
-    """
-    Verify Microsoft Entra ID access token or ID token.
-    Extracts authenticated user identity: oid, email, name, roles/groups.
-    """
-    # Development Mode bypass / simulated tokens for local testing
+def decode_access_token(token: str) -> Dict[str, Any]:
+    """Decode and validate a JWT access token"""
+    # Development / test tokens bypass
     if settings.DEV_MODE:
-        if token == "dev-employee-token" or token.startswith("dev-employee"):
+        if token == "dev-hr-token" or token.startswith("dev-hr"):
             return {
-                "oid": "entra-user-dev-employee-001",
+                "sub": "user-hr-001",
+                "email": "hr.lead@tangentia.com",
+                "name": "Marcus Vance",
+                "role": UserRole.HR_ADMIN.value,
+            }
+        elif token == "dev-employee-token" or token.startswith("dev-employee"):
+            return {
+                "sub": "user-emp-001",
                 "email": "employee@tangentia.com",
                 "name": "Vansh Rupesh (Employee)",
-                "roles": [UserRole.EMPLOYEE.value],
-                "groups": [],
-            }
-        elif token == "dev-hr-token" or token.startswith("dev-hr"):
-            return {
-                "oid": "entra-user-dev-hr-001",
-                "email": "hr.lead@tangentia.com",
-                "name": "Marcus Vance (HR Admin)",
-                "roles": [UserRole.HR_ADMIN.value],
-                "groups": [settings.AZURE_HR_GROUP_ID] if settings.AZURE_HR_GROUP_ID else ["hr-admins"],
+                "role": UserRole.EMPLOYEE.value,
             }
 
-    # Production Entra ID Verification
     try:
-        # Decode header without verification to get Key ID (kid)
-        unverified_header = jwt.get_unverified_header(token)
-        kid = unverified_header.get("kid")
-        if not kid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token header: Missing 'kid'",
-            )
-
-        jwks = await get_entra_jwks()
-        key_dict = next((k for k in jwks.get("keys", []) if k["kid"] == kid), None)
-        if not key_dict:
-            # Refresh JWKS cache and retry
-            global _jwks_cache
-            _jwks_cache = None
-            jwks = await get_entra_jwks()
-            key_dict = next((k for k in jwks.get("keys", []) if k["kid"] == kid), None)
-
-        if not key_dict:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token signing key not found in Entra ID JWKS.",
-            )
-
-        # Validate token against RSA public key
-        public_key = jwk.construct(key_dict)
-        decoded = jwt.decode(
-            token,
-            public_key.to_pem().decode("utf-8"),
-            algorithms=["RS256"],
-            audience=settings.AZURE_CLIENT_ID if settings.AZURE_CLIENT_ID else None,
-            options={"verify_aud": bool(settings.AZURE_CLIENT_ID)},
-        )
-
-        # Extract normalized claims
-        oid = decoded.get("oid") or decoded.get("sub")
-        email = decoded.get("preferred_username") or decoded.get("email") or decoded.get("upn")
-        name = decoded.get("name") or email or "Company Employee"
-        roles = decoded.get("roles", [])
-        groups = decoded.get("groups", [])
-
-        if not oid or not email:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token is missing required user identity claims (oid/email).",
-            )
-
-        return {
-            "oid": oid,
-            "email": email.lower().strip(),
-            "name": name,
-            "roles": roles,
-            "groups": groups,
-        }
-
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        return payload
     except ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication token has expired. Please sign in again.",
+            detail="Session has expired. Please sign in again.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     except JWTError as e:
-        logger.warning(f"JWT verification failure: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid authentication token: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
 
-def sync_user_session(db: Session, claims: Dict[str, Any], explicit_role_override: Optional[str] = None) -> User:
+def authenticate_hr_user(db: Session, email: str, password: str) -> Tuple[User, str]:
     """
-    Ensure user identity exists in the database and synchronize their Entra ID attributes and role.
+    Authenticate an HR user against the Tangentia_Referrals.xlsx Users worksheet.
+    - Validates domain ends with @tangentia.com
+    - Confirms HR role
+    - Checks plain-text password from Excel
+    - Generates and returns (User, JWT token)
     """
-    oid = claims["oid"]
-    email = claims["email"]
-    name = claims["name"]
-    roles = claims.get("roles", [])
-    groups = claims.get("groups", [])
+    clean_email = email.strip().lower()
 
-    # Find existing user by entra_user_id or email
-    user = db.query(User).filter(
-        (User.entra_user_id == oid) | (User.email == email)
-    ).first()
-
-    # Determine role
-    is_hr = False
-    if explicit_role_override:
-        is_hr = (explicit_role_override == UserRole.HR_ADMIN.value)
-    elif "HR_Admin" in roles or "hr_admin" in roles or UserRole.HR_ADMIN.value in roles:
-        is_hr = True
-    elif settings.AZURE_HR_GROUP_ID and settings.AZURE_HR_GROUP_ID in groups:
-        is_hr = True
-    elif "hr-admins" in groups:
-        is_hr = True
-
-    determined_role = UserRole.HR_ADMIN.value if is_hr else UserRole.EMPLOYEE.value
-
-    if not user:
-        user = User(
-            entra_user_id=oid,
-            name=name,
-            email=email,
-            role=determined_role,
+    # 1. Enforce @tangentia.com domain
+    if not clean_email.endswith("@tangentia.com"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Authentication restricted. Only @tangentia.com corporate email addresses are permitted.",
         )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+
+    # 2. Look up user in Excel workbook
+    excel_svc = get_excel_service()
+    excel_user = None
+    try:
+        excel_user = excel_svc.get_user_by_email(clean_email)
+    except Exception as e:
+        logger.warning(f"Could not read user from Excel: {e}")
+
+    # Fallback to in-memory / database user
+    db_user = db.query(User).filter(User.email.ilike(clean_email)).first()
+
+    target_name = "HR Administrator"
+    target_role = None
+    target_dept = "Human Resources"
+    target_password = None
+    target_id = None
+
+    if excel_user:
+        target_name = str(excel_user.get("Name") or "HR Administrator")
+        target_role = str(excel_user.get("Role") or "").strip().lower()
+        target_dept = str(excel_user.get("Department") or "Human Resources")
+        target_password = str(excel_user.get("Password") or "")
+        target_id = str(excel_user.get("User ID") or "")
+    elif db_user:
+        target_name = db_user.name
+        target_role = db_user.role.lower() if db_user.role else ""
+        target_dept = db_user.department or "Human Resources"
+        target_password = db_user.password or ""
+        target_id = db_user.id
     else:
-        # Update user attributes if changed
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account not found. Please verify your email is configured in the Users sheet of Tangentia_Referrals.xlsx.",
+        )
+
+    # 3. Restrict to HR role only
+    if target_role not in [UserRole.HR_ADMIN.value, "hr", "hr_admin", "hr admin", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to HR administrators only. Employees do not require a login.",
+        )
+
+    # 4. Verify password
+    if not target_password or target_password.strip() != password.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password. Please check your credentials configured in the Excel file.",
+        )
+
+    # 5. Sync to database
+    if not db_user:
+        db_user = User(
+            id=target_id or f"user-hr-{clean_email.split('@')[0]}",
+            name=target_name,
+            email=clean_email,
+            password=target_password,
+            role=UserRole.HR_ADMIN.value,
+            department=target_dept,
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    else:
         updated = False
-        if user.entra_user_id != oid:
-            user.entra_user_id = oid
+        if db_user.role != UserRole.HR_ADMIN.value:
+            db_user.role = UserRole.HR_ADMIN.value
             updated = True
-        if user.name != name:
-            user.name = name
+        if target_password and db_user.password != target_password:
+            db_user.password = target_password
             updated = True
-        # If user is marked HR in Entra, upgrade in DB; otherwise retain existing DB role if assigned by admin
-        if is_hr and user.role != UserRole.HR_ADMIN.value:
-            user.role = UserRole.HR_ADMIN.value
-            updated = True
-        elif explicit_role_override and user.role != explicit_role_override:
-            user.role = explicit_role_override
-            updated = True
-            
         if updated:
             db.commit()
-            db.refresh(user)
+            db.refresh(db_user)
 
-    return user
+    # 6. Issue access token
+    token = create_access_token({
+        "sub": db_user.id,
+        "email": db_user.email,
+        "name": db_user.name,
+        "role": db_user.role,
+    })
+
+    return db_user, token

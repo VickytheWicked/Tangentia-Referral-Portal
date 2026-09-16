@@ -6,6 +6,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.models.job_position import JobPosition
+from app.models.referral import Referral, ReferralStatus
 
 logger = logging.getLogger("referral_portal.cats_scraper")
 
@@ -282,6 +283,15 @@ def sync_cats_jobs_with_db(
 
         existing_job = db.query(JobPosition).filter(JobPosition.id == job_id).first()
 
+        # Check if this position has any referral that was already hired
+        has_hired = db.query(Referral).filter(
+            Referral.position_id == job_id,
+            Referral.status == ReferralStatus.HIRED.value,
+        ).first() is not None
+
+        # Position should only be active if it hasn't been filled/hired
+        target_is_active = False if has_hired else True
+
         if existing_job:
             # Update fields if changed
             existing_job.title = item["title"]
@@ -289,7 +299,8 @@ def sync_cats_jobs_with_db(
             existing_job.location = item["location"]
             existing_job.employment_type = item["employment_type"]
             existing_job.description = item["description"]
-            existing_job.is_active = True
+            # Do NOT reactivate a position that has already been filled/hired
+            existing_job.is_active = target_is_active
             updated_count += 1
             synced_jobs.append(existing_job)
         else:
@@ -300,7 +311,7 @@ def sync_cats_jobs_with_db(
                 location=item["location"],
                 employment_type=item["employment_type"],
                 description=item["description"],
-                is_active=True,
+                is_active=target_is_active,
             )
             db.add(new_job)
             created_count += 1
@@ -314,34 +325,39 @@ def sync_cats_jobs_with_db(
                 "department": item["department"],
                 "location": item["location"],
                 "employment_type": item["employment_type"],
-                "is_active": True,
+                "is_active": target_is_active,
                 "description": item["description"],
             })
         except Exception as ex:
             logger.warning(f"Failed to persist synced job {job_id} to Excel: {ex}")
 
-    # Optionally deactivate CATS positions that are no longer active on the site
-    if deactivate_missing:
-        existing_cats_jobs = db.query(JobPosition).filter(
-            JobPosition.id.like("cats-%"),
-            JobPosition.is_active == True,
-        ).all()
-        for j in existing_cats_jobs:
-            if j.id not in scraped_ids:
-                j.is_active = False
-                deactivated_count += 1
-                try:
-                    excel_svc.save_job_position({
-                        "id": j.id,
-                        "title": j.title,
-                        "department": j.department,
-                        "location": j.location,
-                        "employment_type": j.employment_type,
-                        "is_active": False,
-                        "description": j.description,
-                    })
-                except Exception as ex:
-                    logger.warning(f"Failed to update deactivated job {j.id} in Excel: {ex}")
+    # Deactivate CATS positions that have been filled/hired or are missing from live site
+    existing_cats_jobs = db.query(JobPosition).filter(
+        JobPosition.id.like("cats-%"),
+        JobPosition.is_active == True,
+    ).all()
+    for j in existing_cats_jobs:
+        has_hired_ref = db.query(Referral).filter(
+            Referral.position_id == j.id,
+            Referral.status == ReferralStatus.HIRED.value,
+        ).first() is not None
+
+        should_deactivate = has_hired_ref or (deactivate_missing and j.id not in scraped_ids)
+        if should_deactivate:
+            j.is_active = False
+            deactivated_count += 1
+            try:
+                excel_svc.save_job_position({
+                    "id": j.id,
+                    "title": j.title,
+                    "department": j.department,
+                    "location": j.location,
+                    "employment_type": j.employment_type,
+                    "is_active": False,
+                    "description": j.description,
+                })
+            except Exception as ex:
+                logger.warning(f"Failed to update deactivated job {j.id} in Excel: {ex}")
 
     db.commit()
     for j in synced_jobs:

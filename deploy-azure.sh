@@ -101,7 +101,7 @@ log "Creating Azure Static Web App (Free tier)..."
 az staticwebapp create \
   --name "$FRONTEND_APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
-  --location "$LOCATION" \
+  --location "eastasia" \
   --sku Free \
   --output none 2>/dev/null || warn "Static Web App may already exist."
 

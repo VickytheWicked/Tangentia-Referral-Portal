@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     SHAREPOINT_DRIVE_ID: str = Field(default="", description="SharePoint Document Library Drive ID")
     SHAREPOINT_ROOT_FOLDER: str = Field(default="Referral-CVs", description="Root folder in document library for CVs")
     
+    # Azure Blob Storage (used when SHAREPOINT_STORAGE_TYPE == 'blob' or EXCEL_STORAGE_TYPE == 'blob')
+    AZURE_STORAGE_CONNECTION_STRING: str = Field(default="", description="Azure Storage Account connection string")
+    BLOB_CV_CONTAINER: str = Field(default="referral-cvs", description="Blob container for CV uploads")
+    BLOB_DATA_CONTAINER: str = Field(default="referral-data", description="Blob container for Excel workbook")
+
     # Storage Mock Directory (used when SHAREPOINT_STORAGE_TYPE == 'mock')
     LOCAL_STORAGE_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "mock_sharepoint")
 

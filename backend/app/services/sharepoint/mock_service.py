@@ -2,7 +2,7 @@ import os
 import uuid
 import mimetypes
 from datetime import datetime, timezone
-from typing import Tuple
+from typing import Tuple, Optional
 from fastapi import HTTPException, status
 from app.config import settings
 from app.services.sharepoint.base import SharePointServiceInterface, SharePointUploadResult
@@ -68,23 +68,51 @@ class MockSharePointService(SharePointServiceInterface):
 
     async def download_cv(
         self,
-        drive_id: str,
-        item_id: str,
+        drive_id: Optional[str] = None,
+        item_id: Optional[str] = None,
+        referral_number: Optional[str] = None,
+        stored_filename: Optional[str] = None,
+        original_filename: Optional[str] = None,
+        candidate_name: Optional[str] = None,
     ) -> Tuple[bytes, str, str]:
         index = self._load_index()
-        file_path = index.get(item_id)
-        if file_path and os.path.exists(file_path):
-            filename = os.path.basename(file_path)
-            content_type, _ = mimetypes.guess_type(filename)
-            if not content_type:
-                content_type = "application/pdf" if filename.endswith(".pdf") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            with open(file_path, "rb") as fp:
-                return fp.read(), filename, content_type
+        if item_id:
+            file_path = index.get(item_id)
+            if file_path and os.path.exists(file_path):
+                filename = os.path.basename(file_path)
+                content_type, _ = mimetypes.guess_type(filename)
+                if not content_type:
+                    content_type = "application/pdf" if filename.endswith(".pdf") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                with open(file_path, "rb") as fp:
+                    return fp.read(), filename, content_type
 
-        # Fallback to search by item_id or any file
+        # Match by referral_number or stored_filename
         for root, _, files in os.walk(self.base_dir):
             for f in files:
-                if f.startswith("_"):
+                if f.startswith("_") or f.startswith("."):
+                    continue
+                if not (f.lower().endswith(".pdf") or f.lower().endswith(".docx")):
+                    continue
+                match = False
+                if referral_number and referral_number in f:
+                    match = True
+                elif stored_filename and stored_filename != "resume.pdf" and (f.endswith(stored_filename) or stored_filename in f):
+                    match = True
+
+                if match:
+                    file_path = os.path.join(root, f)
+                    content_type, _ = mimetypes.guess_type(f)
+                    if not content_type:
+                        content_type = "application/pdf" if f.endswith(".pdf") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    with open(file_path, "rb") as fp:
+                        return fp.read(), f, content_type
+
+        # Fallback to any file in mock storage
+        for root, _, files in os.walk(self.base_dir):
+            for f in files:
+                if f.startswith("_") or f.startswith("."):
+                    continue
+                if not (f.lower().endswith(".pdf") or f.lower().endswith(".docx")):
                     continue
                 file_path = os.path.join(root, f)
                 content_type, _ = mimetypes.guess_type(f)
@@ -97,9 +125,11 @@ class MockSharePointService(SharePointServiceInterface):
 
     async def delete_cv(
         self,
-        drive_id: str,
-        item_id: str,
+        drive_id: Optional[str] = None,
+        item_id: Optional[str] = None,
     ) -> bool:
+        if not item_id:
+            return True
         index = self._load_index()
         if item_id in index:
             try:

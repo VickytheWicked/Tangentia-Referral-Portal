@@ -6,9 +6,39 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.config import settings
 from app.models.user import User, UserRole
-from app.services.auth_service import verify_microsoft_token, sync_user_session
+from app.services.auth_service import decode_access_token
 
 security = HTTPBearer(auto_error=False)
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """
+    Optionally retrieve the authenticated user from JWT Bearer token.
+    Returns None if unauthenticated or token is invalid, allowing guest employee access.
+    """
+    if not credentials or not credentials.credentials:
+        return None
+
+    token = credentials.credentials
+    try:
+        claims = decode_access_token(token)
+        user_id = claims.get("sub")
+        email = claims.get("email")
+        query = db.query(User)
+        if user_id:
+            user = query.filter(User.id == user_id).first()
+            if user:
+                return user
+        if email:
+            user = query.filter(User.email.ilike(email)).first()
+            if user:
+                return user
+        return None
+    except Exception:
+        return None
 
 
 async def get_current_user(
@@ -17,36 +47,47 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """
-    Validate Microsoft Entra ID token and retrieve the authenticated user record.
-    Rejects any unauthenticated or unauthorized access.
+    Validate JWT access token and retrieve the authenticated user record.
+    Rejects any unauthenticated access with 401 Unauthorized.
     """
     token = None
     if credentials:
         token = credentials.credentials
 
-    # Fallback to dev mode default token if none provided in dev mode
+    # Test / Dev token fallback if explicitly provided
+    if not token and settings.DEV_MODE and x_dev_role:
+        token = "dev-hr-token" if x_dev_role == "hr_admin" else "dev-employee-token"
+
     if not token:
-        if settings.DEV_MODE:
-            # Check dev role requested
-            if x_dev_role == "hr_admin":
-                token = "dev-hr-token"
-            else:
-                token = "dev-employee-token"
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required. Please sign in with your corporate Microsoft account.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please sign in with your @tangentia.com HR account.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    claims = await verify_microsoft_token(token)
-    
-    # Handle dev role override if DEV_MODE is enabled
-    role_override = None
-    if settings.DEV_MODE and x_dev_role in [UserRole.EMPLOYEE.value, UserRole.HR_ADMIN.value]:
-        role_override = x_dev_role
+    claims = decode_access_token(token)
+    user_id = claims.get("sub")
+    email = claims.get("email")
 
-    user = sync_user_session(db, claims, explicit_role_override=role_override)
+    user = None
+    if user_id:
+        user = db.query(User).filter(User.id == user_id).first()
+    if not user and email:
+        user = db.query(User).filter(User.email.ilike(email)).first()
+
+    if not user:
+        # Re-create in-memory user if present in claims
+        user = User(
+            id=user_id or "user-hr-001",
+            name=claims.get("name", "HR Administrator"),
+            email=email or "hr.lead@tangentia.com",
+            role=claims.get("role", UserRole.HR_ADMIN.value),
+            department="Human Resources",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
     return user
 
 
@@ -55,7 +96,7 @@ async def require_hr_admin(
 ) -> User:
     """
     Ensure the authenticated user holds the HR_ADMIN role.
-    Raises 403 Forbidden if the user is a standard employee.
+    Raises 403 Forbidden if the user is not an HR administrator.
     """
     if current_user.role != UserRole.HR_ADMIN.value:
         raise HTTPException(

@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models.job_position import JobPosition
 from app.models.user import User
 from app.schemas.job_position import JobPositionCreate, JobPositionUpdate, JobPositionResponse, SyncCatsResponse
-from app.api.deps import get_current_user, require_hr_admin
+from app.api.deps import get_current_user_optional, require_hr_admin
 
 logger = logging.getLogger("referral_portal.jobs")
 
@@ -18,14 +18,15 @@ router = APIRouter(prefix="/jobs", tags=["Job Openings"])
 async def list_job_positions(
     include_inactive: bool = False,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
     List job positions.
-    Employees see only active jobs; HR can view inactive/archived jobs as well.
+    Accessible publicly to employees without login.
+    Employees see only active jobs; authenticated HR can view inactive/archived jobs as well.
     """
     query = db.query(JobPosition)
-    if not include_inactive or current_user.role != "hr_admin":
+    if not include_inactive or not current_user or current_user.role != "hr_admin":
         query = query.filter(JobPosition.is_active == True)
     
     return query.order_by(JobPosition.created_at.desc()).all()
@@ -80,8 +81,9 @@ async def preview_cats_jobs(
 async def get_job_position(
     job_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    """View job details (Accessible to employees without login)"""
     job = db.query(JobPosition).filter(JobPosition.id == job_id).first()
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job position not found.")

@@ -100,7 +100,12 @@ export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCand
           <span className="metric-value">{analytics?.active_referrals || 0}</span>
         </div>
 
-        <div className="metric-card">
+        <div
+          className="metric-card"
+          style={{ cursor: 'pointer' }}
+          onClick={() => onNavigate('hired-history')}
+          title="View all hired candidates in Hired History"
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span className="metric-label">Hired Candidates</span>
             <CheckCircle size={20} color="#10b981" />

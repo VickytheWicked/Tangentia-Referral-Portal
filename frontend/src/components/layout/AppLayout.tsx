@@ -9,11 +9,12 @@ import {
   Briefcase,
   Layers,
   Sparkles,
+  Award,
   Menu,
   X,
   ShieldCheck,
-  UserCheck,
-  ArrowLeftRight,
+  LogOut,
+  LogIn,
 } from 'lucide-react';
 
 interface AppLayoutProps {
@@ -21,38 +22,28 @@ interface AppLayoutProps {
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const { user, role, switchRole, isDevMode } = useAuth();
+  const { user, isHR, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
-  const isHR = location.pathname.startsWith('/hr');
-
-  // Automatically sync dev role if DEV_MODE is enabled when route changes
-  useEffect(() => {
-    if (isDevMode) {
-      if (isHR && role !== 'hr_admin') {
-        switchRole('hr_admin');
-      } else if (!isHR && role !== 'employee') {
-        switchRole('employee');
-      }
-    }
-  }, [isHR, isDevMode, role, switchRole]);
-
-  // Close mobile menu whenever the route changes
+  // Close mobile drawer on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
   const getPageTitle = () => {
     const path = location.pathname;
+    if (path.includes('/hired-history')) return 'Hired Referral History';
     if (path.includes('/employee/submit')) return 'Submit New Referral';
     if (path.includes('/employee/referrals') || path.includes('/employee/my-referrals')) return 'Candidate Referrals';
+    if (path.startsWith('/employee/openings')) return 'Available Openings';
     if (path.startsWith('/employee')) return 'Employee Dashboard';
     if (path.includes('/hr/referrals')) return 'Enterprise Candidate Database';
     if (path.includes('/hr/jobs')) return 'Job Openings Management';
     if (path.includes('/hr/analytics')) return 'Referral Funnel & Analytics';
     if (path.startsWith('/hr')) return 'HR Referral Overview';
+    if (path.includes('/login')) return 'HR Portal Login';
     return 'Tangentia Referral Portal';
   };
 
@@ -61,15 +52,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     setMobileMenuOpen(false);
   };
 
-  const handleToggleRole = async () => {
-    const nextRole = role === 'hr_admin' ? 'employee' : 'hr_admin';
-    await switchRole(nextRole);
-    if (nextRole === 'hr_admin') {
-      navigate('/hr/dashboard');
-    } else {
-      navigate('/employee/dashboard');
-    }
+  const handleLogout = () => {
+    logout();
+    navigate('/employee/dashboard');
   };
+
+  // Do not render sidebar/navbar layout on login page
+  if (location.pathname === '/login' || location.pathname.startsWith('/login/')) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="app-container">
@@ -91,7 +82,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             </div>
             <div>
               <h1 className="brand-name">Tangentia</h1>
-              <span className="brand-tag">{isHR ? 'Talent Acquisition' : 'Referral Portal'}</span>
+              <span className="brand-tag">{isHR ? 'HR Administration' : 'Referral Portal'}</span>
             </div>
           </div>
           {/* Close button inside mobile drawer */}
@@ -113,14 +104,23 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           {!isHR ? (
             <>
               <div
-                className={`nav-item ${location.pathname === '/employee' || location.pathname === '/employee/dashboard'
+                className={`nav-item ${
+                  location.pathname === '/employee' || location.pathname === '/employee/dashboard'
                     ? 'active'
                     : ''
-                  }`}
+                }`}
                 onClick={() => handleNavClick('/employee/dashboard')}
               >
                 <Layers size={18} />
                 <span>Dashboard</span>
+              </div>
+
+              <div
+                className={`nav-item ${location.pathname === '/employee/openings' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/employee/openings')}
+              >
+                <Briefcase size={18} />
+                <span>Available Openings</span>
               </div>
 
               <div
@@ -132,23 +132,31 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               </div>
 
               <div
-                className={`nav-item ${location.pathname === '/employee/referrals' || location.pathname === '/employee/my-referrals'
+                className={`nav-item ${
+                  location.pathname === '/employee/referrals' || location.pathname === '/employee/my-referrals'
                     ? 'active'
                     : ''
-                  }`}
+                }`}
                 onClick={() => handleNavClick('/employee/referrals')}
               >
                 <Users size={18} />
-                <span>Referrals</span>
+                <span>Candidate Referrals</span>
+              </div>
+
+              <div
+                className={`nav-item ${location.pathname === '/employee/hired-history' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/employee/hired-history')}
+              >
+                <Award size={18} />
+                <span>Hired History</span>
               </div>
             </>
           ) : (
             <>
               <div
-                className={`nav-item ${location.pathname === '/hr' || location.pathname === '/hr/dashboard'
-                    ? 'active'
-                    : ''
-                  }`}
+                className={`nav-item ${
+                  location.pathname === '/hr' || location.pathname === '/hr/dashboard' ? 'active' : ''
+                }`}
                 onClick={() => handleNavClick('/hr/dashboard')}
               >
                 <Layers size={18} />
@@ -160,7 +168,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 onClick={() => handleNavClick('/hr/referrals')}
               >
                 <FolderKanban size={18} />
-                <span>All Referrals</span>
+                <span>All Candidates</span>
               </div>
 
               <div
@@ -168,7 +176,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 onClick={() => handleNavClick('/hr/jobs')}
               >
                 <Briefcase size={18} />
-                <span>Job Openings</span>
+                <span>Manage Openings</span>
               </div>
 
               <div
@@ -178,25 +186,46 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 <BarChart3 size={18} />
                 <span>Analytics</span>
               </div>
+
+              <div
+                className={`nav-item ${location.pathname === '/hr/hired-history' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/hr/hired-history')}
+              >
+                <Award size={18} />
+                <span>Hired History</span>
+              </div>
             </>
           )}
 
-          {/* Quick Role Switcher in Sidebar Footer for Mobile/Desktop */}
-          {isDevMode && (
-            <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
-              <div className="nav-section-title" style={{ padding: '0 0 8px 0' }}>
-                Environment Mode
-              </div>
+          {/* Sidebar Footer Action */}
+          <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
+            {isHR ? (
               <button
                 className="btn btn-secondary btn-sm"
-                style={{ width: '100%', justifyContent: 'center', fontSize: '0.8rem' }}
-                onClick={handleToggleRole}
+                style={{ width: '100%', justifyContent: 'center', fontSize: '0.82rem', gap: '8px' }}
+                onClick={handleLogout}
               >
-                <ArrowLeftRight size={14} />
-                Switch to {role === 'hr_admin' ? 'Employee' : 'HR Admin'}
+                <LogOut size={15} />
+                Sign Out (HR)
               </button>
-            </div>
-          )}
+            ) : (
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  fontSize: '0.82rem',
+                  gap: '8px',
+                  borderColor: 'rgba(59, 130, 246, 0.4)',
+                  color: '#93c5fd',
+                }}
+                onClick={() => handleNavClick('/login')}
+              >
+                <ShieldCheck size={15} color="#60a5fa" />
+                HR Admin Sign In
+              </button>
+            )}
+          </div>
         </nav>
       </aside>
 
@@ -214,62 +243,115 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             <h2 className="page-title">{getPageTitle()}</h2>
           </div>
 
-          <div className="navbar-right">
-            {/* User Profile / Role Pill */}
-            {/* <div className="header-user-pill" title={user?.email || 'Logged in user'}>
-              <div className="header-user-avatar">
-                {role === 'hr_admin' ? <ShieldCheck size={16} /> : <UserCheck size={16} />}
-              </div>
-              <span className="header-user-name">
-                {user?.name || (role === 'hr_admin' ? 'HR Lead' : 'Employee')}
-              </span>
-              <span
+          <div className="navbar-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {isHR ? (
+              <>
+                <div
+                  className="header-user-pill"
+                  title={user?.email || 'Logged in as HR Admin'}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <div className="header-user-avatar" style={{ background: 'rgba(139, 92, 246, 0.25)', color: '#c4b5fd' }}>
+                    <ShieldCheck size={16} />
+                  </div>
+                  <span className="header-user-name">
+                    {user?.name || 'HR Administrator'}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      padding: '2px 7px',
+                      borderRadius: '10px',
+                      background: 'rgba(139, 92, 246, 0.25)',
+                      color: '#c4b5fd',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    HR
+                  </span>
+                </div>
+
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleLogout}
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '6px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                  title="Sign out of HR Admin"
+                >
+                  <LogOut size={14} />
+                  <span className="hidden-mobile">Sign Out</span>
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => navigate('/login')}
                 style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 700,
-                  padding: '2px 7px',
-                  borderRadius: '10px',
-                  background: role === 'hr_admin' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                  color: role === 'hr_admin' ? '#c4b5fd' : '#93c5fd',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
+                  fontSize: '0.82rem',
+                  padding: '6px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: 'rgba(59, 130, 246, 0.35)',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  color: '#93c5fd',
                 }}
               >
-                {role === 'hr_admin' ? 'HR' : 'Emp'}
-              </span>
-            </div> */}
+                <ShieldCheck size={15} color="#60a5fa" />
+                <span>HR Login</span>
+              </button>
+            )}
           </div>
         </header>
 
         <main className="content-area">{children}</main>
 
-        {/* Mobile Bottom Navigation Bar for instantaneous navigation on phones */}
+        {/* Mobile Bottom Navigation Bar */}
         <nav className="mobile-bottom-nav">
           {!isHR ? (
             <>
               <div
-                className={`mobile-bottom-nav-item ${location.pathname === '/employee' || location.pathname === '/employee/dashboard'
+                className={`mobile-bottom-nav-item ${
+                  location.pathname === '/employee' || location.pathname === '/employee/dashboard'
                     ? 'active'
                     : ''
-                  }`}
+                }`}
                 onClick={() => handleNavClick('/employee/dashboard')}
               >
                 <Layers size={18} />
                 <span>Dashboard</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${location.pathname === '/employee/submit' ? 'active' : ''
-                  }`}
+                className={`mobile-bottom-nav-item ${
+                  location.pathname === '/employee/openings' ? 'active' : ''
+                }`}
+                onClick={() => handleNavClick('/employee/openings')}
+              >
+                <Briefcase size={18} />
+                <span>Openings</span>
+              </div>
+              <div
+                className={`mobile-bottom-nav-item ${
+                  location.pathname === '/employee/submit' ? 'active' : ''
+                }`}
                 onClick={() => handleNavClick('/employee/submit')}
               >
                 <PlusCircle size={18} />
                 <span>Submit</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${location.pathname === '/employee/referrals' || location.pathname === '/employee/my-referrals'
+                className={`mobile-bottom-nav-item ${
+                  location.pathname === '/employee/referrals' || location.pathname === '/employee/my-referrals'
                     ? 'active'
                     : ''
-                  }`}
+                }`}
                 onClick={() => handleNavClick('/employee/referrals')}
               >
                 <Users size={18} />
@@ -279,34 +361,34 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           ) : (
             <>
               <div
-                className={`mobile-bottom-nav-item ${location.pathname === '/hr' || location.pathname === '/hr/dashboard'
-                    ? 'active'
-                    : ''
-                  }`}
+                className={`mobile-bottom-nav-item ${
+                  location.pathname === '/hr' || location.pathname === '/hr/dashboard' ? 'active' : ''
+                }`}
                 onClick={() => handleNavClick('/hr/dashboard')}
               >
                 <Layers size={18} />
                 <span>Dashboard</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${location.pathname === '/hr/referrals' ? 'active' : ''
-                  }`}
+                className={`mobile-bottom-nav-item ${
+                  location.pathname === '/hr/referrals' ? 'active' : ''
+                }`}
                 onClick={() => handleNavClick('/hr/referrals')}
               >
                 <FolderKanban size={18} />
                 <span>Candidates</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${location.pathname === '/hr/jobs' ? 'active' : ''
-                  }`}
+                className={`mobile-bottom-nav-item ${location.pathname === '/hr/jobs' ? 'active' : ''}`}
                 onClick={() => handleNavClick('/hr/jobs')}
               >
                 <Briefcase size={18} />
                 <span>Openings</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${location.pathname === '/hr/analytics' ? 'active' : ''
-                  }`}
+                className={`mobile-bottom-nav-item ${
+                  location.pathname === '/hr/analytics' ? 'active' : ''
+                }`}
                 onClick={() => handleNavClick('/hr/analytics')}
               >
                 <BarChart3 size={18} />

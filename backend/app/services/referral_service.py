@@ -58,9 +58,12 @@ def check_duplicate_candidate(
     Returns structured matches for employee review.
     """
     matches: List[DuplicateMatch] = []
-    norm_email = candidate_email.lower().strip()
-    norm_phone = normalize_phone(candidate_phone)
-    norm_name = candidate_name.strip().lower()
+    trimmed_email = candidate_email.strip()
+    norm_email = trimmed_email.lower()
+    trimmed_phone = candidate_phone.strip()
+    norm_phone = normalize_phone(trimmed_phone)
+    trimmed_name = candidate_name.strip()
+    norm_name = trimmed_name.lower()
 
     # Query all active referrals
     candidates = db.query(Referral).filter(
@@ -69,12 +72,21 @@ def check_duplicate_candidate(
 
     for ref in candidates:
         reasons = []
-        if ref.candidate_email.lower().strip() == norm_email:
-            reasons.append("Matching Email Address")
-        if norm_phone and normalize_phone(ref.candidate_phone) == norm_phone:
-            reasons.append("Matching Phone Number")
-        if ref.candidate_name.strip().lower() == norm_name and ref.position_id == position_id:
-            reasons.append("Matching Name & Job Position")
+        ref_trimmed_email = (ref.candidate_email or "").strip()
+        ref_norm_email = ref_trimmed_email.lower()
+        if norm_email and ref_norm_email == norm_email:
+            reasons.append(f"Matching Email Address: '{trimmed_email}' (existing candidate email: '{ref_trimmed_email}')")
+
+        ref_trimmed_phone = (ref.candidate_phone or "").strip()
+        ref_norm_phone = normalize_phone(ref_trimmed_phone)
+        if norm_phone and ref_norm_phone and ref_norm_phone == norm_phone:
+            reasons.append(f"Matching Phone Number: '{trimmed_phone}' (normalized digits: '{norm_phone}', existing candidate phone: '{ref_trimmed_phone}')")
+
+        ref_trimmed_name = (ref.candidate_name or "").strip()
+        ref_norm_name = ref_trimmed_name.lower()
+        if norm_name and ref_norm_name == norm_name and ref.position_id == position_id:
+            pos_title = ref.position.title if ref.position else "Target Position"
+            reasons.append(f"Matching Name & Job Position: Name '{trimmed_name}' applied to '{pos_title}'")
 
         if reasons:
             referrer_name = ref.referred_by_name or (ref.referred_by.name if ref.referred_by else "Unknown Employee")
@@ -89,7 +101,7 @@ def check_duplicate_candidate(
                     status=ref.status,
                     referred_by_name=referrer_name,
                     created_at=ref.created_at.strftime("%Y-%m-%d"),
-                    match_reason=", ".join(reasons),
+                    match_reason="; ".join(reasons),
                 )
             )
 
@@ -163,6 +175,8 @@ async def create_referral_with_cv(
     # Step 2: Save to Database
     try:
         referral_referrer = (form_data.referred_by_name.strip() if form_data.referred_by_name else None) or (current_user.name if current_user else "Employee")
+        referral_referrer_email = (str(form_data.referred_by_email).strip().lower() if form_data.referred_by_email else None) or (current_user.email if current_user else None)
+        referral_referrer_phone = (str(form_data.referred_by_phone).strip() if form_data.referred_by_phone else None)
         referral = Referral(
             referral_number=ref_number,
             candidate_name=form_data.candidate_name.strip(),
@@ -176,6 +190,8 @@ async def create_referral_with_cv(
             position_id=position.id,
             referred_by_user_id=current_user.id,
             referred_by_name=referral_referrer,
+            referred_by_email=referral_referrer_email,
+            referred_by_phone=referral_referrer_phone,
             status=ReferralStatus.SUBMITTED.value,
             sharepoint_drive_id=upload_result.drive_id,
             sharepoint_item_id=upload_result.item_id,
@@ -211,6 +227,7 @@ async def create_referral_with_cv(
                 "candidate_email": referral.candidate_email,
                 "candidate_phone": referral.candidate_phone,
                 "referred_by_name": referral.referred_by_name,
+                "referred_by_email": referral.referred_by_email or current_user.email,
                 "years_of_experience": referral.years_of_experience,
                 "relationship": referral.relationship,
                 "position_title": position.title if position else "N/A",
@@ -280,23 +297,95 @@ def update_referral_status(
         comment=comment or f"Status changed from {old_status} to {new_status} by {current_user.name}",
     )
     db.add(history)
+
+    # If the candidate was hired, deactivate the position and auto-archive competing referrals
+    if new_status == ReferralStatus.HIRED.value:
+        position = db.query(JobPosition).filter(JobPosition.id == referral.position_id).first()
+        if position and position.is_active:
+            position.is_active = False
+            try:
+                from app.services.excel import get_excel_service
+                get_excel_service().save_job_position({
+                    "id": position.id,
+                    "title": position.title,
+                    "department": position.department,
+                    "location": position.location,
+                    "employment_type": position.employment_type,
+                    "is_active": False,
+                    "description": position.description,
+                    "created_at": position.created_at.strftime("%Y-%m-%d %H:%M:%S") if position.created_at else "",
+                })
+            except Exception as pos_err:
+                logger.warning(f"Failed to update deactivated position in Excel: {pos_err}")
+
+        # Find and auto-archive all other active referrals for this position
+        other_referrals = db.query(Referral).filter(
+            Referral.position_id == referral.position_id,
+            Referral.id != referral.id,
+            Referral.status.notin_([ReferralStatus.HIRED.value, ReferralStatus.ARCHIVED.value]),
+        ).all()
+
+        pos_title = position.title if position else "Position"
+        archive_reason = f"Position '{pos_title}' was filled by candidate {referral.candidate_name} (Hired). Automatically archived."
+
+        for other_ref in other_referrals:
+            other_old_status = other_ref.status
+            other_ref.status = ReferralStatus.ARCHIVED.value
+            other_hist = ReferralStatusHistory(
+                referral_id=other_ref.id,
+                old_status=other_old_status,
+                new_status=ReferralStatus.ARCHIVED.value,
+                changed_by_user_id=current_user.id,
+                comment=archive_reason,
+            )
+            db.add(other_hist)
+            try:
+                from app.services.excel import get_excel_service
+                get_excel_service().update_referral_status(
+                    referral_id=other_ref.id,
+                    referral_number=other_ref.referral_number,
+                    new_status=ReferralStatus.ARCHIVED.value,
+                    comment=archive_reason,
+                    changed_by=current_user.name,
+                )
+            except Exception as other_err:
+                logger.warning(f"Failed to write archived status to Excel for referral {other_ref.id}: {other_err}")
+
     db.commit()
     db.refresh(referral)
 
     # Write-through to Microsoft Excel
     try:
         from app.services.excel import get_excel_service
-        get_excel_service().update_referral_status(
+        excel_svc = get_excel_service()
+        excel_svc.update_referral_status(
             referral_id=referral.id,
             referral_number=referral.referral_number,
             new_status=new_status,
             comment=comment,
             changed_by=current_user.name,
         )
+        if new_status == ReferralStatus.HIRED.value:
+            pos = referral.position
+            excel_svc.save_hired_record({
+                "id": referral.id,
+                "referral_number": referral.referral_number,
+                "candidate_name": referral.candidate_name,
+                "candidate_email": referral.candidate_email,
+                "position_id": referral.position_id,
+                "position_title": pos.title if pos else "Unknown Position",
+                "department": pos.department if pos else "General",
+                "location": pos.location if pos else "Tangentia Office",
+                "employment_type": pos.employment_type if pos else "Full-time",
+                "referred_by_name": referral.referred_by_name or (referral.referred_by.name if referral.referred_by else "Employee"),
+                "hired_at": referral.updated_at or referral.created_at,
+                "status": "Hired",
+            })
     except Exception as excel_err:
         logger.warning(f"Excel status update write-through failed: {excel_err}")
 
     return referral
+
 
 
 def withdraw_referral(
@@ -408,5 +497,9 @@ async def get_referral_cv_bytes(
     file_bytes, filename, content_type = await sharepoint_service.download_cv(
         drive_id=referral.sharepoint_drive_id,
         item_id=referral.sharepoint_item_id,
+        referral_number=referral.referral_number,
+        stored_filename=referral.stored_filename,
+        original_filename=referral.original_filename,
+        candidate_name=referral.candidate_name,
     )
     return file_bytes, referral.original_filename or filename, content_type

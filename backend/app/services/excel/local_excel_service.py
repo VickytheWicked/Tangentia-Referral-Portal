@@ -1,4 +1,5 @@
 import os
+import io
 import logging
 import threading
 from datetime import datetime, timezone
@@ -25,6 +26,7 @@ BORDER_THIN = Border(
 
 SHEET_SCHEMAS = {
     "Referrals": [
+
         "Referral Number",
         "Candidate Name",
         "Candidate Email",
@@ -79,12 +81,27 @@ SHEET_SCHEMAS = {
         "User ID",
         "Name",
         "Email",
+        "Password",
         "Role",
         "Department",
-        "Entra User ID",
         "Created At",
     ],
+    "HiredHistory": [
+        "Referral Number",
+        "Candidate Name",
+        "Candidate Email",
+        "Position Title",
+        "Department",
+        "Location",
+        "Employment Type",
+        "Referred By",
+        "Hired Date",
+        "Status",
+        "Referral ID",
+        "Position ID",
+    ],
 }
+
 
 
 class LocalExcelService(ExcelServiceInterface):
@@ -122,10 +139,48 @@ class LocalExcelService(ExcelServiceInterface):
             ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
 
     def initialize_workbook(self) -> None:
-        """Create structured Excel workbook if it doesn't exist"""
+        """Create structured Excel workbook if it doesn't exist, and ensure sheet schemas are current"""
         with self._lock:
             if os.path.exists(self.file_path):
+                # Ensure Users sheet exists and has updated headers including Password
+                try:
+                    wb = openpyxl.load_workbook(self.file_path)
+                    modified = False
+                    if "Users" not in wb.sheetnames:
+                        ws = wb.create_sheet(title="Users")
+                        self._style_header_row(ws, SHEET_SCHEMAS["Users"])
+                        self._auto_adjust_column_widths(ws)
+                        modified = True
+                    else:
+                        ws = wb["Users"]
+                        headers = [str(c.value).strip() if c.value is not None else "" for c in ws[1]]
+                        if "Password" not in headers:
+                            # Re-create/update header row
+                            ws.delete_rows(1)
+                            ws.insert_rows(1)
+                            for col_idx, h in enumerate(SHEET_SCHEMAS["Users"], 1):
+                                cell = ws.cell(row=1, column=col_idx, value=h)
+                                cell.fill = HEADER_FILL
+                                cell.font = HEADER_FONT
+                                cell.alignment = Alignment(horizontal="center", vertical="center")
+                                cell.border = BORDER_THIN
+                            ws.row_dimensions[1].height = 26
+                            self._auto_adjust_column_widths(ws)
+                            modified = True
+                    # Ensure HiredHistory sheet exists
+                    if "HiredHistory" not in wb.sheetnames:
+                        ws_hh = wb.create_sheet(title="HiredHistory")
+                        self._style_header_row(ws_hh, SHEET_SCHEMAS["HiredHistory"])
+                        self._auto_adjust_column_widths(ws_hh)
+                        modified = True
+
+                    if modified:
+                        wb.save(self.file_path)
+                    wb.close()
+                except Exception as e:
+                    logger.warning(f"Error checking sheets in Excel workbook: {e}")
                 return
+
 
             wb = openpyxl.Workbook()
             default_sheet = wb.active
@@ -262,8 +317,17 @@ class LocalExcelService(ExcelServiceInterface):
                 now_str,
             ])
 
+            # If status transitioned away from Hired, remove from HiredHistory worksheet
+            if "HiredHistory" in wb.sheetnames and new_status != "Hired":
+                ws_hh = wb["HiredHistory"]
+                for r in range(2, ws_hh.max_row + 1):
+                    if str(ws_hh.cell(row=r, column=11).value or "").strip() == str(referral_id).strip():
+                        ws_hh.delete_rows(r)
+                        break
+
             wb.save(self.file_path)
             wb.close()
+
 
     def append_hr_note(
         self,
@@ -373,6 +437,254 @@ class LocalExcelService(ExcelServiceInterface):
                 for r in reversed(rows_to_del):
                     ws_n.delete_rows(r)
 
+            # 4. Clean up HiredHistory sheet
+            if "HiredHistory" in wb.sheetnames:
+                ws_hh = wb["HiredHistory"]
+                row_to_del = None
+                for r in range(2, ws_hh.max_row + 1):
+                    if str(ws_hh.cell(row=r, column=11).value or "").strip() == str(referral_id).strip():
+                        row_to_del = r
+                        break
+                if row_to_del:
+                    ws_hh.delete_rows(row_to_del)
+
             wb.save(self.file_path)
             wb.close()
             logger.info(f"Deleted referral {referral_id} from Microsoft Excel workbook.")
+
+
+    def save_user(self, user_data: Dict[str, Any]) -> None:
+        """Insert or update user in Users worksheet"""
+        with self._lock:
+            if not os.path.exists(self.file_path):
+                self.initialize_workbook()
+            wb = openpyxl.load_workbook(self.file_path)
+            if "Users" not in wb.sheetnames:
+                ws = wb.create_sheet(title="Users")
+                self._style_header_row(ws, SHEET_SCHEMAS["Users"])
+            else:
+                ws = wb["Users"]
+
+            headers = SHEET_SCHEMAS["Users"]
+            user_id = str(user_data.get("id") or "").strip()
+            email = str(user_data.get("email") or "").strip().lower()
+
+            target_row = None
+            email_col = headers.index("Email") + 1
+            id_col = headers.index("User ID") + 1
+
+            for r in range(2, ws.max_row + 1):
+                c_email = str(ws.cell(row=r, column=email_col).value or "").strip().lower()
+                c_id = str(ws.cell(row=r, column=id_col).value or "").strip()
+                if (email and c_email == email) or (user_id and c_id == user_id):
+                    target_row = r
+                    break
+
+            row_num = target_row if target_row else ws.max_row + 1
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+            row_values = [
+                user_id,
+                user_data.get("name", ""),
+                user_data.get("email", ""),
+                user_data.get("password", ""),
+                user_data.get("role", "employee"),
+                user_data.get("department", ""),
+                user_data.get("created_at") or now_str,
+            ]
+
+            for col_idx, val in enumerate(row_values, start=1):
+                cell = ws.cell(row=row_num, column=col_idx, value=val)
+                cell.font = DATA_FONT
+                cell.border = BORDER_THIN
+
+            self._auto_adjust_column_widths(ws)
+            wb.save(self.file_path)
+            wb.close()
+            logger.info(f"Saved user {email} to Users worksheet (row {row_num}).")
+
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Look up user directly from the Users worksheet in Excel"""
+        with self._lock:
+            if not os.path.exists(self.file_path):
+                return None
+            wb = openpyxl.load_workbook(self.file_path, data_only=True)
+            if "Users" not in wb.sheetnames:
+                wb.close()
+                return None
+            ws = wb["Users"]
+            sheet_headers = [str(cell.value).strip() if cell.value is not None else "" for cell in ws[1]]
+            email_idx = None
+            for idx, h in enumerate(sheet_headers):
+                if h.lower() == "email":
+                    email_idx = idx
+                    break
+
+            if email_idx is None:
+                wb.close()
+                return None
+
+            clean_email = email.strip().lower()
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if not any(row):
+                    continue
+                row_email = str(row[email_idx] or "").strip().lower() if email_idx < len(row) else ""
+                if row_email == clean_email:
+                    res = {}
+                    for idx, h in enumerate(sheet_headers):
+                        if h:
+                            res[h] = row[idx] if idx < len(row) else None
+                    wb.close()
+                    return res
+
+            wb.close()
+            return None
+
+    def save_hired_record(self, hired: Dict[str, Any]) -> None:
+        """Insert or update a candidate record in HiredHistory sheet"""
+        with self._lock:
+            if not os.path.exists(self.file_path):
+                self.initialize_workbook()
+            wb = openpyxl.load_workbook(self.file_path)
+            if "HiredHistory" not in wb.sheetnames:
+                ws = wb.create_sheet(title="HiredHistory")
+                self._style_header_row(ws, SHEET_SCHEMAS["HiredHistory"])
+            else:
+                ws = wb["HiredHistory"]
+
+            ref_id = str(hired.get("id") or hired.get("referral_id") or "").strip()
+            existing_row = None
+            for r in range(2, ws.max_row + 1):
+                if str(ws.cell(row=r, column=11).value or "").strip() == ref_id:
+                    existing_row = r
+                    break
+
+            hired_at = hired.get("hired_at")
+            if isinstance(hired_at, datetime):
+                hired_at_str = hired_at.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                hired_at_str = str(hired_at or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
+
+            row_values = [
+                hired.get("referral_number", ""),
+                hired.get("candidate_name", ""),
+                hired.get("candidate_email", ""),
+                hired.get("position_title", ""),
+                hired.get("department", ""),
+                hired.get("location", ""),
+                hired.get("employment_type", "Full-time"),
+                hired.get("referred_by_name", "Employee"),
+                hired_at_str,
+                hired.get("status", "Hired"),
+                ref_id,
+                str(hired.get("position_id") or ""),
+            ]
+
+            if existing_row:
+                for col_idx, val in enumerate(row_values, start=1):
+                    ws.cell(row=existing_row, column=col_idx, value=val)
+            else:
+                ws.append(row_values)
+                r_idx = ws.max_row
+                for col_idx in range(1, len(row_values) + 1):
+                    cell = ws.cell(row=r_idx, column=col_idx)
+                    cell.font = DATA_FONT
+                    cell.border = BORDER_THIN
+                    cell.alignment = Alignment(vertical="center")
+
+            self._auto_adjust_column_widths(ws)
+            wb.save(self.file_path)
+            wb.close()
+            logger.info(f"Saved hired candidate {hired.get('candidate_name')} ({ref_id}) to HiredHistory worksheet.")
+
+
+def generate_hired_history_workbook_bytes(hired_items: List[Any]) -> bytes:
+    """
+    Generate a standalone styled Microsoft Excel (.xlsx) workbook for Hired Referral History.
+    Can accept Referral models, dicts, or Pydantic schemas.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "HiredHistory"
+
+    headers = SHEET_SCHEMAS["HiredHistory"]
+    ws.append(headers)
+    ws.freeze_panes = "A2"
+    for col_idx, _ in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = HEADER_FILL
+        cell.font = HEADER_FONT
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = BORDER_THIN
+    ws.row_dimensions[1].height = 26
+
+    for item in hired_items:
+        if isinstance(item, dict):
+            ref_num = item.get("referral_number", "")
+            cand_name = item.get("candidate_name", "")
+            cand_email = item.get("candidate_email", "")
+            pos_title = item.get("position_title", "")
+            dept = item.get("department", "")
+            loc = item.get("location", "")
+            emp_type = item.get("employment_type", "Full-time")
+            ref_by = item.get("referred_by_name", "")
+            hired_at = item.get("hired_at", "")
+            status_val = item.get("status", "Hired")
+            ref_id = item.get("id") or item.get("referral_id", "")
+            pos_id = item.get("position_id", "")
+        else:
+            ref_num = getattr(item, "referral_number", "")
+            cand_name = getattr(item, "candidate_name", "")
+            cand_email = getattr(item, "candidate_email", "")
+            pos = getattr(item, "position", None)
+            pos_title = getattr(item, "position_title", (pos.title if pos else ""))
+            dept = getattr(item, "department", (pos.department if pos else ""))
+            loc = getattr(item, "location", (pos.location if pos else ""))
+            emp_type = getattr(item, "employment_type", (pos.employment_type if pos else "Full-time"))
+            ref_by = getattr(item, "referred_by_name", "")
+            hired_at = getattr(item, "hired_at", (getattr(item, "updated_at", None) or getattr(item, "created_at", None)))
+            status_val = "Hired"
+            ref_id = getattr(item, "id", "")
+            pos_id = getattr(item, "position_id", "")
+
+        if isinstance(hired_at, datetime):
+            hired_at_str = hired_at.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            hired_at_str = str(hired_at or "")
+
+        row = [
+            ref_num,
+            cand_name,
+            cand_email,
+            pos_title,
+            dept,
+            loc,
+            emp_type or "Full-time",
+            ref_by or "Employee",
+            hired_at_str,
+            status_val,
+            str(ref_id),
+            str(pos_id),
+        ]
+        ws.append(row)
+        r_idx = ws.max_row
+        for c_idx in range(1, len(row) + 1):
+            cell = ws.cell(row=r_idx, column=c_idx)
+            cell.font = DATA_FONT
+            cell.border = BORDER_THIN
+            cell.alignment = Alignment(vertical="center")
+
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            val = str(cell.value or "")
+            if len(val) > max_len:
+                max_len = len(val)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    wb.close()
+    return buf.getvalue()
+

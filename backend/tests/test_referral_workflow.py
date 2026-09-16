@@ -188,3 +188,88 @@ def test_hr_archive_and_delete_workflow(client, seeded_job):
     # 5. Verify referral is gone
     get_res = client.get(f"/api/referrals/{ref_id}", headers=hr_headers)
     assert get_res.status_code == 404
+
+
+def test_referrer_email_custom_submitted_details(client, seeded_job):
+    """
+    Verify that the referrer email and name submitted in the employee details
+    are stored and returned properly (not defaulting to employee@tangentia.com).
+    """
+    pdf_content = b"%PDF-1.4\n1 0 obj\n<< /Title (Referral CV) >>\nendobj\ntrailer\n<<>>\n%%EOF"
+    submit_data = {
+        "candidate_name": "Devin Torres",
+        "candidate_email": "devin.torres@example.com",
+        "candidate_phone": "+14165553333",
+        "referred_by_name": "Sarah Connor",
+        "referred_by_email": "sarah.connor@tangentia.com",
+        "referred_by_phone": "+14165554444",
+        "relationship": "Former Colleague",
+        "referral_note": "Exceptional team lead and systems architect.",
+        "position_id": seeded_job.id,
+        "candidate_consent": True,
+    }
+    files = {"file": ("devin_torres_cv.pdf", io.BytesIO(pdf_content), "application/pdf")}
+
+    # Submit referral publicly as employee (no auth token required)
+    res = client.post("/api/referrals", data=submit_data, files=files)
+    assert res.status_code == 201
+    created_ref = res.json()
+
+    # The referrer name and email MUST match what was submitted, NOT employee@tangentia.com
+    assert created_ref["referred_by_name"] == "Sarah Connor"
+    assert created_ref["referred_by_email"] == "sarah.connor@tangentia.com"
+    ref_id = created_ref["id"]
+
+    # Detail view check
+    detail_res = client.get(f"/api/referrals/{ref_id}")
+    assert detail_res.status_code == 200
+    assert detail_res.json()["referred_by_name"] == "Sarah Connor"
+    assert detail_res.json()["referred_by_email"] == "sarah.connor@tangentia.com"
+
+    # List view check
+    list_res = client.get("/api/referrals")
+    assert list_res.status_code == 200
+    matched = [r for r in list_res.json() if r["id"] == ref_id]
+    assert len(matched) == 1
+    assert matched[0]["referred_by_name"] == "Sarah Connor"
+    assert matched[0]["referred_by_email"] == "sarah.connor@tangentia.com"
+
+    # CV Download check
+    cv_res = client.get(f"/api/referrals/{ref_id}/cv")
+    assert cv_res.status_code == 200
+    assert cv_res.headers["content-type"] == "application/pdf"
+    assert cv_res.content == pdf_content
+
+
+def test_download_cv_fallback_when_item_id_none(client, db_session, seeded_job):
+    from app.models.referral import Referral
+    import uuid
+
+    ref_id = str(uuid.uuid4())
+    ref = Referral(
+        id=ref_id,
+        referral_number="REF-2026-999999",
+        candidate_name="Fallback Test",
+        candidate_email="fallback@tangentia.com",
+        candidate_phone="+14160000000",
+        referred_by_name="Test Referrer",
+        referred_by_user_id="default-employee-id",
+        years_of_experience=2.0,
+        relationship="Former Colleague",
+        referral_note="Great candidate.",
+        position_id=seeded_job.id,
+        status="Submitted",
+        original_filename="devin_torres_cv.pdf",
+        stored_filename="devin_torres_cv.pdf",
+        sharepoint_drive_id=None,
+        sharepoint_item_id=None,
+        candidate_consent=True,
+    )
+    db_session.add(ref)
+    db_session.commit()
+
+    cv_res = client.get(f"/api/referrals/{ref_id}/cv")
+    assert cv_res.status_code == 200
+    assert len(cv_res.content) > 0
+
+

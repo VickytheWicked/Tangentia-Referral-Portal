@@ -147,3 +147,17 @@ export interface AnalyticsResponse {
   monthly_trends: MonthlyTrend[];
   top_referrers: TopReferrer[];
 }
+
+export interface HiredHistoryItem {
+  id: string;
+  referral_number: string;
+  candidate_name: string;
+  position_id: string;
+  position_title: string;
+  department: string;
+  location: string;
+  employment_type?: string;
+  referred_by_name?: string;
+  hired_at: string;
+  status: string;
+}

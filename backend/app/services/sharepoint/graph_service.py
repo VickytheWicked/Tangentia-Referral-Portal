@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from typing import Tuple
+from typing import Tuple, Optional
 import msal
 import httpx
 from fastapi import HTTPException, status
@@ -112,10 +112,20 @@ class GraphSharePointService(SharePointServiceInterface):
 
     async def download_cv(
         self,
-        drive_id: str,
-        item_id: str,
+        drive_id: Optional[str] = None,
+        item_id: Optional[str] = None,
+        referral_number: Optional[str] = None,
+        stored_filename: Optional[str] = None,
+        original_filename: Optional[str] = None,
+        candidate_name: Optional[str] = None,
     ) -> Tuple[bytes, str, str]:
         """Download CV binary stream from SharePoint via Microsoft Graph"""
+        if not drive_id or not item_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File metadata not found in SharePoint.",
+            )
+
         token = self._get_access_token()
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -140,9 +150,11 @@ class GraphSharePointService(SharePointServiceInterface):
 
     async def delete_cv(
         self,
-        drive_id: str,
-        item_id: str,
+        drive_id: Optional[str] = None,
+        item_id: Optional[str] = None,
     ) -> bool:
+        if not drive_id or not item_id:
+            return True
         """Rollback helper: delete uploaded item if downstream DB operations fail"""
         try:
             token = self._get_access_token()

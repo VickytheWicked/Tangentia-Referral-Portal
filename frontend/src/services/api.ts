@@ -9,17 +9,24 @@ import {
   AnalyticsResponse,
   UserRole,
   SyncCatsResponse,
+  HiredHistoryItem,
 } from '../types';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
-// Current active dev role stored in localStorage for seamless dev mode testing
-let currentDevRole: UserRole = (localStorage.getItem('dev_role') as UserRole) || 'employee';
-let currentAuthToken: string | null = localStorage.getItem('msal_token');
+// Clear any legacy persistent tokens from localStorage to prevent accidental auto-login
+try {
+  localStorage.removeItem('tangentia_auth_token');
+  localStorage.removeItem('dev_role');
+} catch {}
+
+// Auth token stored in sessionStorage for the active HR Administrator tab session
+let currentAuthToken: string | null = sessionStorage.getItem('tangentia_auth_token');
+let currentDevRole: UserRole = (sessionStorage.getItem('dev_role') as UserRole) || 'employee';
 
 export const setDevRole = (role: UserRole) => {
   currentDevRole = role;
-  localStorage.setItem('dev_role', role);
+  sessionStorage.setItem('dev_role', role);
 };
 
 export const getStoredDevRole = (): UserRole => currentDevRole;
@@ -27,22 +34,22 @@ export const getStoredDevRole = (): UserRole => currentDevRole;
 export const setAuthToken = (token: string | null) => {
   currentAuthToken = token;
   if (token) {
-    localStorage.setItem('msal_token', token);
+    sessionStorage.setItem('tangentia_auth_token', token);
   } else {
-    localStorage.removeItem('msal_token');
+    sessionStorage.removeItem('tangentia_auth_token');
+    try {
+      localStorage.removeItem('tangentia_auth_token');
+    } catch {}
   }
 };
 
+export const getAuthToken = (): string | null => currentAuthToken;
+
 const getHeaders = (isMultipart: boolean = false): HeadersInit => {
-  const headers: Record<string, string> = {
-    'X-Dev-Role': currentDevRole,
-  };
+  const headers: Record<string, string> = {};
 
   if (currentAuthToken) {
     headers['Authorization'] = `Bearer ${currentAuthToken}`;
-  } else {
-    // Default dev token for dev mode
-    headers['Authorization'] = `Bearer dev-${currentDevRole === 'hr_admin' ? 'hr' : 'employee'}-token`;
   }
 
   if (!isMultipart) {
@@ -68,9 +75,18 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 export const api = {
   // Auth
+  async login(credentials: { email: string; password: string }): Promise<{ access_token: string; token_type: string; user: User }> {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials),
+    });
+    return handleResponse<{ access_token: string; token_type: string; user: User }>(res);
+  },
+
   async getAuthConfig() {
     const res = await fetch(`${API_BASE}/auth/config`);
-    return handleResponse<{ tenant_id: string; client_id: string; authority: string; dev_mode: boolean }>(res);
+    return handleResponse<{ dev_mode: boolean; auth_domain: string }>(res);
   },
 
   async getCurrentUser(): Promise<User> {
@@ -154,7 +170,39 @@ export const api = {
     return handleResponse<ReferralSummary[]>(res);
   },
 
+  async getHiredHistory(positionId?: string): Promise<HiredHistoryItem[]> {
+    const url = positionId
+      ? `${API_BASE}/referrals/hired-history?position_id=${encodeURIComponent(positionId)}`
+      : `${API_BASE}/referrals/hired-history`;
+    const res = await fetch(url, {
+      headers: getHeaders(),
+    });
+    return handleResponse<HiredHistoryItem[]>(res);
+  },
+
+  async downloadHiredHistoryExcel(positionId?: string): Promise<void> {
+    const url = positionId
+      ? `${API_BASE}/referrals/hired-history/excel-export?position_id=${encodeURIComponent(positionId)}`
+      : `${API_BASE}/referrals/hired-history/excel-export`;
+    const res = await fetch(url, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error('Failed to export Hired Referral History Excel spreadsheet.');
+    }
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = 'Tangentia_Hired_History.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(blobUrl);
+    document.body.removeChild(a);
+  },
+
   async getReferralDetail(id: string): Promise<ReferralDetail> {
+
     const res = await fetch(`${API_BASE}/referrals/${id}`, {
       headers: getHeaders(),
     });
@@ -176,13 +224,32 @@ export const api = {
       headers: getHeaders(),
     });
     if (!res.ok) {
-      throw new Error('Failed to retrieve CV file.');
+      let errMsg = 'Failed to retrieve CV file.';
+      try {
+        const errorData = await res.json();
+        if (errorData && errorData.detail) {
+          errMsg = errorData.detail;
+        }
+      } catch {
+        // Fallback to generic message
+      }
+      throw new Error(errMsg);
     }
+
+    let filename = suggestedFilename;
+    const disposition = res.headers.get('Content-Disposition');
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename=["']?([^"';]+)["']?/);
+      if (match && match[1]) {
+        filename = match[1].trim();
+      }
+    }
+
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = suggestedFilename || `CV_${referralId}.pdf`;
+    a.download = filename || `CV_${referralId}.pdf`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);

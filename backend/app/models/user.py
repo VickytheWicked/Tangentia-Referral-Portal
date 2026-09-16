@@ -15,9 +15,10 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    entra_user_id = Column(String(100), unique=True, index=True, nullable=False)
+    entra_user_id = Column(String(100), unique=True, index=True, nullable=True)
     name = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
+    password = Column(String(255), nullable=True)
     role = Column(String(50), default=UserRole.EMPLOYEE.value, nullable=False)
     department = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

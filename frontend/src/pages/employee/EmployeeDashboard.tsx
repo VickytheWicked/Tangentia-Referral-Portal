@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
-import { ReferralSummary, ReferralDetail } from '../../types';
+import { ReferralSummary, ReferralDetail, JobPosition } from '../../types';
 import { api } from '../../services/api';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
@@ -17,6 +18,9 @@ import {
   ExternalLink,
   Search,
   AlertCircle,
+  Briefcase,
+  MapPin,
+  ArrowRight,
 } from 'lucide-react';
 
 interface EmployeeDashboardProps {
@@ -25,8 +29,11 @@ interface EmployeeDashboardProps {
 
 export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [referrals, setReferrals] = useState<ReferralSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [openings, setOpenings] = useState<JobPosition[]>([]);
+  const [isOpeningsLoading, setIsOpeningsLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
   const [selectedReferral, setSelectedReferral] = useState<ReferralDetail | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState<boolean>(false);
@@ -48,8 +55,21 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
     }
   };
 
+  const fetchOpenings = async () => {
+    setIsOpeningsLoading(true);
+    try {
+      const data = await api.getJobs(false);
+      setOpenings(data);
+    } catch (err) {
+      console.error('Failed to load openings:', err);
+    } finally {
+      setIsOpeningsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchReferrals();
+    fetchOpenings();
   }, []);
 
   const openDetail = async (refSummary: ReferralSummary) => {
@@ -140,13 +160,215 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
           <span className="metric-value">{inInterview}</span>
         </div>
 
-        <div className="metric-card">
+        <div
+          className="metric-card"
+          style={{ cursor: 'pointer' }}
+          onClick={() => onNavigate('hired-history')}
+          title="View all hired candidates in Hired History"
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span className="metric-label">Successfully Hired</span>
             <CheckCircle size={20} color="#10b981" />
           </div>
           <span className="metric-value">{hired}</span>
         </div>
+      </div>
+
+      {/* Available Openings Section */}
+      <div className="card">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '18px',
+            flexWrap: 'wrap',
+            gap: '12px',
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Briefcase size={20} color="#60a5fa" />
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Available Openings
+              </h3>
+              {!isOpeningsLoading && openings.length > 0 && (
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    color: '#93c5fd',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                  }}
+                >
+                  {openings.length} Active {openings.length === 1 ? 'Role' : 'Roles'}
+                </span>
+              )}
+            </div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+              Explore current open positions. Click any opening to submit a referral with this target job position fixed.
+            </p>
+          </div>
+
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => onNavigate('openings')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <span>View All Openings</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
+
+        {isOpeningsLoading ? (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            Loading available openings...
+          </div>
+        ) : openings.length === 0 ? (
+          <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <Briefcase size={36} color="var(--text-muted)" style={{ margin: '0 auto 10px auto' }} />
+            <p style={{ fontSize: '0.88rem' }}>No open job positions currently available.</p>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
+              gap: '16px',
+            }}
+          >
+            {openings.slice(0, 4).map((job) => (
+              <div
+                key={job.id}
+                onClick={() => {
+                  navigate(`/employee/submit?positionId=${encodeURIComponent(job.id)}`, {
+                    state: { positionId: job.id },
+                  });
+                }}
+                className="hover-card"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '12px',
+                  padding: '18px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        color: '#60a5fa',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      {job.department}
+                    </span>
+                    {job.id.startsWith('cats-') && (
+                      <span
+                        style={{
+                          fontSize: '0.64rem',
+                          fontWeight: 700,
+                          padding: '1px 5px',
+                          borderRadius: '4px',
+                          background: 'rgba(59, 130, 246, 0.15)',
+                          color: '#93c5fd',
+                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                        }}
+                      >
+                        CATS ATS
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 600,
+                      padding: '2px 6px',
+                      borderRadius: '10px',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      color: '#34d399',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                    }}
+                  >
+                    Active
+                  </span>
+                </div>
+
+                <h4 style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                  {job.title}
+                </h4>
+
+                <p
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.45,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    flex: 1,
+                    margin: 0,
+                  }}
+                  title={job.description}
+                >
+                  {job.description}
+                </p>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    fontSize: '0.76rem',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <MapPin size={12} /> {job.location}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={12} /> {job.employment_type}
+                  </span>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '10px', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '7px 12px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/employee/submit?positionId=${encodeURIComponent(job.id)}`, {
+                        state: { positionId: job.id },
+                      });
+                    }}
+                  >
+                    <PlusCircle size={14} /> Refer for this Role
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Recent Referrals Table */}
@@ -335,6 +557,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
             <div className="responsive-info-grid" style={{ gap: '12px', fontSize: '0.86rem' }}>
               <div><strong>Email:</strong> {selectedReferral.candidate_email}</div>
               <div><strong>Phone:</strong> {selectedReferral.candidate_phone}</div>
+              <div><strong>Referred By:</strong> {selectedReferral.referred_by_name || 'N/A'} {selectedReferral.referred_by_email && `(${selectedReferral.referred_by_email})`}</div>
               <div><strong>Experience:</strong> {selectedReferral.years_of_experience} years</div>
               <div><strong>Relationship:</strong> {selectedReferral.relationship}</div>
               {selectedReferral.linkedin_url && (

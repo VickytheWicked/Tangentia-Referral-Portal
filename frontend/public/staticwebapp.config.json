@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/staticwebapp.config.json",
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": [
+      "/assets/*",
+      "/api/*",
+      "*.{css,js,json,png,jpg,jpeg,gif,svg,ico,webp,woff,woff2,ttf,eot,webmanifest,map}"
+    ]
+  },
+  "mimeTypes": {
+    ".json": "text/json"
+  }
+}

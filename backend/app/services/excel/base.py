@@ -77,3 +77,25 @@ class ExcelServiceInterface(ABC):
         Delete candidate referral and related entries from Microsoft Excel storage.
         """
         pass
+
+    @abstractmethod
+    def save_user(self, user_data: Dict[str, Any]) -> None:
+        """
+        Insert or update a user record in the Users worksheet.
+        """
+        pass
+
+    @abstractmethod
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve user record directly by email from the Users worksheet.
+        """
+        pass
+
+    @abstractmethod
+    def save_hired_record(self, hired_data: Dict[str, Any]) -> None:
+        """
+        Insert or update a candidate record in the HiredHistory worksheet.
+        """
+        pass
+

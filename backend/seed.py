@@ -21,9 +21,10 @@ def seed_database():
         hr_user = db.query(User).filter(User.email == "hr.lead@tangentia.com").first()
         if not hr_user:
             hr_user = User(
-                entra_user_id="entra-user-dev-hr-001",
+                entra_user_id="user-dev-hr-001",
                 name="Marcus Vance",
                 email="hr.lead@tangentia.com",
+                password="TangentiaHR@2026",
                 role=UserRole.HR_ADMIN.value,
                 department="Human Resources",
             )
