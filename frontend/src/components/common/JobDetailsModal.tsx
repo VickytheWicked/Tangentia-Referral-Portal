@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { JobPosition } from '../../types';
 import { Modal } from './Modal';
+import { JobUnavailableModal } from './JobUnavailableModal';
+import { api } from '../../services/api';
 import {
   Briefcase,
   MapPin,
@@ -12,6 +14,7 @@ import {
   FileText,
   CheckCircle2,
   XCircle,
+  Loader2,
 } from 'lucide-react';
 
 interface JobDetailsModalProps {
@@ -19,6 +22,7 @@ interface JobDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   showReferButton?: boolean;
+  onRefer?: (job: JobPosition) => void;
 }
 
 export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
@@ -26,8 +30,11 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
   isOpen,
   onClose,
   showReferButton = true,
+  onRefer,
 }) => {
   const navigate = useNavigate();
+  const [isChecking, setIsChecking] = useState<boolean>(false);
+  const [isUnavailableModalOpen, setIsUnavailableModalOpen] = useState<boolean>(false);
 
   if (!job) return null;
 
@@ -121,11 +128,27 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
     );
   };
 
-  const handleReferClick = () => {
-    onClose();
-    navigate(`/employee/submit?positionId=${encodeURIComponent(job.id)}`, {
-      state: { positionId: job.id },
-    });
+  const handleReferClick = async () => {
+    if (onRefer) {
+      onRefer(job);
+      return;
+    }
+    setIsChecking(true);
+    try {
+      const liveJob = await api.getJob(job.id);
+      if (!liveJob || !liveJob.is_active) {
+        setIsUnavailableModalOpen(true);
+        return;
+      }
+      onClose();
+      navigate(`/employee/submit?positionId=${encodeURIComponent(job.id)}`, {
+        state: { positionId: job.id },
+      });
+    } catch {
+      setIsUnavailableModalOpen(true);
+    } finally {
+      setIsChecking(false);
+    }
   };
 
   const modalFooter = (
@@ -162,9 +185,11 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
             type="button"
             className="btn btn-primary btn-sm"
             onClick={handleReferClick}
+            disabled={isChecking}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            <PlusCircle size={15} /> Refer Candidate
+            {isChecking ? <Loader2 size={15} className="spin" /> : <PlusCircle size={15} />}
+            {isChecking ? 'Checking status...' : 'Refer Candidate'}
           </button>
         )}
       </div>
@@ -172,13 +197,14 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
   );
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={job.title}
-      maxWidth="720px"
-      footer={modalFooter}
-    >
+    <>
+      <Modal
+        isOpen={isOpen && !isUnavailableModalOpen}
+        onClose={onClose}
+        title={job.title}
+        maxWidth="720px"
+        footer={modalFooter}
+      >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {/* Top Badges & Context */}
         <div
@@ -349,5 +375,20 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
         </div>
       </div>
     </Modal>
+
+    <JobUnavailableModal
+      isOpen={isUnavailableModalOpen}
+      onClose={() => {
+        setIsUnavailableModalOpen(false);
+        onClose();
+      }}
+      jobTitle={job.title}
+      onExploreOtherJobs={() => {
+        setIsUnavailableModalOpen(false);
+        onClose();
+        navigate('/employee/openings');
+      }}
+    />
+    </>
   );
 };

@@ -3,6 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { JobPosition, DuplicateMatch } from '../../types';
 import { api } from '../../services/api';
 import { DuplicateModal } from '../../components/common/DuplicateModal';
+import { JobUnavailableModal } from '../../components/common/JobUnavailableModal';
 import {
   UploadCloud,
   FileText,
@@ -90,6 +91,10 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
   const [showDuplicateModal, setShowDuplicateModal] = useState<boolean>(false);
   const [duplicateConfirmed, setDuplicateConfirmed] = useState<boolean>(false);
 
+  // Position Unavailable Modal
+  const [showUnavailableModal, setShowUnavailableModal] = useState<boolean>(false);
+  const [unavailableJobTitle, setUnavailableJobTitle] = useState<string>('');
+
   useEffect(() => {
     const fetchPositions = async () => {
       try {
@@ -98,6 +103,16 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
         if (jobs.length > 0) {
           if (preselectedJobId && jobs.some((j) => j.id === preselectedJobId)) {
             setPositionId(preselectedJobId);
+          } else if (preselectedJobId) {
+            // Position was preselected in URL / navigation state, but is no longer in active list
+            try {
+              const directJob = await api.getJob(preselectedJobId);
+              setUnavailableJobTitle(directJob?.title || 'Selected Position');
+            } catch {
+              setUnavailableJobTitle('Selected Position');
+            }
+            setShowUnavailableModal(true);
+            setPositionId(jobs[0].id);
           } else if (!positionId) {
             setPositionId(jobs[0].id);
           }
@@ -294,9 +309,14 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       const result = await api.submitReferral(formData);
       setSuccessReferralNumber(result.referral_number);
     } catch (err: any) {
-      setErrorMessage(
-        err.message || 'Referral submission could not be completed. The CV could not be uploaded to SharePoint.'
-      );
+      if (err.message && (err.message.toLowerCase().includes('no longer open') || err.message.toLowerCase().includes('invalid or no longer open'))) {
+        setUnavailableJobTitle(selectedJob?.title || 'Selected Position');
+        setShowUnavailableModal(true);
+      } else {
+        setErrorMessage(
+          err.message || 'Referral submission could not be completed. The CV could not be uploaded to SharePoint.'
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -906,6 +926,13 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
           setShowDuplicateModal(false);
           setErrorMessage(null);
         }}
+      />
+
+      {/* Position Unavailable Notice Modal */}
+      <JobUnavailableModal
+        isOpen={showUnavailableModal}
+        onClose={() => setShowUnavailableModal(false)}
+        jobTitle={unavailableJobTitle}
       />
     </div>
   );

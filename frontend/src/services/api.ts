@@ -104,6 +104,13 @@ export const api = {
     return handleResponse<JobPosition[]>(res);
   },
 
+  async getJob(id: string): Promise<JobPosition> {
+    const res = await fetch(`${API_BASE}/jobs/${encodeURIComponent(id)}`, {
+      headers: getHeaders(),
+    });
+    return handleResponse<JobPosition>(res);
+  },
+
   async createJob(data: Partial<JobPosition>): Promise<JobPosition> {
     const res = await fetch(`${API_BASE}/jobs`, {
       method: 'POST',

@@ -17,8 +17,10 @@ import {
     PlusCircle,
     ArrowRight,
     Eye,
+    Loader2,
 } from 'lucide-react';
 import { JobDetailsModal } from '../../components/common/JobDetailsModal';
+import { JobUnavailableModal } from '../../components/common/JobUnavailableModal';
 
 export const OpeningsPage: React.FC = () => {
     const navigate = useNavigate();
@@ -27,6 +29,13 @@ export const OpeningsPage: React.FC = () => {
     const [includeInactive, setIncludeInactive] = useState<boolean>(true);
     const [isSyncing, setIsSyncing] = useState<boolean>(false);
     const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+    // Live Availability Check & Unavailable Modal State
+    const [checkingJobId, setCheckingJobId] = useState<string | null>(null);
+    const [unavailableModal, setUnavailableModal] = useState<{
+        isOpen: boolean;
+        jobTitle: string;
+    }>({ isOpen: false, jobTitle: '' });
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -80,6 +89,50 @@ export const OpeningsPage: React.FC = () => {
             });
         } finally {
             setIsSyncing(false);
+        }
+    };
+
+    const handleReferCandidate = async (e: React.MouseEvent | null, job: JobPosition) => {
+        if (e) e.stopPropagation();
+        if (!job.is_active) {
+            if (viewingJob) setViewingJob(null);
+            setUnavailableModal({
+                isOpen: true,
+                jobTitle: job.title,
+            });
+            return;
+        }
+
+        setCheckingJobId(job.id);
+        try {
+            const liveJob = await api.getJob(job.id);
+            if (!liveJob || !liveJob.is_active) {
+                // Update local state so it immediately reflects deactivated status
+                setPositions((prev) =>
+                    prev.map((p) => (p.id === job.id ? { ...p, is_active: false } : p))
+                );
+                if (viewingJob) setViewingJob(null);
+                setUnavailableModal({
+                    isOpen: true,
+                    jobTitle: job.title,
+                });
+                return;
+            }
+            if (viewingJob) setViewingJob(null);
+            navigate(`/employee/submit?positionId=${encodeURIComponent(job.id)}`, {
+                state: { positionId: job.id },
+            });
+        } catch {
+            setPositions((prev) =>
+                prev.map((p) => (p.id === job.id ? { ...p, is_active: false } : p))
+            );
+            if (viewingJob) setViewingJob(null);
+            setUnavailableModal({
+                isOpen: true,
+                jobTitle: job.title,
+            });
+        } finally {
+            setCheckingJobId(null);
         }
     };
 
@@ -357,15 +410,15 @@ export const OpeningsPage: React.FC = () => {
                                             fontSize: '0.82rem',
                                             fontWeight: 600,
                                         }}
-                                        disabled={!job.is_active}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            navigate(`/employee/submit?positionId=${encodeURIComponent(job.id)}`, {
-                                                state: { positionId: job.id },
-                                            });
-                                        }}
+                                        disabled={checkingJobId === job.id}
+                                        onClick={(e) => handleReferCandidate(e, job)}
                                     >
-                                        <PlusCircle size={14} /> Refer Candidate
+                                        {checkingJobId === job.id ? (
+                                            <Loader2 size={14} className="spin" />
+                                        ) : (
+                                            <PlusCircle size={14} />
+                                        )}
+                                        {checkingJobId === job.id ? 'Checking...' : 'Refer Candidate'}
                                     </button>
                                 </div>
                             </div>
@@ -486,6 +539,18 @@ export const OpeningsPage: React.FC = () => {
                 isOpen={!!viewingJob}
                 onClose={() => setViewingJob(null)}
                 showReferButton={true}
+                onRefer={(job) => handleReferCandidate(null, job)}
+            />
+
+            {/* Job Deactivated / Unavailable Notice Modal */}
+            <JobUnavailableModal
+                isOpen={unavailableModal.isOpen}
+                onClose={() => setUnavailableModal({ isOpen: false, jobTitle: '' })}
+                jobTitle={unavailableModal.jobTitle}
+                onExploreOtherJobs={() => {
+                    setUnavailableModal({ isOpen: false, jobTitle: '' });
+                    fetchJobs();
+                }}
             />
         </div>
     );
