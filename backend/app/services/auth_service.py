@@ -109,7 +109,7 @@ def authenticate_hr_user(db: Session, email: str, password: str) -> Tuple[User, 
     else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Account not found. Please verify your email is configured in the Users sheet of Tangentia_Referrals.xlsx.",
+            detail="User does not exist. Please verify your email address or contact your administrator.",
         )
 
     # 3. Restrict to HR role only
@@ -123,7 +123,7 @@ def authenticate_hr_user(db: Session, email: str, password: str) -> Tuple[User, 
     if not target_password or target_password.strip() != password.strip():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password. Please check your credentials configured in the Excel file.",
+            detail="Password incorrect. Please check your password and try again.",
         )
 
     # 5. Sync to database

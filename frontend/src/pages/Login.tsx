@@ -4,16 +4,22 @@ import { useAuth } from '../auth/AuthContext';
 import {
   Sparkles,
   ShieldCheck,
+  ShieldAlert,
   Lock,
   Mail,
   Eye,
   EyeOff,
   AlertCircle,
+  AlertTriangle,
   ArrowRight,
   ArrowLeft,
   UserCheck,
+  UserX,
+  KeyRound,
   FileSpreadsheet,
 } from 'lucide-react';
+
+type AuthErrorType = 'user_not_found' | 'password_incorrect' | 'role_restricted' | 'domain_invalid' | 'general' | null;
 
 export const LoginPage: React.FC = () => {
   const { login, isHR, isLoading: isAuthLoading } = useAuth();
@@ -25,6 +31,7 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<AuthErrorType>(null);
 
   // If already logged in as HR, redirect to HR Dashboard
   useEffect(() => {
@@ -40,14 +47,17 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setErrorType(null);
 
     const cleanEmail = email.trim();
     if (!validateEmail(cleanEmail)) {
+      setErrorType('domain_invalid');
       setErrorMessage('Access restricted. Please use your official @tangentia.com HR email address.');
       return;
     }
 
     if (!password) {
+      setErrorType('password_incorrect');
       setErrorMessage('Please enter your HR portal password.');
       return;
     }
@@ -59,7 +69,41 @@ export const LoginPage: React.FC = () => {
       const from = (location.state as any)?.from?.pathname || '/hr/dashboard';
       navigate(from, { replace: true });
     } catch (err: any) {
-      setErrorMessage(err.message || 'Login failed. Please verify your credentials configured in the Excel file.');
+      const rawMsg = err.message || '';
+      const lower = rawMsg.toLowerCase();
+
+      if (
+        lower.includes('user does not exist') ||
+        lower.includes('account not found') ||
+        lower.includes('not registered') ||
+        lower.includes('user not found')
+      ) {
+        setErrorType('user_not_found');
+        setErrorMessage(
+          'User does not exist. No HR account found for this email address. Please check your email or contact the administrator.'
+        );
+      } else if (
+        (lower.includes('password') && (lower.includes('incorrect') || lower.includes('invalid'))) ||
+        lower.includes('credentials')
+      ) {
+        setErrorType('password_incorrect');
+        setErrorMessage(
+          'Password incorrect. The password you entered does not match our records. Please verify and try again.'
+        );
+      } else if (
+        lower.includes('access restricted') ||
+        lower.includes('employee') ||
+        lower.includes('forbidden') ||
+        lower.includes('403')
+      ) {
+        setErrorType('role_restricted');
+        setErrorMessage(
+          'Access restricted to HR administrators only. Employee accounts do not have access to this portal and do not require login.'
+        );
+      } else {
+        setErrorType('general');
+        setErrorMessage(rawMsg || 'Login failed. Please verify your credentials configured in the Excel file.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -176,9 +220,149 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Error notification */}
-        {errorMessage && (
+        {/* User Does Not Exist Warning Banner */}
+        {errorType === 'user_not_found' && (
           <div
+            className="fade-in"
+            style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(185, 28, 28, 0.09) 100%)',
+              border: '1px solid rgba(239, 68, 68, 0.45)',
+              borderRadius: '12px',
+              padding: '14px 16px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              boxShadow: '0 4px 16px rgba(239, 68, 68, 0.14)',
+            }}
+          >
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'rgba(239, 68, 68, 0.22)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                color: '#f87171',
+              }}
+            >
+              <UserX size={18} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, color: '#fca5a5', fontSize: '0.92rem', marginBottom: '3px' }}>
+                User Does Not Exist
+              </div>
+              <div style={{ color: '#fecaca', fontSize: '0.84rem', lineHeight: 1.45 }}>
+                {errorMessage}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Password Incorrect Warning Banner */}
+        {errorType === 'password_incorrect' && (
+          <div
+            className="fade-in"
+            style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(220, 38, 38, 0.12) 100%)',
+              border: '1px solid rgba(245, 158, 11, 0.5)',
+              borderRadius: '12px',
+              padding: '14px 16px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              boxShadow: '0 4px 16px rgba(245, 158, 11, 0.14)',
+            }}
+          >
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'rgba(245, 158, 11, 0.22)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                color: '#fbbf24',
+              }}
+            >
+              <KeyRound size={18} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, color: '#fde68a', fontSize: '0.92rem', marginBottom: '3px' }}>
+                Password Incorrect
+              </div>
+              <div style={{ color: '#fef3c7', fontSize: '0.84rem', lineHeight: 1.45 }}>
+                {errorMessage}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Role Restricted Banner */}
+        {errorType === 'role_restricted' && (
+          <div
+            className="fade-in"
+            style={{
+              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.16) 0%, rgba(59, 130, 246, 0.1) 100%)',
+              border: '1px solid rgba(168, 85, 247, 0.45)',
+              borderRadius: '12px',
+              padding: '14px 16px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+            }}
+          >
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'rgba(168, 85, 247, 0.22)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                color: '#c084fc',
+              }}
+            >
+              <ShieldAlert size={18} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, color: '#e9d5ff', fontSize: '0.92rem', marginBottom: '3px' }}>
+                Access Restricted to HR Admins
+              </div>
+              <div style={{ color: '#f3e8ff', fontSize: '0.84rem', lineHeight: 1.45, marginBottom: '8px' }}>
+                {errorMessage}
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => navigate('/employee/dashboard')}
+                style={{
+                  fontSize: '0.78rem',
+                  padding: '4px 10px',
+                  background: 'rgba(168, 85, 247, 0.25)',
+                  borderColor: 'rgba(168, 85, 247, 0.5)',
+                  color: '#e9d5ff',
+                }}
+              >
+                Go to Employee Portal <ArrowRight size={12} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Generic or Domain Error notification */}
+        {(errorType === 'domain_invalid' || errorType === 'general') && errorMessage && (
+          <div
+            className="fade-in"
             style={{
               background: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid rgba(239, 68, 68, 0.35)',
@@ -212,13 +396,39 @@ export const LoginPage: React.FC = () => {
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
-                if (errorMessage) setErrorMessage(null);
+                if (errorType === 'user_not_found' || errorType === 'domain_invalid') {
+                  setErrorType(null);
+                  setErrorMessage(null);
+                }
               }}
               style={{
-                borderColor: email && !validateEmail(email) ? 'rgba(239, 68, 68, 0.5)' : undefined,
+                borderColor:
+                  errorType === 'user_not_found'
+                    ? '#ef4444'
+                    : email && !validateEmail(email)
+                    ? 'rgba(239, 68, 68, 0.5)'
+                    : undefined,
+                boxShadow: errorType === 'user_not_found' ? '0 0 0 3px rgba(239, 68, 68, 0.2)' : undefined,
               }}
             />
-            {email && !validateEmail(email) && (
+            {errorType === 'user_not_found' && (
+              <div
+                className="fade-in"
+                style={{
+                  fontSize: '0.78rem',
+                  color: '#f87171',
+                  marginTop: '5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontWeight: 500,
+                }}
+              >
+                <UserX size={13} />
+                <span>User does not exist in the system</span>
+              </div>
+            )}
+            {email && !validateEmail(email) && errorType !== 'user_not_found' && (
               <span style={{ fontSize: '0.75rem', color: '#f87171', marginTop: '4px', display: 'block' }}>
                 Must be an @tangentia.com domain email address
               </span>
@@ -239,9 +449,16 @@ export const LoginPage: React.FC = () => {
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  if (errorMessage) setErrorMessage(null);
+                  if (errorType === 'password_incorrect') {
+                    setErrorType(null);
+                    setErrorMessage(null);
+                  }
                 }}
-                style={{ paddingRight: '40px' }}
+                style={{
+                  paddingRight: '40px',
+                  borderColor: errorType === 'password_incorrect' ? '#f59e0b' : undefined,
+                  boxShadow: errorType === 'password_incorrect' ? '0 0 0 3px rgba(245, 158, 11, 0.25)' : undefined,
+                }}
               />
               <button
                 type="button"
@@ -264,6 +481,23 @@ export const LoginPage: React.FC = () => {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {errorType === 'password_incorrect' && (
+              <div
+                className="fade-in"
+                style={{
+                  fontSize: '0.78rem',
+                  color: '#fbbf24',
+                  marginTop: '5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontWeight: 500,
+                }}
+              >
+                <KeyRound size={13} />
+                <span>Password incorrect. Please check and try again.</span>
+              </div>
+            )}
           </div>
 
           <button

@@ -45,6 +45,16 @@ def test_hr_login_invalid_password(client):
         json={"email": "hr.lead@tangentia.com", "password": "WrongPassword123"},
     )
     assert res.status_code == 401
+    assert "password incorrect" in res.json()["detail"].lower()
+
+
+def test_hr_login_user_does_not_exist(client):
+    res = client.post(
+        "/api/auth/login",
+        json={"email": "nobody.atall@tangentia.com", "password": "SomePassword123"},
+    )
+    assert res.status_code == 401
+    assert "user does not exist" in res.json()["detail"].lower()
 
 
 def test_hr_login_employee_rejected(client):
