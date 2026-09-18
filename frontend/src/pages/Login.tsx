@@ -16,7 +16,6 @@ import {
   UserCheck,
   UserX,
   KeyRound,
-  FileSpreadsheet,
 } from 'lucide-react';
 
 type AuthErrorType = 'user_not_found' | 'password_incorrect' | 'role_restricted' | 'domain_invalid' | 'general' | null;
@@ -445,7 +444,7 @@ export const LoginPage: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 required
                 className="form-input"
-                placeholder="Enter password from Excel"
+                placeholder="Enter your HR password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -524,35 +523,6 @@ export const LoginPage: React.FC = () => {
             )}
           </button>
         </form>
-
-        {/* Excel storage info banner */}
-        <div
-          style={{
-            marginTop: '24px',
-            padding: '12px 14px',
-            background: 'rgba(15, 23, 42, 0.65)',
-            border: '1px dashed rgba(255, 255, 255, 0.12)',
-            borderRadius: '10px',
-            fontSize: '0.78rem',
-            color: 'var(--text-muted)',
-            lineHeight: 1.45,
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '8px',
-          }}
-        >
-          <FileSpreadsheet size={16} color="#34d399" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div>
-            <strong style={{ color: '#e2e8f0' }}>Excel Credential Storage:</strong> Passwords are maintained in the{' '}
-            <code style={{ color: '#93c5fd', background: 'rgba(30, 41, 59, 0.8)', padding: '1px 5px', borderRadius: '4px' }}>
-              Users
-            </code>{' '}
-            sheet of <code style={{ color: '#93c5fd', background: 'rgba(30, 41, 59, 0.8)', padding: '1px 5px', borderRadius: '4px' }}>Tangentia_Referrals.xlsx</code>.
-            Default test account:{' '}
-            <span style={{ color: '#a7f3d0' }}>hr.lead@tangentia.com</span> /{' '}
-            <span style={{ color: '#a7f3d0' }}>TangentiaHR@2026</span>
-          </div>
-        </div>
       </div>
     </div>
   );
