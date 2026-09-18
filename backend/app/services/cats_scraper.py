@@ -257,7 +257,7 @@ def scrape_all_cats_jobs(client: Optional[httpx.Client] = None) -> List[Dict[str
 
 def sync_cats_jobs_with_db(
     db: Session,
-    deactivate_missing: bool = False,
+    deactivate_missing: bool = True,
     client: Optional[httpx.Client] = None,
 ) -> Dict[str, Any]:
     """

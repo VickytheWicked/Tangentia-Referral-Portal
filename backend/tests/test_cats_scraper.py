@@ -255,3 +255,56 @@ def test_sync_cats_deactivates_closed_jobs(db_session):
         assert open_cats_job.is_active is False
 
 
+def test_sync_cats_preserves_manually_added_jobs(db_session):
+    """
+    Verify that manually created jobs (IDs not starting with 'cats-') are NEVER
+    deactivated during CATS synchronization, even if they do not exist in CATS.
+    """
+    manual_job = JobPosition(
+        id="job-manual-12345",
+        title="Internal Special Project Lead",
+        department="Operations",
+        location="Toronto, Canada",
+        employment_type="Full-time",
+        description="Manually created opening by HR",
+        is_active=True,
+    )
+    cats_job_to_close = JobPosition(
+        id="cats-88888",
+        title="Old CATS Position",
+        department="Engineering",
+        location="Toronto, Canada",
+        employment_type="Full-time",
+        description="Old CATS role",
+        is_active=True,
+    )
+    db_session.add_all([manual_job, cats_job_to_close])
+    db_session.commit()
+
+    # Scraper returns only a new position, so cats-88888 should be deactivated,
+    # but manual_job MUST remain active.
+    mock_scraped = [
+        {
+            "portal_id": "cats-77777",
+            "title": "Fresh CATS Role",
+            "department": "Sales",
+            "location": "Remote",
+            "employment_type": "Full-time",
+            "description": "Scraped fresh role",
+        }
+    ]
+
+    with patch("app.services.cats_scraper.scrape_all_cats_jobs", return_value=mock_scraped):
+        res = sync_cats_jobs_with_db(db_session, deactivate_missing=True)
+        assert res["deactivated_count"] >= 1
+
+        db_session.refresh(cats_job_to_close)
+        db_session.refresh(manual_job)
+
+        # CATS job should be deactivated
+        assert cats_job_to_close.is_active is False
+        # Manually added job MUST remain active!
+        assert manual_job.is_active is True
+
+
+

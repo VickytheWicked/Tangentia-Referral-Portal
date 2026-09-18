@@ -122,7 +122,7 @@ export const api = {
     return handleResponse<JobPosition>(res);
   },
 
-  async syncCatsJobs(deactivateMissing: boolean = false): Promise<SyncCatsResponse> {
+  async syncCatsJobs(deactivateMissing: boolean = true): Promise<SyncCatsResponse> {
     const res = await fetch(`${API_BASE}/jobs/sync-cats?deactivate_missing=${deactivateMissing}`, {
       method: 'POST',
       headers: getHeaders(),

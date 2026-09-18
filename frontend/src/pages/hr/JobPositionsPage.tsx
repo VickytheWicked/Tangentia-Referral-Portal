@@ -22,7 +22,6 @@ export const JobPositionsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [includeInactive, setIncludeInactive] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [deactivateOnSync, setDeactivateOnSync] = useState<boolean>(true);
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Modal State
@@ -60,8 +59,8 @@ export const JobPositionsPage: React.FC = () => {
     setIsSyncing(true);
     setSyncFeedback(null);
     try {
-      const res = await api.syncCatsJobs(deactivateOnSync);
-      const deactivatedPart = deactivateOnSync && res.deactivated_count > 0
+      const res = await api.syncCatsJobs(true);
+      const deactivatedPart = res.deactivated_count > 0
         ? `, ${res.deactivated_count} deactivated`
         : '';
       setSyncFeedback({
@@ -170,42 +169,20 @@ export const JobPositionsPage: React.FC = () => {
               Show deactivated positions
             </label>
 
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.72rem', color: '#93c5fd', background: 'rgba(59, 130, 246, 0.15)', padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-                  Auto-syncs every 6h
-                </span>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={handleSyncCats}
-                  disabled={isSyncing}
-                  title="Scrape and synchronize live open requisitions from Tangentia CATS Careers"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <RefreshCw size={15} className={isSyncing ? 'spin' : ''} />
-                  {isSyncing ? 'Syncing CATS...' : 'Sync CATS ATS'}
-                </button>
-              </div>
-              <label
-                title="When enabled, CATS-imported positions that no longer appear on the CATS portal will be automatically deactivated."
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  fontSize: '0.74rem',
-                  color: deactivateOnSync ? '#f59e0b' : 'var(--text-muted)',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.72rem', color: '#93c5fd', background: 'rgba(59, 130, 246, 0.15)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                Auto-syncs every 6h
+              </span>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleSyncCats}
+                disabled={isSyncing}
+                title="Scrape and synchronize live open requisitions from Tangentia CATS Careers (closed jobs auto-deactivate)"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                <input
-                  type="checkbox"
-                  checked={deactivateOnSync}
-                  onChange={(e) => setDeactivateOnSync(e.target.checked)}
-                  style={{ width: '12px', height: '12px', accentColor: '#f59e0b' }}
-                />
-                Deactivate closed jobs
-              </label>
+                <RefreshCw size={15} className={isSyncing ? 'spin' : ''} />
+                {isSyncing ? 'Syncing CATS...' : 'Sync CATS ATS'}
+              </button>
             </div>
 
             <button className="btn btn-primary btn-sm" onClick={openCreateModal}>

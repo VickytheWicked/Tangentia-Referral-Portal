@@ -34,7 +34,7 @@ async def list_job_positions(
 
 @router.post("/sync-cats", response_model=SyncCatsResponse)
 async def sync_cats_jobs(
-    deactivate_missing: bool = False,
+    deactivate_missing: bool = True,
     db: Session = Depends(get_db),
     hr_user: User = Depends(require_hr_admin),
 ):
