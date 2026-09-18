@@ -240,9 +240,10 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
         ))
         db.commit()  # Commit defaults first so email UNIQUE index is populated
 
-        # Collect emails already in DB to avoid UNIQUE constraint on email
-        existing_emails = {u.email.lower() for u in db.query(User).all()}
+        # Collect emails, IDs, and entra IDs already in DB to avoid UNIQUE constraint violations
+        existing_emails = {u.email.lower() for u in db.query(User).all() if u.email}
         existing_ids = {u.id for u in db.query(User).all()}
+        existing_entra_ids = {u.entra_user_id for u in db.query(User).all() if u.entra_user_id}
 
         # Check if Excel Users sheet is empty, seed default HR user
         if len(data.get("Users", [])) == 0:
@@ -256,27 +257,38 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
             })
             data = excel_svc.load_all_data()
 
-        # Merge users from Excel Users sheet, skipping any already loaded by ID or email
+        # Merge users from Excel Users sheet, skipping duplicates safely
         for u_row in data.get("Users", []):
             u_id = str(u_row.get("User ID") or "").strip()
             u_email = str(u_row.get("Email") or "").strip().lower()
             if not u_id:
                 continue
-            # Use merge (upsert by PK) — it safely updates existing rows without duplicate inserts
+
             u_role = str(u_row.get("Role") or UserRole.EMPLOYEE.value)
             u_pass = str(u_row.get("Password") or "").strip()
-            # Preserve a stable entra_user_id if user already exists
+
+            # Preserve or generate a unique entra_user_id
             entra_id = str(u_row.get("Entra User ID") or "").strip()
-            if not entra_id:
+            if not entra_id or (entra_id in existing_entra_ids and u_id not in existing_ids):
                 if u_id in existing_ids:
                     existing_user = db.query(User).filter(User.id == u_id).first()
-                    entra_id = existing_user.entra_user_id or f"user-{u_id[:8]}"
+                    entra_id = (existing_user and existing_user.entra_user_id) or f"entra-{u_id}"
                 else:
-                    entra_id = f"user-{u_id[:8]}"
+                    entra_id = f"entra-{u_id}"
+                if entra_id in existing_entra_ids and u_id not in existing_ids:
+                    entra_id = f"entra-{u_id}-{uuid.uuid4().hex[:6]}"
+
+            # Safe unique email handling
+            clean_email = u_email or f"{u_id}@tangentia.com"
+            if clean_email in existing_emails and u_id not in existing_ids:
+                clean_email = f"{u_id}@tangentia.com"
+                if clean_email in existing_emails:
+                    clean_email = f"{u_id}-{uuid.uuid4().hex[:4]}@tangentia.com"
+
             u_obj = User(
                 id=u_id,
                 name=str(u_row.get("Name") or "Employee"),
-                email=u_email or f"{u_id[:8]}@tangentia.com",
+                email=clean_email,
                 password=u_pass,
                 role=u_role,
                 department=str(u_row.get("Department") or "Engineering"),
@@ -285,8 +297,9 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
             try:
                 db.merge(u_obj)
                 db.flush()
-                existing_emails.add(u_email)
+                existing_emails.add(clean_email.lower())
                 existing_ids.add(u_id)
+                existing_entra_ids.add(entra_id)
             except Exception as ue:
                 db.rollback()
                 logger.warning(f"Skipping duplicate user {u_id} ({u_email}): {ue}")
@@ -388,17 +401,31 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 ref_by_uid = str(row.get("Referred By User ID") or "").strip()
                 if not ref_by_uid or ref_by_uid not in valid_user_ids:
                     if ref_by_uid:
+                        safe_email = f"{ref_by_uid}@tangentia.com"
+                        if safe_email in existing_emails and ref_by_uid not in existing_ids:
+                            safe_email = f"{ref_by_uid}-{uuid.uuid4().hex[:4]}@tangentia.com"
+                        safe_entra = f"entra-{ref_by_uid}"
+                        if safe_entra in existing_entra_ids:
+                            safe_entra = f"entra-{ref_by_uid}-{uuid.uuid4().hex[:6]}"
                         new_user = User(
                             id=ref_by_uid,
                             name=referred_by or "Tangentia Employee",
-                            email=f"{ref_by_uid[:8]}@tangentia.com",
+                            email=safe_email,
                             role=UserRole.EMPLOYEE.value,
                             department="Engineering",
-                            entra_user_id=f"entra-{ref_by_uid}",
+                            entra_user_id=safe_entra,
                         )
-                        db.merge(new_user)
-                        db.commit()
-                        valid_user_ids.add(ref_by_uid)
+                        try:
+                            db.merge(new_user)
+                            db.commit()
+                            valid_user_ids.add(ref_by_uid)
+                            existing_emails.add(safe_email.lower())
+                            existing_ids.add(ref_by_uid)
+                            existing_entra_ids.add(safe_entra)
+                        except Exception as ue2:
+                            db.rollback()
+                            logger.warning(f"Failed creating missing user {ref_by_uid}: {ue2}")
+                            ref_by_uid = "user-emp-001"
                     else:
                         ref_by_uid = "user-emp-001"
 

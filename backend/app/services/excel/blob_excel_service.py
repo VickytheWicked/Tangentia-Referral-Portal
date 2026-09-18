@@ -42,10 +42,7 @@ class BlobExcelService(LocalExcelService):
             pass
 
         # Use a local cache path for openpyxl operations
-        local_cache_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "data",
-        )
+        local_cache_dir = os.path.dirname(settings.EXCEL_FILE_PATH)
         os.makedirs(local_cache_dir, exist_ok=True)
         local_path = os.path.join(local_cache_dir, EXCEL_BLOB_NAME)
 
