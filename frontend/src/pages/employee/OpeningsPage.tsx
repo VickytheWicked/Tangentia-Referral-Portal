@@ -16,7 +16,9 @@ import {
     ExternalLink,
     PlusCircle,
     ArrowRight,
+    Eye,
 } from 'lucide-react';
+import { JobDetailsModal } from '../../components/common/JobDetailsModal';
 
 export const OpeningsPage: React.FC = () => {
     const navigate = useNavigate();
@@ -30,6 +32,7 @@ export const OpeningsPage: React.FC = () => {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [editingJob, setEditingJob] = useState<JobPosition | null>(null);
+    const [viewingJob, setViewingJob] = useState<JobPosition | null>(null);
 
     // Form Fields
     const [title, setTitle] = useState<string>('');
@@ -253,13 +256,7 @@ export const OpeningsPage: React.FC = () => {
                         {positions.map((job) => (
                             <div
                                 key={job.id}
-                                onClick={() => {
-                                    if (job.is_active) {
-                                        navigate(`/employee/submit?positionId=${encodeURIComponent(job.id)}`, {
-                                            state: { positionId: job.id },
-                                        });
-                                    }
-                                }}
+                                onClick={() => setViewingJob(job)}
                                 style={{
                                     background: 'var(--bg-secondary)',
                                     border: `1px solid ${job.is_active ? 'var(--border-subtle)' : 'rgba(239, 68, 68, 0.2)'}`,
@@ -351,16 +348,36 @@ export const OpeningsPage: React.FC = () => {
                                     </span>
                                 </div>
 
-                                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', marginTop: '4px' }}>
+                                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', marginTop: '4px', display: 'flex', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline btn-sm"
+                                        style={{
+                                            flex: 1,
+                                            justifyContent: 'center',
+                                            gap: '6px',
+                                            padding: '8px 10px',
+                                            fontSize: '0.82rem',
+                                            fontWeight: 600,
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setViewingJob(job);
+                                        }}
+                                        title="View extracted job details, requirements, and responsibilities from CATS One"
+                                    >
+                                        <Eye size={14} /> More Details
+                                    </button>
+
                                     <button
                                         type="button"
                                         className="btn btn-primary btn-sm"
                                         style={{
-                                            width: '100%',
+                                            flex: 1.2,
                                             justifyContent: 'center',
-                                            gap: '8px',
-                                            padding: '8px 14px',
-                                            fontSize: '0.84rem',
+                                            gap: '6px',
+                                            padding: '8px 10px',
+                                            fontSize: '0.82rem',
                                             fontWeight: 600,
                                         }}
                                         disabled={!job.is_active}
@@ -371,7 +388,7 @@ export const OpeningsPage: React.FC = () => {
                                             });
                                         }}
                                     >
-                                        <PlusCircle size={15} /> Refer Candidate for this Role
+                                        <PlusCircle size={14} /> Refer Candidate
                                     </button>
                                 </div>
                             </div>
@@ -485,6 +502,14 @@ export const OpeningsPage: React.FC = () => {
                     </form>
                 </Modal>
             )}
+
+            {/* CATS One Job Details Modal */}
+            <JobDetailsModal
+                job={viewingJob}
+                isOpen={!!viewingJob}
+                onClose={() => setViewingJob(null)}
+                showReferButton={true}
+            />
         </div>
     );
 };

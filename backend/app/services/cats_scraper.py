@@ -235,7 +235,8 @@ def scrape_all_cats_jobs(client: Optional[httpx.Client] = None) -> List[Dict[str
         for job in listings:
             try:
                 detail = fetch_cats_job_detail(job["url_path"], client=client)
-                job["description"] = summarize_to_one_or_two_liner(
+                full_text = detail.get("description", "").strip()
+                job["description"] = full_text or summarize_to_one_or_two_liner(
                     detail.get("description", ""),
                     job["title"],
                     job["location"],

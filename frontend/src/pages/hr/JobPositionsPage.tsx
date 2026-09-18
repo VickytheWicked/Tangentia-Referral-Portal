@@ -13,7 +13,9 @@ import {
   Building,
   RefreshCw,
   ExternalLink,
+  Eye,
 } from 'lucide-react';
+import { JobDetailsModal } from '../../components/common/JobDetailsModal';
 
 export const JobPositionsPage: React.FC = () => {
   const [positions, setPositions] = useState<JobPosition[]>([]);
@@ -26,6 +28,7 @@ export const JobPositionsPage: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingJob, setEditingJob] = useState<JobPosition | null>(null);
+  const [viewingJob, setViewingJob] = useState<JobPosition | null>(null);
 
   // Form Fields
   const [title, setTitle] = useState<string>('');
@@ -338,31 +341,51 @@ export const JobPositionsPage: React.FC = () => {
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', marginTop: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', marginTop: '4px', gap: '8px', flexWrap: 'wrap' }}>
                   <button
+                    type="button"
                     className="btn btn-outline btn-sm"
-                    onClick={() => toggleJobStatus(job)}
+                    onClick={() => setViewingJob(job)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem' }}
+                    title="View extracted job details from CATS One"
                   >
-                    {job.is_active ? (
-                      <>
-                        <XCircle size={14} color="#f87171" /> Deactivate
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 size={14} color="#34d399" /> Activate
-                      </>
-                    )}
+                    <Eye size={13} /> More Details
                   </button>
 
-                  <button className="btn btn-secondary btn-sm" onClick={() => openEditModal(job)}>
-                    <Edit2 size={14} /> Edit
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => toggleJobStatus(job)}
+                    >
+                      {job.is_active ? (
+                        <>
+                          <XCircle size={14} color="#f87171" /> Deactivate
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={14} color="#34d399" /> Activate
+                        </>
+                      )}
+                    </button>
+
+                    <button className="btn btn-secondary btn-sm" onClick={() => openEditModal(job)}>
+                      <Edit2 size={14} /> Edit
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* CATS One Job Details Modal */}
+      <JobDetailsModal
+        job={viewingJob}
+        isOpen={!!viewingJob}
+        onClose={() => setViewingJob(null)}
+        showReferButton={true}
+      />
 
       {/* Create / Edit Modal */}
       {isModalOpen && (
