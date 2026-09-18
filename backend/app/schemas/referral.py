@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from app.schemas.job_position import JobPositionResponse
 from app.schemas.status_history import StatusHistoryResponse
 from app.schemas.hr_note import HRNoteResponse
@@ -20,6 +20,16 @@ class ReferralCreateForm(BaseModel):
     referred_by_email: Optional[str] = Field(None, max_length=255)
     referred_by_phone: Optional[str] = Field(None, max_length=50)
     candidate_consent: bool = Field(..., description="Must be true")
+
+    @field_validator("referred_by_email")
+    @classmethod
+    def validate_employee_email(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip():
+            clean = v.strip().lower()
+            if not clean.endswith("@tangentia.com"):
+                raise ValueError("Employee email must be an official @tangentia.com corporate email address.")
+            return clean
+        return v
 
 
 class ReferralStatusUpdate(BaseModel):

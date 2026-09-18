@@ -138,6 +138,33 @@ class LocalExcelService(ExcelServiceInterface):
                     max_len = len(val)
             ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
 
+    @staticmethod
+    def _remove_blank_rows(ws) -> int:
+        """
+        Remove any blank/empty rows (where all cells are None or empty whitespace)
+        from row 2 onwards. Cleans row dimensions for deleted rows so no empty row tags remain.
+        Returns the number of blank rows removed.
+        """
+        blank_rows = []
+        for r in range(2, ws.max_row + 1):
+            is_blank = True
+            for c in range(1, ws.max_column + 1):
+                val = ws.cell(row=r, column=c).value
+                if val is not None and str(val).strip() != "":
+                    is_blank = False
+                    break
+            if is_blank:
+                blank_rows.append(r)
+
+        for r in reversed(blank_rows):
+            ws.delete_rows(r, 1)
+
+        # Remove any lingering row_dimensions above max_row to avoid ghost rows
+        for r in [dim for dim in list(ws.row_dimensions.keys()) if dim > ws.max_row]:
+            del ws.row_dimensions[r]
+
+        return len(blank_rows)
+
     def initialize_workbook(self) -> None:
         """Create structured Excel workbook if it doesn't exist, and ensure sheet schemas are current"""
         with self._lock:
@@ -173,6 +200,11 @@ class LocalExcelService(ExcelServiceInterface):
                         self._style_header_row(ws_hh, SHEET_SCHEMAS["HiredHistory"])
                         self._auto_adjust_column_widths(ws_hh)
                         modified = True
+
+                    # Clean up any legacy blank rows across all sheets so data sits contiguously
+                    for s_name in wb.sheetnames:
+                        if self._remove_blank_rows(wb[s_name]) > 0:
+                            modified = True
 
                     if modified:
                         wb.save(self.file_path)
@@ -226,6 +258,9 @@ class LocalExcelService(ExcelServiceInterface):
         with self._lock:
             wb = openpyxl.load_workbook(self.file_path)
             ws = wb["Referrals"]
+
+            # Remove any trailing or orphaned blank rows so ws.append places the new row directly below existing data
+            self._remove_blank_rows(ws)
 
             now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             row_values = [
@@ -415,7 +450,11 @@ class LocalExcelService(ExcelServiceInterface):
                         row_to_delete = r
                         break
                 if row_to_delete:
-                    ws.delete_rows(row_to_delete)
+                    ws.delete_rows(row_to_delete, 1)
+
+                # Ensure any blank rows are removed and subsequent records shift directly upward
+                self._remove_blank_rows(ws)
+                self._auto_adjust_column_widths(ws)
 
             # 2. Clean up StatusHistory sheet
             if "StatusHistory" in wb.sheetnames:
@@ -425,7 +464,8 @@ class LocalExcelService(ExcelServiceInterface):
                     if str(ws_h.cell(row=r, column=2).value or "").strip() == str(referral_id).strip():
                         rows_to_del.append(r)
                 for r in reversed(rows_to_del):
-                    ws_h.delete_rows(r)
+                    ws_h.delete_rows(r, 1)
+                self._remove_blank_rows(ws_h)
 
             # 3. Clean up HRNotes sheet
             if "HRNotes" in wb.sheetnames:
@@ -435,7 +475,8 @@ class LocalExcelService(ExcelServiceInterface):
                     if str(ws_n.cell(row=r, column=2).value or "").strip() == str(referral_id).strip():
                         rows_to_del.append(r)
                 for r in reversed(rows_to_del):
-                    ws_n.delete_rows(r)
+                    ws_n.delete_rows(r, 1)
+                self._remove_blank_rows(ws_n)
 
             # 4. Clean up HiredHistory sheet
             if "HiredHistory" in wb.sheetnames:
@@ -446,7 +487,8 @@ class LocalExcelService(ExcelServiceInterface):
                         row_to_del = r
                         break
                 if row_to_del:
-                    ws_hh.delete_rows(row_to_del)
+                    ws_hh.delete_rows(row_to_del, 1)
+                self._remove_blank_rows(ws_hh)
 
             wb.save(self.file_path)
             wb.close()

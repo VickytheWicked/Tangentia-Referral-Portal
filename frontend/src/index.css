@@ -471,6 +471,18 @@ body {
   color: var(--text-muted);
 }
 
+/* Remove spin buttons from number inputs across the app */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .form-textarea {
   min-height: 90px;
   resize: vertical;

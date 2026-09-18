@@ -273,3 +273,98 @@ def test_download_cv_fallback_when_item_id_none(client, db_session, seeded_job):
     assert len(cv_res.content) > 0
 
 
+def test_strict_employee_email_tangentia_validation(client, seeded_job):
+    """
+    Verify that employee email MUST strictly end with @tangentia.com.
+    Any other domain (e.g. gmail.com, yahoo.com) must be rejected with 400 Bad Request.
+    """
+    pdf_content = b"%PDF-1.4\n1 0 obj\n<< /Title (CV) >>\nendobj\ntrailer\n<<>>\n%%EOF"
+    base_data = {
+        "candidate_name": "Email Domain Test Candidate",
+        "candidate_email": "domain.test@example.com",
+        "candidate_phone": "+1 416-555-0100",
+        "referred_by_name": "Test Employee",
+        "referred_by_phone": "+1 416-555-0192",
+        "relationship": "Former Colleague",
+        "referral_note": "Testing corporate email domain enforcement strictly.",
+        "position_id": seeded_job.id,
+        "candidate_consent": True,
+    }
+
+    # 1. Non-tangentia email (e.g. @gmail.com) -> must be rejected with 400
+    data_gmail = {**base_data, "referred_by_email": "john.doe@gmail.com"}
+    files_gmail = {"file": ("cv.pdf", io.BytesIO(pdf_content), "application/pdf")}
+    res_gmail = client.post("/api/referrals", data=data_gmail, files=files_gmail)
+    assert res_gmail.status_code == 400
+    assert "@tangentia.com" in res_gmail.json()["detail"]
+
+    # 2. Another non-tangentia email (e.g. @outlook.com) -> must be rejected with 400
+    data_outlook = {**base_data, "referred_by_email": "john.doe@outlook.com"}
+    files_outlook = {"file": ("cv.pdf", io.BytesIO(pdf_content), "application/pdf")}
+    res_outlook = client.post("/api/referrals", data=data_outlook, files=files_outlook)
+    assert res_outlook.status_code == 400
+    assert "@tangentia.com" in res_outlook.json()["detail"]
+
+    # 3. Valid @tangentia.com email -> succeeds
+    data_tangentia = {**base_data, "referred_by_email": "john.doe@tangentia.com"}
+    files_tangentia = {"file": ("cv.pdf", io.BytesIO(pdf_content), "application/pdf")}
+    res_tangentia = client.post("/api/referrals", data=data_tangentia, files=files_tangentia)
+    assert res_tangentia.status_code == 201
+    created = res_tangentia.json()
+    assert created["referred_by_email"] == "john.doe@tangentia.com"
+
+
+def test_referral_phone_stored_with_country_code_in_db_and_excel(client, seeded_job):
+    """
+    Verify that referral phone number with country code is properly stored
+    in both the database and the Excel spreadsheet.
+    """
+    import openpyxl
+    from app.services.excel import get_excel_service
+
+    pdf_content = b"%PDF-1.4\n1 0 obj\n<< /Title (CV) >>\nendobj\ntrailer\n<<>>\n%%EOF"
+    candidate_phone_with_cc = "+91 98200 12345"
+    submit_data = {
+        "candidate_name": "Aarav Sharma",
+        "candidate_email": "aarav.sharma@example.com",
+        "candidate_phone": candidate_phone_with_cc,
+        "referred_by_name": "Rohan Mehra",
+        "referred_by_email": "rohan.mehra@tangentia.com",
+        "referred_by_phone": "+91 98200 99999",
+        "relationship": "Former Colleague",
+        "referral_note": "Aarav is an outstanding senior engineer with deep cloud experience.",
+        "position_id": seeded_job.id,
+        "candidate_consent": True,
+    }
+    files = {"file": ("aarav_sharma_cv.pdf", io.BytesIO(pdf_content), "application/pdf")}
+
+    res = client.post("/api/referrals", data=submit_data, files=files)
+    assert res.status_code == 201
+    created = res.json()
+    assert created["candidate_phone"] == candidate_phone_with_cc
+    ref_id = created["id"]
+    ref_num = created["referral_number"]
+
+    # Verify detail API returns candidate phone with country code
+    detail_res = client.get(f"/api/referrals/{ref_id}")
+    assert detail_res.status_code == 200
+    assert detail_res.json()["candidate_phone"] == candidate_phone_with_cc
+
+    # Verify in Excel workbook that candidate phone has the country code
+    excel_svc = get_excel_service()
+    wb = openpyxl.load_workbook(excel_svc.file_path, data_only=True)
+    ws = wb["Referrals"]
+
+    found_row = None
+    for row in range(2, ws.max_row + 1):
+        if ws.cell(row=row, column=10).value == ref_id or ws.cell(row=row, column=3).value == "aarav.sharma@example.com":
+            found_row = row
+            break
+
+    assert found_row is not None, f"Referral {ref_id} not found in Excel Referrals sheet"
+    excel_phone = ws.cell(row=found_row, column=4).value
+    assert excel_phone == candidate_phone_with_cc
+    wb.close()
+
+
+

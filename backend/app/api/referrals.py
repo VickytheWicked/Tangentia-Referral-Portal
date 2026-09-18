@@ -43,6 +43,11 @@ def get_or_create_employee_user(
     clean_name = (referred_by_name or "").strip()
 
     if clean_email:
+        if not clean_email.endswith("@tangentia.com"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Employee email must be an official @tangentia.com corporate email address.",
+            )
         emp = db.query(User).filter(User.email == clean_email).first()
         if emp:
             if clean_name and (not emp.name or emp.name in ["Tangentia Employee", "Vansh Rupesh (Employee)"]):
@@ -81,7 +86,7 @@ def get_or_create_employee_user(
         return new_emp
 
     # Fallback to default employee if no email provided
-    emp = db.query(User).filter(User.id == "user-emp-001").first()
+    emp = db.query(User).filter((User.id == "user-emp-001") | (User.email == "employee@tangentia.com")).first()
     if not emp:
         emp = User(
             id="user-emp-001",
@@ -169,17 +174,26 @@ async def submit_referral(
     """
     Submit a candidate referral with CV file without requiring employee login.
     Uses the submitted employee details (name, email, phone) as the referrer identity.
+    Strictly enforces @tangentia.com for employee email.
     """
     ref_by_name = (referred_by_name or referred_by or "").strip() or None
     ref_by_email = (referred_by_email or employee_email or "").strip().lower() or None
     ref_by_phone = (referred_by_phone or employee_phone or "").strip() or None
+
+    # Strictly enforce @tangentia.com for employee email
+    effective_emp_email = ref_by_email or (current_user.email.strip().lower() if current_user and current_user.email else None) or "employee@tangentia.com"
+    if not effective_emp_email.endswith("@tangentia.com"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Employee email must be an official @tangentia.com corporate email address.",
+        )
 
     form_data = ReferralCreateForm(
         candidate_name=candidate_name,
         candidate_email=candidate_email,
         candidate_phone=candidate_phone,
         referred_by_name=ref_by_name,
-        referred_by_email=ref_by_email,
+        referred_by_email=effective_emp_email,
         referred_by_phone=ref_by_phone,
         linkedin_url=linkedin_url,
         github_url=github_url,
@@ -193,7 +207,7 @@ async def submit_referral(
     effective_user = current_user or get_or_create_employee_user(
         db,
         referred_by_name=ref_by_name,
-        referred_by_email=ref_by_email,
+        referred_by_email=effective_emp_email,
     )
     sharepoint_svc = get_sharepoint_service()
     referral = await create_referral_with_cv(

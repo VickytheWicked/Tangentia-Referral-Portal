@@ -14,6 +14,30 @@ import {
   Building2,
 } from 'lucide-react';
 
+const COUNTRY_CODES = [
+  { code: '+91', label: '+91 (India)', country: 'India' },
+  { code: '+1', label: '+1 (Canada / US)', country: 'Canada/US' },
+  { code: '+44', label: '+44 (UK)', country: 'UK' },
+  { code: '+971', label: '+971 (UAE)', country: 'UAE' },
+  { code: '+61', label: '+61 (Australia)', country: 'Australia' },
+  { code: '+65', label: '+65 (Singapore)', country: 'Singapore' },
+  { code: '+49', label: '+49 (Germany)', country: 'Germany' },
+  { code: '+33', label: '+33 (France)', country: 'France' },
+  { code: '+81', label: '+81 (Japan)', country: 'Japan' },
+  { code: '+86', label: '+86 (China)', country: 'China' },
+  { code: '+52', label: '+52 (Mexico)', country: 'Mexico' },
+  { code: '+55', label: '+55 (Brazil)', country: 'Brazil' },
+  { code: '+27', label: '+27 (South Africa)', country: 'South Africa' },
+  { code: '+353', label: '+353 (Ireland)', country: 'Ireland' },
+  { code: '+31', label: '+31 (Netherlands)', country: 'Netherlands' },
+  { code: '+41', label: '+41 (Switzerland)', country: 'Switzerland' },
+  { code: '+64', label: '+64 (New Zealand)', country: 'New Zealand' },
+  { code: '+63', label: '+63 (Philippines)', country: 'Philippines' },
+  { code: '+92', label: '+92 (Pakistan)', country: 'Pakistan' },
+  { code: '+880', label: '+880 (Bangladesh)', country: 'Bangladesh' },
+  { code: '+94', label: '+94 (Sri Lanka)', country: 'Sri Lanka' },
+];
+
 interface SubmitReferralPageProps {
   onReferralCreated: () => void;
 }
@@ -35,16 +59,18 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
   // Employee Information
   const [employeeName, setEmployeeName] = useState<string>('');
   const [employeeEmail, setEmployeeEmail] = useState<string>('');
+  const [employeeCountryCode, setEmployeeCountryCode] = useState<string>('+91');
   const [employeePhone, setEmployeePhone] = useState<string>('');
 
   // Referral Information
   const [referralName, setReferralName] = useState<string>('');
   const [referralEmail, setReferralEmail] = useState<string>('');
+  const [referralCountryCode, setReferralCountryCode] = useState<string>('+91');
   const [referralPhone, setReferralPhone] = useState<string>('');
   const [linkedinUrl, setLinkedinUrl] = useState<string>('');
   const [githubUrl, setGithubUrl] = useState<string>('');
   const [positionId, setPositionId] = useState<string>(preselectedJobId);
-  const [yearsOfExperience, setYearsOfExperience] = useState<number>(3.0);
+  const [yearsOfExperience, setYearsOfExperience] = useState<string>('3');
   const [relationship, setRelationship] = useState<string>('Former Colleague');
   const [referralNote, setReferralNote] = useState<string>('');
   const [candidateConsent, setCandidateConsent] = useState<boolean>(false);
@@ -125,9 +151,23 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
     }
   };
 
+  const getFullReferralPhone = (rawPhone: string, code: string) => {
+    const trimmed = rawPhone.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('+')) return trimmed;
+    return `${code} ${trimmed}`;
+  };
+
+  const getFullEmployeePhone = (rawPhone: string, code: string) => {
+    const trimmed = rawPhone.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('+')) return trimmed;
+    return `${code} ${trimmed}`;
+  };
+
   const performDuplicateCheck = async () => {
     const emailToCheck = referralEmail.trim();
-    const phoneToCheck = referralPhone.trim();
+    const phoneToCheck = getFullReferralPhone(referralPhone, referralCountryCode);
     const nameToCheck = referralName.trim();
 
     if (!nameToCheck || !emailToCheck || !positionId) return false;
@@ -166,11 +206,11 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
     setErrorMessage(null);
 
     const cleanEmployeeName = employeeName.trim();
-    const cleanEmployeeEmail = employeeEmail.trim();
-    const cleanEmployeePhone = employeePhone.trim();
+    const cleanEmployeeEmail = employeeEmail.trim().toLowerCase();
+    const cleanEmployeePhone = getFullEmployeePhone(employeePhone, employeeCountryCode);
     const cleanReferralName = referralName.trim();
-    const cleanReferralEmail = referralEmail.trim();
-    const cleanReferralPhone = referralPhone.trim();
+    const cleanReferralEmail = referralEmail.trim().toLowerCase();
+    const cleanReferralPhone = getFullReferralPhone(referralPhone, referralCountryCode);
 
     if (!cleanEmployeeName) {
       setErrorMessage('Please enter your Employee Full Name.');
@@ -182,7 +222,12 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       return;
     }
 
-    if (!cleanEmployeePhone) {
+    if (!cleanEmployeeEmail.endsWith('@tangentia.com')) {
+      setErrorMessage('Access restricted: Employee Email Address must be an official @tangentia.com corporate email.');
+      return;
+    }
+
+    if (!employeePhone.trim()) {
       setErrorMessage('Please enter your Employee Phone Number.');
       return;
     }
@@ -197,8 +242,14 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       return;
     }
 
-    if (!cleanReferralPhone) {
+    if (!referralPhone.trim()) {
       setErrorMessage('Please enter the Referral’s Phone Number.');
+      return;
+    }
+
+    const numExperience = parseFloat(yearsOfExperience);
+    if (isNaN(numExperience) || numExperience < 0 || numExperience > 50) {
+      setErrorMessage('Please enter a valid number of years of experience (e.g. 3 or 4.5).');
       return;
     }
 
@@ -234,7 +285,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       if (linkedinUrl) formData.append('linkedin_url', linkedinUrl);
       if (githubUrl) formData.append('github_url', githubUrl);
       formData.append('position_id', positionId);
-      formData.append('years_of_experience', yearsOfExperience.toString());
+      formData.append('years_of_experience', numExperience.toString());
       formData.append('relationship', relationship);
       formData.append('referral_note', referralNote);
       formData.append('candidate_consent', 'true');
@@ -378,7 +429,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
               <div className="form-group">
                 <label className="form-label">
-                  Employee Email Address <span className="required">*</span>
+                  Employee Email Address (@tangentia.com) <span className="required">*</span>
                 </label>
                 <input
                   type="email"
@@ -388,6 +439,9 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                   value={employeeEmail}
                   onChange={(e) => setEmployeeEmail(e.target.value)}
                 />
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  Must be your official <strong style={{ color: '#93c5fd' }}>@tangentia.com</strong> corporate email
+                </span>
               </div>
             </div>
 
@@ -396,14 +450,33 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                 <label className="form-label">
                   Employee Phone Number <span className="required">*</span>
                 </label>
-                <input
-                  type="tel"
-                  required
-                  className="form-input"
-                  placeholder="e.g. +1 416-555-0192"
-                  value={employeePhone}
-                  onChange={(e) => setEmployeePhone(e.target.value)}
-                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="form-select"
+                    style={{
+                      width: '120px',
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                    }}
+                    value={employeeCountryCode}
+                    onChange={(e) => setEmployeeCountryCode(e.target.value)}
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={`emp-${c.code}-${c.country}`} value={c.code}>
+                        {c.code} ({c.country})
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="tel"
+                    required
+                    className="form-input"
+                    style={{ flex: 1 }}
+                    placeholder="e.g. 98200 12345 or 416-555-0192"
+                    value={employeePhone}
+                    onChange={(e) => setEmployeePhone(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -578,21 +651,49 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                 <label className="form-label">
                   Referral's Phone Number <span className="required">*</span>
                 </label>
-                <input
-                  type="tel"
-                  required
-                  className="form-input"
-                  placeholder="e.g. +1 416-555-0199"
-                  value={referralPhone}
-                  onChange={(e) => {
-                    setReferralPhone(e.target.value);
-                    setDuplicateConfirmed(false);
-                    if (errorMessage && errorMessage.includes('Duplicate Referral')) {
-                      setErrorMessage(null);
-                    }
-                  }}
-                  onBlur={performDuplicateCheck}
-                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select
+                    className="form-select"
+                    style={{
+                      width: '120px',
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                    }}
+                    value={referralCountryCode}
+                    onChange={(e) => {
+                      setReferralCountryCode(e.target.value);
+                      setDuplicateConfirmed(false);
+                      if (errorMessage && errorMessage.includes('Duplicate Referral')) {
+                        setErrorMessage(null);
+                      }
+                    }}
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={`ref-${c.code}-${c.country}`} value={c.code}>
+                        {c.code} ({c.country})
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="tel"
+                    required
+                    className="form-input"
+                    style={{ flex: 1 }}
+                    placeholder="e.g. 98200 12345 or 416-555-0199"
+                    value={referralPhone}
+                    onChange={(e) => {
+                      setReferralPhone(e.target.value);
+                      setDuplicateConfirmed(false);
+                      if (errorMessage && errorMessage.includes('Duplicate Referral')) {
+                        setErrorMessage(null);
+                      }
+                    }}
+                    onBlur={performDuplicateCheck}
+                  />
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  Stored in Excel as: {getFullReferralPhone(referralPhone, referralCountryCode) || `${referralCountryCode} [phone]`}
+                </span>
               </div>
             </div>
 
@@ -602,14 +703,19 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                   Years of Relevant Experience <span className="required">*</span>
                 </label>
                 <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="40"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.]?[0-9]*"
                   required
                   className="form-input"
+                  placeholder="e.g. 3 or 4.5"
                   value={yearsOfExperience}
-                  onChange={(e) => setYearsOfExperience(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setYearsOfExperience(val);
+                    }
+                  }}
                 />
               </div>
 
@@ -794,7 +900,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
         matches={duplicateMatches}
         candidateName={referralName}
         checkedEmail={referralEmail}
-        checkedPhone={referralPhone}
+        checkedPhone={getFullReferralPhone(referralPhone, referralCountryCode)}
         onConfirmSubmit={() => {
           setDuplicateConfirmed(true);
           setShowDuplicateModal(false);
