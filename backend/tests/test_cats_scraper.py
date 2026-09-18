@@ -204,3 +204,54 @@ def test_api_sync_cats_authorized(client: TestClient):
         assert data["success"] is True
         assert data["total_scraped"] == 2
 
+
+def test_cats_scheduler_status_endpoint(client: TestClient):
+    response = client.get("/api/jobs/sync-cats/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["enabled"] is True
+    assert data["interval_hours"] == 6
+    assert data["deactivate_missing"] is True
+
+
+def test_sync_cats_deactivates_closed_jobs(db_session):
+    """
+    Verify that when jobs disappear from CATS One (e.g. job closed/filled),
+    syncing with deactivate_missing=True deactivates them (is_active=False).
+    """
+    # 1. Seed an active CATS position that was previously open
+    open_cats_job = JobPosition(
+        id="cats-99999",
+        title="Previously Open Role",
+        department="Engineering",
+        location="Toronto, Canada",
+        employment_type="Full-time",
+        description="Legacy role",
+        is_active=True,
+    )
+    db_session.add(open_cats_job)
+    db_session.commit()
+    assert open_cats_job.is_active is True
+
+    # 2. Mock CATS scraper returning jobs that DO NOT include cats-99999
+    mock_scraped = [
+        {
+            "portal_id": "cats-11111",
+            "title": "Newly Opened Role",
+            "department": "Engineering",
+            "location": "Goa, India",
+            "employment_type": "Full-time",
+            "description": "New job description.",
+        }
+    ]
+
+    with patch("app.services.cats_scraper.scrape_all_cats_jobs", return_value=mock_scraped):
+        res = sync_cats_jobs_with_db(db_session, deactivate_missing=True)
+        assert res["deactivated_count"] >= 1
+        assert res["created_count"] == 1
+
+        # Check in DB that the missing job was deactivated
+        db_session.refresh(open_cats_job)
+        assert open_cats_job.is_active is False
+
+

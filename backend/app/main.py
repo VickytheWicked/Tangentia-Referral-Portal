@@ -31,6 +31,7 @@ async def startup_event():
     from app.database import SessionLocal
     from app.services.excel import get_excel_service
     from app.services.excel.sync import initialize_and_sync_excel
+    from app.services.cats_scheduler import start_cats_scheduler
 
     db = SessionLocal()
     try:
@@ -40,6 +41,18 @@ async def startup_event():
         logger.error(f"Failed to synchronize with Microsoft Excel workbook on startup: {e}", exc_info=True)
     finally:
         db.close()
+
+    # Start automatic background sync from Tangentia CATS One every 6 hours
+    try:
+        start_cats_scheduler()
+    except Exception as e:
+        logger.error(f"Failed to start CATS auto-sync scheduler: {e}", exc_info=True)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    from app.services.cats_scheduler import stop_cats_scheduler
+    stop_cats_scheduler()
 
 # CORS Middleware
 app.add_middleware(

@@ -77,6 +77,15 @@ async def preview_cats_jobs(
         )
 
 
+@router.get("/sync-cats/status")
+async def get_cats_sync_status():
+    """
+    Get status of the automatic 6-hour CATS One sync scheduler.
+    """
+    from app.services.cats_scheduler import get_cats_scheduler_status
+    return get_cats_scheduler_status()
+
+
 @router.get("/{job_id}", response_model=JobPositionResponse)
 async def get_job_position(
     job_id: str,
