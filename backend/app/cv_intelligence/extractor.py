@@ -205,8 +205,13 @@ def heuristic_cv_extract(cv_text: str) -> CandidateProfileExtraction:
         if re.search(pattern, lower_cv):
             skills_found.add(canonicalize_skill(kw))
 
-    # 7. Robust Section-Aware Education Extraction
-    education_items = extract_education_from_cv(cv_text)
+    # 7. Robust Section-Aware Extractors for Education, Experience, Projects, Certifications
+    from app.cv_intelligence.schemas import EducationItem, ExperienceItem, ProjectItem, CertificationItem
+
+    education_items = [EducationItem.model_validate(e) if isinstance(e, dict) else e for e in extract_education_from_cv(cv_text)]
+    experience_items = [ExperienceItem.model_validate(exp) if isinstance(exp, dict) else exp for exp in extract_experience_from_cv(cv_text)]
+    project_items = [ProjectItem.model_validate(p) if isinstance(p, dict) else p for p in extract_projects_from_cv(cv_text)]
+    cert_items = [CertificationItem.model_validate(c) if isinstance(c, dict) else c for c in extract_certifications_from_cv(cv_text)]
 
     return CandidateProfileExtraction(
         candidate_name=candidate_name,
@@ -217,10 +222,303 @@ def heuristic_cv_extract(cv_text: str) -> CandidateProfileExtraction:
         years_of_experience=years_exp,
         skills=sorted(list(skills_found)),
         education=education_items,
-        experience=[],
-        projects=[],
-        certifications=[],
+        experience=experience_items,
+        projects=project_items,
+        certifications=cert_items,
     )
+
+
+def extract_experience_from_cv(raw_text: str) -> list:
+    """
+    Section-aware heuristic extractor for work experience entries.
+    Identifies job titles, employers, date ranges, and bullet point responsibilities.
+    """
+    if not raw_text or not raw_text.strip():
+        return []
+
+    lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
+
+    exp_start = None
+    exp_end = None
+    for i, line in enumerate(lines):
+        clean = line.strip().strip(":").upper()
+        if clean in [
+            "EXPERIENCE", "WORK EXPERIENCE", "PROFESSIONAL EXPERIENCE",
+            "EMPLOYMENT HISTORY", "WORK HISTORY", "CAREER HISTORY",
+            "RELEVANT EXPERIENCE", "PROFESSIONAL BACKGROUND"
+        ]:
+            exp_start = i
+            break
+
+    if exp_start is None:
+        for i, line in enumerate(lines):
+            clean = line.strip().strip(":").upper()
+            if any(clean.startswith(h) for h in ["EXPERIENCE", "WORK EXPERIENCE", "PROFESSIONAL EXPERIENCE"]):
+                exp_start = i
+                break
+
+    if exp_start is None:
+        return []
+
+    for j in range(exp_start + 1, min(len(lines), exp_start + 80)):
+        clean_next = lines[j].strip().strip(":").upper()
+        if any(clean_next.startswith(h) for h in [
+            "EDUCATION", "ACADEMIC", "PROJECTS", "KEY PROJECTS", "SKILLS",
+            "TECHNICAL SKILLS", "CERTIFICATIONS", "CERTIFICATES", "DECLARATION",
+            "LANGUAGES", "STRENGTHS", "PERSONAL DETAILS", "ACHIEVEMENTS"
+        ]):
+            exp_end = j
+            break
+
+    exp_lines = lines[exp_start + 1: exp_end if exp_end else exp_start + 50]
+    if not exp_lines:
+        return []
+
+    date_pattern = re.compile(
+        r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}/\d{2,4})?\s*(?:19|20)\d{2}\s*[-–to\s]+\s*(?:Present|Current|Till Date|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?|\d{1,2}/\d{2,4})?\s*(?:19|20)\d{2})",
+        re.IGNORECASE
+    )
+
+    items = []
+    current_entry = None
+
+    for line in exp_lines:
+        date_match = date_pattern.search(line)
+        is_bullet = line.startswith(("-", "•", "*", "–", "—", "▪", "▫", ">")) or bool(re.match(r"^\d+\.\s+", line))
+
+        if date_match and not is_bullet:
+            if current_entry:
+                items.append(current_entry)
+
+            dur = date_match.group(0).strip()
+            rest = (line[:date_match.start()] + " " + line[date_match.end():]).strip(" |,-–()")
+            parts = [p.strip() for p in re.split(r"[-–|@]|(?:at\s+)", rest) if p.strip()]
+            job_title = parts[0] if parts else "Role"
+            company = parts[1] if len(parts) > 1 else None
+
+            current_entry = {
+                "job_title": job_title,
+                "company": company,
+                "duration": dur,
+                "responsibilities": []
+            }
+        elif is_bullet:
+            cleaned_bullet = re.sub(r"^[-•*–—▪▫>\d.]+\s*", "", line).strip()
+            if cleaned_bullet:
+                if not current_entry:
+                    current_entry = {
+                        "job_title": "Professional Experience",
+                        "company": None,
+                        "duration": None,
+                        "responsibilities": []
+                    }
+                current_entry["responsibilities"].append(cleaned_bullet[:250])
+        else:
+            if not current_entry or not current_entry.get("company"):
+                parts = [p.strip() for p in re.split(r"[-–|@]|(?:at\s+)", line) if p.strip()]
+                if len(parts) >= 2 and any(t in line.lower() for t in ["engineer", "developer", "architect", "lead", "analyst", "manager", "specialist", "consultant", "intern"]):
+                    if current_entry and not current_entry.get("responsibilities"):
+                        current_entry["job_title"] = parts[0]
+                        current_entry["company"] = parts[1]
+                    else:
+                        if current_entry:
+                            items.append(current_entry)
+                        current_entry = {
+                            "job_title": parts[0],
+                            "company": parts[1],
+                            "duration": None,
+                            "responsibilities": []
+                        }
+
+    if current_entry:
+        items.append(current_entry)
+
+    valid_items = []
+    for it in items:
+        if it.get("job_title") or it.get("company") or it.get("responsibilities"):
+            valid_items.append(it)
+    return valid_items[:8]
+
+
+def extract_projects_from_cv(raw_text: str) -> list:
+    """
+    Section-aware heuristic extractor for project items.
+    """
+    if not raw_text or not raw_text.strip():
+        return []
+
+    lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
+
+    proj_start = None
+    proj_end = None
+    for i, line in enumerate(lines):
+        clean = line.strip().strip(":").upper()
+        if clean in [
+            "PROJECTS", "KEY PROJECTS", "ACADEMIC PROJECTS", "PERSONAL PROJECTS",
+            "REPRESENTATIVE PROJECTS", "PROJECT EXPERIENCE", "NOTABLE PROJECTS"
+        ]:
+            proj_start = i
+            break
+
+    if proj_start is None:
+        for i, line in enumerate(lines):
+            clean = line.strip().strip(":").upper()
+            if any(clean.startswith(h) for h in ["KEY PROJECTS", "PROJECTS:", "NOTABLE PROJECTS"]):
+                proj_start = i
+                break
+
+    if proj_start is None:
+        return []
+
+    for j in range(proj_start + 1, min(len(lines), proj_start + 60)):
+        clean_next = lines[j].strip().strip(":").upper()
+        if any(clean_next.startswith(h) for h in [
+            "EDUCATION", "ACADEMIC", "EXPERIENCE", "WORK EXPERIENCE", "SKILLS",
+            "TECHNICAL SKILLS", "CERTIFICATIONS", "DECLARATION", "LANGUAGES", "STRENGTHS"
+        ]):
+            proj_end = j
+            break
+
+    proj_lines = lines[proj_start + 1: proj_end if proj_end else proj_start + 40]
+    if not proj_lines:
+        return []
+
+    projects = []
+    current_proj = None
+
+    for line in proj_lines:
+        is_bullet = line.startswith(("-", "•", "*", "–", "—", "▪", "▫", ">")) or bool(re.match(r"^\d+\.\s+", line))
+        tech_match = re.search(r"(?:tech(?:nologies|nology)?(?:\s*stack)?|tools|environment)\s*[:–-]\s*(.+)", line, re.IGNORECASE)
+
+        if tech_match:
+            tech_raw = tech_match.group(1).strip()
+            techs = [t.strip() for t in re.split(r"[,;|/]", tech_raw) if t.strip()]
+            if not current_proj:
+                current_proj = {"name": "Project", "description": "", "technologies": []}
+            current_proj["technologies"].extend(techs[:8])
+        elif not is_bullet and len(line) <= 80 and not line.endswith("."):
+            if current_proj:
+                projects.append(current_proj)
+            clean_title = re.sub(r"^(?:project\s*[:–-]?\s*|\d+\.\s*)", "", line, flags=re.IGNORECASE).strip()
+            current_proj = {
+                "name": clean_title,
+                "description": "",
+                "technologies": []
+            }
+        else:
+            cleaned_text = re.sub(r"^[-•*–—▪▫>\d.]+\s*", "", line).strip()
+            if cleaned_text:
+                if not current_proj:
+                    current_proj = {"name": "Project", "description": "", "technologies": []}
+                if current_proj["description"]:
+                    current_proj["description"] += " " + cleaned_text
+                else:
+                    current_proj["description"] = cleaned_text
+
+    if current_proj:
+        projects.append(current_proj)
+
+    valid_projects = []
+    for p in projects:
+        if p.get("name") and len(p["name"]) >= 3:
+            p["description"] = p.get("description", "")[:300]
+            valid_projects.append(p)
+    return valid_projects[:6]
+
+
+def extract_certifications_from_cv(raw_text: str) -> list:
+    """
+    Section-aware heuristic extractor for certifications.
+    """
+    if not raw_text or not raw_text.strip():
+        return []
+
+    lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
+
+    cert_start = None
+    cert_end = None
+    for i, line in enumerate(lines):
+        clean = line.strip().strip(":").upper()
+        if clean in [
+            "CERTIFICATIONS", "CERTIFICATES", "LICENSES & CERTIFICATIONS",
+            "PROFESSIONAL CERTIFICATIONS", "ACCREDITATIONS", "COURSES & CERTIFICATIONS"
+        ]:
+            cert_start = i
+            break
+
+    if cert_start is None:
+        for i, line in enumerate(lines):
+            clean = line.strip().strip(":").upper()
+            if any(clean.startswith(h) for h in ["CERTIFICATIONS", "CERTIFICATES", "LICENSES"]):
+                cert_start = i
+                break
+
+    if cert_start is None:
+        return []
+
+    for j in range(cert_start + 1, min(len(lines), cert_start + 40)):
+        clean_next = lines[j].strip().strip(":").upper()
+        if any(clean_next.startswith(h) for h in [
+            "EDUCATION", "EXPERIENCE", "PROJECTS", "SKILLS", "DECLARATION",
+            "LANGUAGES", "STRENGTHS", "PERSONAL DETAILS", "HOBBIES"
+        ]):
+            cert_end = j
+            break
+
+    cert_lines = lines[cert_start + 1: cert_end if cert_end else cert_start + 25]
+    if not cert_lines:
+        return []
+
+    items = []
+    KNOWN_ISSUERS = [
+        ("AWS", "Amazon Web Services"),
+        ("Amazon", "Amazon Web Services"),
+        ("Microsoft", "Microsoft"),
+        ("Azure", "Microsoft Azure"),
+        ("Google", "Google Cloud"),
+        ("GCP", "Google Cloud"),
+        ("Automation Anywhere", "Automation Anywhere"),
+        ("UiPath", "UiPath"),
+        ("Scrum Alliance", "Scrum Alliance"),
+        ("Scrum.org", "Scrum.org"),
+        ("PMI", "Project Management Institute"),
+        ("Cisco", "Cisco"),
+        ("Oracle", "Oracle"),
+        ("CompTIA", "CompTIA"),
+        ("Salesforce", "Salesforce"),
+        ("HashiCorp", "HashiCorp"),
+        ("Kubernetes", "CNCF / Linux Foundation"),
+    ]
+
+    for line in cert_lines:
+        clean = re.sub(r"^[-•*–—▪▫>\d.]+\s*", "", line).strip()
+        if not clean or len(clean) < 4 or len(clean) > 120:
+            continue
+
+        year_match = re.search(r"\b((?:19|20)\d{2})\b", clean)
+        year = year_match.group(1) if year_match else None
+
+        name = clean
+        if year:
+            name = re.sub(r"\b" + year + r"\b", "", name).strip(" ,-–()")
+
+        issuer = None
+        for keyword, full_name in KNOWN_ISSUERS:
+            if re.search(r"\b" + re.escape(keyword) + r"\b", clean, re.IGNORECASE):
+                issuer = full_name
+                break
+
+        by_match = re.search(r"(?:by|from|issued by)\s+([A-Za-z0-9\s&]+)", clean, re.IGNORECASE)
+        if by_match and not issuer:
+            issuer = by_match.group(1).strip()[:50]
+
+        items.append({
+            "name": name[:100],
+            "issuer": issuer,
+            "year": year
+        })
+
+    return items[:8]
 
 
 DEGREE_EXTRACTION_RULES = [
@@ -401,23 +699,29 @@ class GeminiCVExtractor:
         self.api_key = api_key or settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
         self.model_name = model_name or settings.CV_LLM_MODEL or "gemini-2.5-flash"
 
+    def is_available(self) -> bool:
+        """Check if Gemini extraction is currently available."""
+        if not self.api_key:
+            return False
+        if time.time() < GeminiCVExtractor._circuit_open_until:
+            return False
+        return True
+
     def extract(self, cv_text: str) -> CandidateProfileExtraction:
         """
-        Extract structured candidate profile from CV text.
-        Returns a validated CandidateProfileExtraction model.
+        Extract structured candidate profile from CV text using Google Gemini.
+        Raises ExtractionServiceError if Gemini is unavailable, unconfigured, or fails.
         """
         if not cv_text or not cv_text.strip():
             raise ExtractionServiceError("Extracted CV text is empty.")
 
-        # If no API key configured, use rule-based fallback directly
+        # If no API key configured, signal that Gemini is unavailable
         if not self.api_key:
-            logger.info("No Gemini API key configured. Using heuristic CV extractor.")
-            return heuristic_cv_extract(cv_text)
+            raise ExtractionServiceError("No Gemini API key configured.")
 
         # Fast path if circuit breaker is open
         if time.time() < GeminiCVExtractor._circuit_open_until:
-            logger.info("Gemini API circuit breaker is OPEN. Using fast heuristic parser.")
-            return heuristic_cv_extract(cv_text)
+            raise ExtractionServiceError("Gemini API circuit breaker is OPEN (service temporarily unavailable).")
 
         try:
             from google import genai
@@ -462,6 +766,19 @@ class GeminiCVExtractor:
                 GeminiCVExtractor._circuit_open_until = time.time() + 180.0
             raise ExtractionServiceError(f"Gemini CV extraction failed: {str(e)}")
 
+    def extract_with_fallback(self, cv_text: str) -> CandidateProfileExtraction:
+        """
+        Attempts Gemini extraction, filling missing fields from fallback.
+        If Gemini is unavailable, returns full heuristic fallback.
+        """
+        fallback = heuristic_cv_extract(cv_text)
+        try:
+            primary = self.extract(cv_text)
+            return fill_missing_from_fallback(primary, fallback)
+        except Exception as e:
+            logger.info(f"Gemini extraction unavailable ({e}), using heuristic parser.")
+            return fallback
+
     def _parse_and_validate(self, json_string: str) -> CandidateProfileExtraction:
         """
         Clean markdown formatting (if any) and parse JSON with Pydantic.
@@ -479,6 +796,93 @@ class GeminiCVExtractor:
         return CandidateProfileExtraction.model_validate(data)
 
 
+def fill_missing_from_fallback(
+    primary: CandidateProfileExtraction,
+    fallback: CandidateProfileExtraction,
+) -> CandidateProfileExtraction:
+    """
+    Fills any details that were not given by Gemini (or are empty/invalid)
+    using the rule-based fallback extraction.
+    """
+    # 1. Candidate name
+    cand_name = primary.candidate_name
+    if not cand_name or not is_valid_human_name(cand_name):
+        cand_name = fallback.candidate_name
+
+    # 2. Email
+    email = primary.email
+    if not email or "@" not in email:
+        email = fallback.email
+
+    # 3. Phone
+    phone = primary.phone
+    if not phone or len(re.sub(r"\D", "", phone)) < 7:
+        phone = fallback.phone
+
+    # 4. URLs
+    linkedin_url = primary.linkedin_url or fallback.linkedin_url
+    github_url = primary.github_url or fallback.github_url
+
+    # 5. Years of experience
+    years_exp = primary.years_of_experience
+    if not years_exp or years_exp <= 0:
+        years_exp = fallback.years_of_experience
+
+    # 6. Skills: Merge primary skills with fallback skills so no skills are lost
+    seen_skills = set()
+    merged_skills = []
+    for s in (primary.skills or []):
+        if s and str(s).strip():
+            clean_s = canonicalize_skill(str(s).strip())
+            low = clean_s.lower()
+            if low not in seen_skills:
+                seen_skills.add(low)
+                merged_skills.append(clean_s)
+
+    for s in (fallback.skills or []):
+        if s and str(s).strip():
+            clean_s = canonicalize_skill(str(s).strip())
+            low = clean_s.lower()
+            if low not in seen_skills:
+                seen_skills.add(low)
+                merged_skills.append(clean_s)
+
+    # 7. Education: If primary has education, keep it and supplement any missing degrees from fallback
+    if primary.education:
+        merged_edu = list(primary.education)
+        existing_degrees = {str(e.degree).lower() for e in merged_edu if e.degree}
+        for f in (fallback.education or []):
+            if f.degree and str(f.degree).lower() not in existing_degrees:
+                merged_edu.append(f)
+                existing_degrees.add(str(f.degree).lower())
+    else:
+        merged_edu = list(fallback.education or [])
+
+    # 8. Experience
+    merged_exp = list(primary.experience or []) if primary.experience else list(fallback.experience or [])
+
+    # 9. Projects
+    merged_proj = list(primary.projects or []) if primary.projects else list(fallback.projects or [])
+
+    # 10. Certifications
+    merged_cert = list(primary.certifications or []) if primary.certifications else list(fallback.certifications or [])
+
+    return CandidateProfileExtraction(
+        candidate_name=cand_name,
+        email=email,
+        phone=phone,
+        linkedin_url=linkedin_url,
+        github_url=github_url,
+        years_of_experience=years_exp or 0.0,
+        skills=merged_skills,
+        education=merged_edu,
+        experience=merged_exp,
+        projects=merged_proj,
+        certifications=merged_cert,
+    )
+
+
 # Factory function
 def get_cv_extractor() -> GeminiCVExtractor:
     return GeminiCVExtractor()
+

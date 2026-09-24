@@ -1,3 +1,4 @@
+import re
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -68,6 +69,32 @@ class CVIntelligenceService:
 
         profile = CVIntelligenceService.get_or_create_profile(cv_db, referral_id)
 
+        # Snapshot prior stored details from cv_intelligence before processing
+        prior_details = {
+            "candidate_name": profile.candidate_name,
+            "email": profile.email,
+            "phone": profile.phone,
+            "linkedin_url": profile.linkedin_url,
+            "github_url": profile.github_url,
+            "years_of_experience": profile.years_of_experience,
+            "skills": list(profile.skills or []) if profile.skills else [],
+            "education": list(profile.education or []) if profile.education else [],
+            "experience": list(profile.experience or []) if profile.experience else [],
+            "projects": list(profile.projects or []) if profile.projects else [],
+            "certifications": list(profile.certifications or []) if profile.certifications else [],
+            "extraction_status": profile.extraction_status,
+            "extracted_at": profile.extracted_at,
+        }
+
+        prior_match = (
+            cv_db.query(JobMatch)
+            .filter(
+                JobMatch.candidate_profile_id == profile.id,
+                JobMatch.position_id == referral.position_id,
+            )
+            .first()
+        )
+
         # Skip if already completed unless force_reprocess is True
         if profile.extraction_status == ExtractionStatus.COMPLETED.value and not force_reprocess:
             return profile
@@ -97,50 +124,190 @@ class CVIntelligenceService:
                 content_type=content_type,
             )
 
-            # 3. Extract structured profile via Gemini with heuristic fallback
+            # 3. Rule-based heuristic fallback extraction from CV text
+            from app.cv_intelligence.extractor import heuristic_cv_extract, is_valid_human_name
+            from app.cv_intelligence.matcher import canonicalize_skill
+
+            fallback_data = heuristic_cv_extract(cv_text)
+
+            # 4. Attempt Gemini extraction
+            gemini_data: Optional[CandidateProfileExtraction] = None
+            gemini_available = False
             try:
                 extractor = get_cv_extractor()
-                extracted_data: CandidateProfileExtraction = extractor.extract(cv_text)
+                gemini_data = extractor.extract(cv_text)
+                gemini_available = True
             except Exception as ex:
-                logger.warning(f"Live Gemini extraction failed ({ex}), using heuristic parser.")
-                from app.cv_intelligence.extractor import heuristic_cv_extract
-                extracted_data = heuristic_cv_extract(cv_text)
+                logger.warning(f"Live Gemini extraction unavailable for referral {referral_id} ({ex}).")
+                gemini_data = None
+                gemini_available = False
 
-            # 4. Save extracted profile into cv_intelligence.db
-            from app.cv_intelligence.extractor import is_valid_human_name
+            # 5. Merge Candidate Profile Details
+            # Priority:
+            # - If Gemini is available: use Gemini details, fill any missing/empty details from fallback and prior.
+            # - If Gemini is unavailable: use prior stored details in CV intelligence, fill missing from fallback and referral.
 
-            cand_name = extracted_data.candidate_name
-            if not cand_name or not is_valid_human_name(cand_name):
+            # 5a. Candidate Name
+            cand_name = None
+            if gemini_data and gemini_data.candidate_name and is_valid_human_name(gemini_data.candidate_name):
+                cand_name = gemini_data.candidate_name
+            elif prior_details.get("candidate_name") and is_valid_human_name(prior_details["candidate_name"]):
+                cand_name = prior_details["candidate_name"]
+            elif fallback_data.candidate_name and is_valid_human_name(fallback_data.candidate_name):
+                cand_name = fallback_data.candidate_name
+            elif referral.candidate_name and is_valid_human_name(referral.candidate_name):
                 cand_name = referral.candidate_name
+            else:
+                cand_name = referral.candidate_name or "Candidate"
 
-            cand_years = extracted_data.years_of_experience
-            if (cand_years is None or cand_years <= 0) and referral.years_of_experience:
+            # 5b. Email
+            final_email = None
+            if gemini_data and gemini_data.email and "@" in gemini_data.email:
+                final_email = gemini_data.email.strip()
+            elif prior_details.get("email") and "@" in str(prior_details["email"]):
+                final_email = str(prior_details["email"]).strip()
+            elif fallback_data.email and "@" in fallback_data.email:
+                final_email = fallback_data.email.strip()
+            else:
+                final_email = (referral.candidate_email or "").strip() or None
+
+            # 5c. Phone
+            final_phone = None
+            if gemini_data and gemini_data.phone and len(re.sub(r"\D", "", gemini_data.phone)) >= 7:
+                final_phone = gemini_data.phone.strip()
+            elif prior_details.get("phone") and len(re.sub(r"\D", "", str(prior_details["phone"]))) >= 7:
+                final_phone = str(prior_details["phone"]).strip()
+            elif fallback_data.phone and len(re.sub(r"\D", "", fallback_data.phone)) >= 7:
+                final_phone = fallback_data.phone.strip()
+            else:
+                final_phone = (referral.candidate_phone or "").strip() or None
+
+            # 5d. URLs (LinkedIn, GitHub)
+            final_linkedin = None
+            if gemini_data and gemini_data.linkedin_url and "linkedin" in gemini_data.linkedin_url.lower():
+                final_linkedin = gemini_data.linkedin_url.strip()
+            elif prior_details.get("linkedin_url") and "linkedin" in str(prior_details["linkedin_url"]).lower():
+                final_linkedin = str(prior_details["linkedin_url"]).strip()
+            elif fallback_data.linkedin_url:
+                final_linkedin = fallback_data.linkedin_url.strip()
+            else:
+                final_linkedin = (referral.linkedin_url or "").strip() or None
+
+            final_github = None
+            if gemini_data and gemini_data.github_url and "github" in gemini_data.github_url.lower():
+                final_github = gemini_data.github_url.strip()
+            elif prior_details.get("github_url") and "github" in str(prior_details["github_url"]).lower():
+                final_github = str(prior_details["github_url"]).strip()
+            elif fallback_data.github_url:
+                final_github = fallback_data.github_url.strip()
+            else:
+                final_github = (referral.github_url or "").strip() or None
+
+            # 5e. Years of Experience
+            cand_years = 0.0
+            if gemini_data and gemini_data.years_of_experience and float(gemini_data.years_of_experience) > 0:
+                cand_years = float(gemini_data.years_of_experience)
+            elif prior_details.get("years_of_experience") and float(prior_details["years_of_experience"]) > 0:
+                cand_years = float(prior_details["years_of_experience"])
+            elif fallback_data.years_of_experience and float(fallback_data.years_of_experience) > 0:
+                cand_years = float(fallback_data.years_of_experience)
+            elif referral.years_of_experience and float(referral.years_of_experience) > 0:
                 cand_years = float(referral.years_of_experience)
 
-            profile.candidate_name = cand_name
-            profile.email = extracted_data.email or referral.candidate_email
-            profile.phone = extracted_data.phone or referral.candidate_phone
-            profile.linkedin_url = extracted_data.linkedin_url or referral.linkedin_url
-            profile.github_url = extracted_data.github_url or referral.github_url
-            profile.years_of_experience = cand_years or 0.0
-            # Ensure education is populated if LLM returned empty list
-            if not extracted_data.education:
-                from app.cv_intelligence.extractor import extract_education_from_cv
-                from app.cv_intelligence.schemas import EducationItem
-                edu_items = extract_education_from_cv(cv_text)
-                if edu_items:
-                    extracted_data.education = [EducationItem.model_validate(e) for e in edu_items]
+            # 5f. Skills: Union Gemini skills (if available) with prior skills and fallback skills
+            seen_skills = set()
+            merged_skills = []
 
-            profile.skills = extracted_data.skills
-            profile.education = [e.model_dump() for e in extracted_data.education]
-            profile.experience = [exp.model_dump() for exp in extracted_data.experience]
-            profile.projects = [p.model_dump() for p in extracted_data.projects]
-            profile.certifications = [c.model_dump() for c in extracted_data.certifications]
+            def _append_skills(s_list):
+                for s in (s_list or []):
+                    if s and str(s).strip():
+                        clean_s = canonicalize_skill(str(s).strip())
+                        low = clean_s.lower()
+                        if low not in seen_skills:
+                            seen_skills.add(low)
+                            merged_skills.append(clean_s)
+
+            if gemini_data and gemini_data.skills:
+                _append_skills(gemini_data.skills)
+            if prior_details.get("skills"):
+                _append_skills(prior_details["skills"])
+            if fallback_data and fallback_data.skills:
+                _append_skills(fallback_data.skills)
+
+            # 5g. Education
+            gemini_edu = [e.model_dump() if hasattr(e, "model_dump") else e for e in (gemini_data.education or [])] if gemini_data else []
+            prior_edu = prior_details.get("education") or []
+            fallback_edu = [e.model_dump() if hasattr(e, "model_dump") else e for e in (fallback_data.education or [])] if fallback_data else []
+
+            if gemini_edu:
+                final_edu = gemini_edu
+                existing_degrees = {str(e.get("degree", "")).lower() for e in final_edu if isinstance(e, dict) and e.get("degree")}
+                for f in fallback_edu:
+                    if isinstance(f, dict) and f.get("degree") and str(f["degree"]).lower() not in existing_degrees:
+                        final_edu.append(f)
+                        existing_degrees.add(str(f["degree"]).lower())
+            elif prior_edu:
+                final_edu = prior_edu
+                existing_degrees = {str(e.get("degree", "")).lower() for e in final_edu if isinstance(e, dict) and e.get("degree")}
+                for f in fallback_edu:
+                    if isinstance(f, dict) and f.get("degree") and str(f["degree"]).lower() not in existing_degrees:
+                        final_edu.append(f)
+                        existing_degrees.add(str(f["degree"]).lower())
+            else:
+                final_edu = fallback_edu
+
+            # 5h. Experience
+            gemini_exp = [exp.model_dump() if hasattr(exp, "model_dump") else exp for exp in (gemini_data.experience or [])] if gemini_data else []
+            prior_exp = prior_details.get("experience") or []
+            fallback_exp = [exp.model_dump() if hasattr(exp, "model_dump") else exp for exp in (fallback_data.experience or [])] if fallback_data else []
+
+            if gemini_exp:
+                final_exp = gemini_exp
+            elif prior_exp:
+                final_exp = prior_exp
+            else:
+                final_exp = fallback_exp
+
+            # 5i. Projects
+            gemini_proj = [p.model_dump() if hasattr(p, "model_dump") else p for p in (gemini_data.projects or [])] if gemini_data else []
+            prior_proj = prior_details.get("projects") or []
+            fallback_proj = [p.model_dump() if hasattr(p, "model_dump") else p for p in (fallback_data.projects or [])] if fallback_data else []
+
+            if gemini_proj:
+                final_proj = gemini_proj
+            elif prior_proj:
+                final_proj = prior_proj
+            else:
+                final_proj = fallback_proj
+
+            # 5j. Certifications
+            gemini_cert = [c.model_dump() if hasattr(c, "model_dump") else c for c in (gemini_data.certifications or [])] if gemini_data else []
+            prior_cert = prior_details.get("certifications") or []
+            fallback_cert = [c.model_dump() if hasattr(c, "model_dump") else c for c in (fallback_data.certifications or [])] if fallback_data else []
+
+            if gemini_cert:
+                final_cert = gemini_cert
+            elif prior_cert:
+                final_cert = prior_cert
+            else:
+                final_cert = fallback_cert
+
+            profile.candidate_name = cand_name
+            profile.email = final_email
+            profile.phone = final_phone
+            profile.linkedin_url = final_linkedin
+            profile.github_url = final_github
+            profile.years_of_experience = cand_years
+            profile.skills = merged_skills
+            profile.education = final_edu
+            profile.experience = final_exp
+            profile.projects = final_proj
+            profile.certifications = final_cert
             profile.extraction_status = ExtractionStatus.COMPLETED.value
             profile.extracted_at = datetime.now(timezone.utc)
             profile.extraction_error = None
 
-            # 5. Compute job matching against referral's target position
+            # 6. Compute job matching against referral's target position
             position = db.query(JobPosition).filter(JobPosition.id == referral.position_id).first()
             if position:
                 match_level, matched_skills, missing_skills, exp_match, explanation, fit_summary = llm_match_candidate_to_job(
@@ -152,6 +319,13 @@ class CVIntelligenceService:
                     job_department=position.department,
                     job_description=position.description,
                 )
+
+                # If Gemini was unavailable and we had prior match details in cv_db, preserve rich fit_summary:
+                if not gemini_available and prior_match:
+                    if prior_match.fit_summary and len(prior_match.fit_summary) > 15:
+                        fit_summary = prior_match.fit_summary
+                    if prior_match.explanation and len(prior_match.explanation) > len(explanation):
+                        explanation = prior_match.explanation
 
                 # Update or create JobMatch in cv_intelligence.db
                 job_match = (
@@ -178,7 +352,7 @@ class CVIntelligenceService:
 
             cv_db.commit()
             cv_db.refresh(profile)
-            logger.info(f"Successfully processed CV intelligence for referral {referral_id}")
+            logger.info(f"Successfully processed CV intelligence for referral {referral_id} (Gemini available={gemini_available})")
 
             # Persist to Azure Blob Storage if configured
             try:
@@ -192,8 +366,25 @@ class CVIntelligenceService:
 
         except (TextExtractionError, ExtractionServiceError, Exception) as err:
             logger.error(f"CV Intelligence processing failed for referral {referral_id}: {str(err)}")
-            profile.extraction_status = ExtractionStatus.FAILED.value
-            profile.extraction_error = str(err)
+            # If we had prior completed details in cv_intelligence, restore them rather than breaking into FAILED!
+            if prior_details.get("extraction_status") == ExtractionStatus.COMPLETED.value and (prior_details.get("skills") or prior_details.get("candidate_name")):
+                logger.info(f"Restoring prior completed CV intelligence details for referral {referral_id}")
+                profile.candidate_name = prior_details.get("candidate_name")
+                profile.email = prior_details.get("email")
+                profile.phone = prior_details.get("phone")
+                profile.linkedin_url = prior_details.get("linkedin_url")
+                profile.github_url = prior_details.get("github_url")
+                profile.years_of_experience = prior_details.get("years_of_experience") or 0.0
+                profile.skills = prior_details.get("skills") or []
+                profile.education = prior_details.get("education") or []
+                profile.experience = prior_details.get("experience") or []
+                profile.projects = prior_details.get("projects") or []
+                profile.certifications = prior_details.get("certifications") or []
+                profile.extraction_status = ExtractionStatus.COMPLETED.value
+                profile.extraction_error = None
+            else:
+                profile.extraction_status = ExtractionStatus.FAILED.value
+                profile.extraction_error = str(err)
             cv_db.commit()
             cv_db.refresh(profile)
 

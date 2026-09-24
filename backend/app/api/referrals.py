@@ -177,7 +177,7 @@ async def api_extract_cv_details(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CV file exceeds maximum allowable size of 10MB.")
 
     from app.cv_intelligence.text_extractor import extract_cv_text
-    from app.cv_intelligence.extractor import get_cv_extractor, heuristic_cv_extract, is_valid_human_name
+    from app.cv_intelligence.extractor import get_cv_extractor, heuristic_cv_extract, is_valid_human_name, fill_missing_from_fallback
 
     try:
         cv_text = extract_cv_text(file_bytes=file_bytes, filename=file.filename, content_type=file.content_type)
@@ -193,6 +193,8 @@ async def api_extract_cv_details(
     try:
         extractor = get_cv_extractor()
         extracted = extractor.extract(cv_text)
+        fallback = heuristic_cv_extract(cv_text)
+        extracted = fill_missing_from_fallback(extracted, fallback)
     except Exception as ex:
         logger.info(f"Gemini CV extraction unavailable ({ex}), using heuristic parser.")
         extracted = heuristic_cv_extract(cv_text)
