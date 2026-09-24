@@ -12,6 +12,7 @@ import { AnalyticsPage } from './pages/hr/AnalyticsPage';
 import { OpeningsPage } from './pages/employee/OpeningsPage';
 import { HiredHistoryPage } from './pages/common/HiredHistoryPage';
 import { LoginPage } from './pages/Login';
+import { HRSuggestionsPage } from './pages/hr/HRSuggestionsPage';
 
 // Protected Route wrapper ensuring only authenticated HR users access HR Administration
 const RequireHR: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -146,6 +147,14 @@ const MainPortalContent: React.FC = () => {
               initialSelectedId={selectedCandidateId}
               onClearInitialId={() => setSelectedCandidateId(null)}
             />
+          </RequireHR>
+        }
+      />
+      <Route
+        path="/hr/suggestions"
+        element={
+          <RequireHR>
+            <HRSuggestionsPage />
           </RequireHR>
         }
       />

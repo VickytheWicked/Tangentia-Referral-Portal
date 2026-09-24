@@ -161,3 +161,17 @@ export interface HiredHistoryItem {
   hired_at: string;
   status: string;
 }
+
+export interface CVExtractionPreview {
+  success: boolean;
+  candidate_name?: string | null;
+  candidate_email?: string | null;
+  candidate_phone?: string | null;
+  years_of_experience?: number | null;
+  linkedin_url?: string | null;
+  github_url?: string | null;
+  skills?: string[];
+  found_fields: string[];
+  not_found_fields: string[];
+  message?: string | null;
+}

@@ -10,6 +10,8 @@ from app.api.jobs import router as jobs_router
 from app.api.referrals import router as referrals_router
 from app.api.hr import router as hr_router
 from app.api.analytics import router as analytics_router
+from app.api.cv_intelligence import router as cv_intelligence_router
+from app.historical_suggestions.api import router as historical_suggestions_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("referral_portal")
@@ -42,6 +44,14 @@ async def startup_event():
     finally:
         db.close()
 
+    # Initialize isolated CV Intelligence SQLite database if enabled
+    if settings.CV_INTELLIGENCE_ENABLED:
+        try:
+            from app.cv_intelligence.database import init_cv_db
+            init_cv_db()
+        except Exception as e:
+            logger.error(f"Failed to initialize CV Intelligence database: {e}", exc_info=True)
+
     # Start automatic background sync from Tangentia CATS One every 6 hours
     try:
         start_cats_scheduler()
@@ -53,6 +63,12 @@ async def startup_event():
 async def shutdown_event():
     from app.services.cats_scheduler import stop_cats_scheduler
     stop_cats_scheduler()
+    try:
+        from app.cv_intelligence.blob_sync import upload_cv_db_to_blob, is_cv_blob_sync_enabled
+        if is_cv_blob_sync_enabled():
+            upload_cv_db_to_blob()
+    except Exception as e:
+        logger.error(f"Failed to persist CV Intelligence DB to Azure Blob on shutdown: {e}")
 
 # CORS Middleware
 app.add_middleware(
@@ -102,3 +118,5 @@ app.include_router(jobs_router, prefix=settings.API_V1_STR)
 app.include_router(referrals_router, prefix=settings.API_V1_STR)
 app.include_router(hr_router, prefix=settings.API_V1_STR)
 app.include_router(analytics_router, prefix=settings.API_V1_STR)
+app.include_router(cv_intelligence_router, prefix=settings.API_V1_STR)
+app.include_router(historical_suggestions_router, prefix=settings.API_V1_STR)

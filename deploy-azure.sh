@@ -127,6 +127,9 @@ az webapp config appsettings set \
     DATABASE_URL="sqlite:///:memory:" \
     EXCEL_STORAGE_TYPE="mock" \
     SHAREPOINT_STORAGE_TYPE="mock" \
+    CV_STORAGE_TYPE="local" \
+    BLOB_DATA_CONTAINER="referral-data" \
+    BLOB_CV_INTELLIGENCE_NAME="cv_intelligence.db" \
     CORS_ORIGINS_EXTRA="${FRONTEND_URL}" \
     WEBSITES_PORT="8000" \
     SCM_DO_BUILD_DURING_DEPLOYMENT="true" \

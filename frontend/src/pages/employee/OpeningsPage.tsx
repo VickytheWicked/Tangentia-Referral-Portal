@@ -216,7 +216,7 @@ export const OpeningsPage: React.FC = () => {
                         </p>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    {/* <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                             <input
                                 type="checkbox"
@@ -225,27 +225,7 @@ export const OpeningsPage: React.FC = () => {
                             />
                             Show deactivated positions
                         </label>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '0.72rem', color: '#93c5fd', background: 'rgba(59, 130, 246, 0.15)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-                                Auto-syncs every 6h
-                            </span>
-                            <button
-                                className="btn btn-secondary btn-sm"
-                                onClick={handleSyncCats}
-                                disabled={isSyncing}
-                                title="Scrape and synchronize live open requisitions from Tangentia CATS Careers (closed jobs auto-deactivate)"
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                            >
-                                <RefreshCw size={15} className={isSyncing ? 'spin' : ''} />
-                                {isSyncing ? 'Syncing CATS...' : 'Sync CATS ATS'}
-                            </button>
-                        </div>
-
-                        {/* <button className="btn btn-primary btn-sm" onClick={openCreateModal}>
-                            <Plus size={16} /> Add New Opening
-                        </button> */}
-                    </div>
+                    </div> */}
                 </div>
 
                 {syncFeedback && (

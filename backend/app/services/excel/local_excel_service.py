@@ -168,7 +168,7 @@ class LocalExcelService(ExcelServiceInterface):
     def initialize_workbook(self) -> None:
         """Create structured Excel workbook if it doesn't exist, and ensure sheet schemas are current"""
         with self._lock:
-            if os.path.exists(self.file_path):
+            if os.path.exists(self.file_path) and os.path.getsize(self.file_path) > 0:
                 # Ensure Users sheet exists and has updated headers including Password
                 try:
                     wb = openpyxl.load_workbook(self.file_path)
@@ -209,10 +209,9 @@ class LocalExcelService(ExcelServiceInterface):
                     if modified:
                         wb.save(self.file_path)
                     wb.close()
+                    return
                 except Exception as e:
-                    logger.warning(f"Error checking sheets in Excel workbook: {e}")
-                return
-
+                    logger.warning(f"Error checking sheets in Excel workbook (will recreate clean workbook): {e}")
 
             wb = openpyxl.Workbook()
             default_sheet = wb.active
@@ -229,10 +228,16 @@ class LocalExcelService(ExcelServiceInterface):
     def load_all_data(self) -> Dict[str, List[Dict[str, Any]]]:
         """Read all records from Excel sheets into memory"""
         with self._lock:
-            if not os.path.exists(self.file_path):
+            if not os.path.exists(self.file_path) or os.path.getsize(self.file_path) == 0:
                 return {k: [] for k in SHEET_SCHEMAS}
 
-            wb = openpyxl.load_workbook(self.file_path, data_only=True)
+            try:
+                wb = openpyxl.load_workbook(self.file_path, data_only=True)
+            except Exception as e:
+                logger.warning(f"Excel workbook could not be loaded ({e}), re-initializing workbook...")
+                self.initialize_workbook()
+                return {k: [] for k in SHEET_SCHEMAS}
+
             result = {}
 
             for sheet_name, headers in SHEET_SCHEMAS.items():

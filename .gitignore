@@ -38,6 +38,8 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 referrals.db
+backend/data/cv_intelligence.db
+cv_intelligence.db
 storage/mock_sharepoint/
 backend/storage/mock_sharepoint/*
 !backend/storage/mock_sharepoint/.gitkeep
@@ -59,3 +61,4 @@ frontend/.env
 *.swo
 .DS_Store
 Thumbs.db
+*.zip

@@ -10,7 +10,14 @@ import {
   UserRole,
   SyncCatsResponse,
   HiredHistoryItem,
+  CVExtractionPreview,
 } from '../types';
+import {
+  OpeningSuggestions,
+  CandidateProfileDetail,
+  CVIntelligenceStatus,
+} from '../types/cv_intelligence';
+import { HistoricalSuggestionsResponse } from '../types/historical_suggestions';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
@@ -157,6 +164,18 @@ export const api = {
       body: JSON.stringify(data),
     });
     return handleResponse<DuplicateCheckResponse>(res);
+  },
+
+  // Extract CV Details for Autofill
+  async extractCV(file: File): Promise<CVExtractionPreview> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/referrals/extract-cv`, {
+      method: 'POST',
+      headers: getHeaders(true),
+      body: formData,
+    });
+    return handleResponse<CVExtractionPreview>(res);
   },
 
   // Submit Referral
@@ -356,4 +375,57 @@ export const api = {
     });
     return handleResponse<AnalyticsResponse>(res);
   },
+
+  // ================================================================
+  // CV Intelligence & HR Suggestions Endpoints
+  // ================================================================
+  async getCVIntelligenceStatus(): Promise<CVIntelligenceStatus> {
+    const res = await fetch(`${API_BASE}/cv-intelligence/status`, {
+      headers: getHeaders(),
+    });
+    return handleResponse<CVIntelligenceStatus>(res);
+  },
+
+  async getHRSuggestions(): Promise<OpeningSuggestions[]> {
+    const res = await fetch(`${API_BASE}/cv-intelligence/suggestions`, {
+      headers: getHeaders(),
+    });
+    return handleResponse<OpeningSuggestions[]>(res);
+  },
+
+  async getCandidateIntelligence(referralId: string): Promise<CandidateProfileDetail> {
+    const res = await fetch(`${API_BASE}/cv-intelligence/candidates/${referralId}`, {
+      headers: getHeaders(),
+    });
+    return handleResponse<CandidateProfileDetail>(res);
+  },
+
+  async processCandidateCV(referralId: string, force: boolean = false): Promise<CandidateProfileDetail> {
+    const res = await fetch(`${API_BASE}/cv-intelligence/process/${referralId}?force=${force}`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return handleResponse<CandidateProfileDetail>(res);
+  },
+
+  async processOpeningCVs(positionId: string): Promise<{ status: string; candidate_count: number; message: string }> {
+    const res = await fetch(`${API_BASE}/cv-intelligence/process-opening/${positionId}`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return handleResponse<{ status: string; candidate_count: number; message: string }>(res);
+  },
+
+  // ================================================================
+  // Historical Referral Suggestions (Isolated & Local-Only)
+  // ================================================================
+  async getHistoricalSuggestions(positionId: string, threshold?: number): Promise<HistoricalSuggestionsResponse> {
+    const query = threshold !== undefined ? `?threshold=${threshold}` : '';
+    const res = await fetch(`${API_BASE}/historical-suggestions/positions/${positionId}${query}`, {
+      headers: getHeaders(),
+    });
+    return handleResponse<HistoricalSuggestionsResponse>(res);
+  },
 };
+
+export const apiService = api;

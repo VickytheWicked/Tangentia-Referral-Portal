@@ -19,6 +19,7 @@ from app.schemas.referral import (
     ReferralDetailResponse,
     ReferralWithdrawRequest,
     HiredHistoryResponse,
+    CVExtractionPreviewResponse,
 )
 from app.schemas.duplicate import DuplicateCheckRequest, DuplicateCheckResponse
 from app.schemas.status_history import StatusHistoryResponse
@@ -146,6 +147,93 @@ async def api_check_duplicate(
         candidate_phone=payload.candidate_phone,
         candidate_name=payload.candidate_name,
         position_id=payload.position_id,
+    )
+
+
+@router.post("/extract-cv", response_model=CVExtractionPreviewResponse)
+async def api_extract_cv_details(
+    file: UploadFile = File(...),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """
+    Extract candidate information (name, email, phone, experience, linkedin, github)
+    from an uploaded CV/resume file (PDF or DOCX) to autofill the referral form.
+    Accessible to all employees submitting referrals.
+    """
+    if not file or not file.filename:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No CV file uploaded.")
+
+    ext = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
+    if ext not in ["pdf", "docx"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file format '.{ext}'. Please upload a PDF (.pdf) or Word document (.docx).",
+        )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded CV file is empty (0 bytes).")
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CV file exceeds maximum allowable size of 10MB.")
+
+    from app.cv_intelligence.text_extractor import extract_cv_text
+    from app.cv_intelligence.extractor import get_cv_extractor, heuristic_cv_extract, is_valid_human_name
+
+    try:
+        cv_text = extract_cv_text(file_bytes=file_bytes, filename=file.filename, content_type=file.content_type)
+    except Exception as e:
+        logger.warning(f"Text extraction failed on uploaded CV: {e}")
+        return CVExtractionPreviewResponse(
+            success=False,
+            found_fields=[],
+            not_found_fields=["name", "email", "phone"],
+            message=f"Could not read text from this file: {str(e)}",
+        )
+
+    try:
+        extractor = get_cv_extractor()
+        extracted = extractor.extract(cv_text)
+    except Exception as ex:
+        logger.info(f"Gemini CV extraction unavailable ({ex}), using heuristic parser.")
+        extracted = heuristic_cv_extract(cv_text)
+
+    # Sanity checks on name
+    cand_name = extracted.candidate_name
+    if cand_name and not is_valid_human_name(cand_name):
+        cand_name = None
+
+    # Track found vs not found fields
+    found = []
+    not_found = []
+
+    if cand_name:
+        found.append("name")
+    else:
+        not_found.append("name")
+
+    if extracted.email:
+        found.append("email")
+    else:
+        not_found.append("email")
+
+    if extracted.phone:
+        found.append("phone")
+    else:
+        not_found.append("phone")
+
+    years_val = extracted.years_of_experience if extracted.years_of_experience and extracted.years_of_experience > 0 else None
+
+    return CVExtractionPreviewResponse(
+        success=True,
+        candidate_name=cand_name,
+        candidate_email=extracted.email,
+        candidate_phone=extracted.phone,
+        years_of_experience=years_val,
+        linkedin_url=extracted.linkedin_url,
+        github_url=extracted.github_url,
+        skills=extracted.skills,
+        found_fields=found,
+        not_found_fields=not_found,
     )
 
 

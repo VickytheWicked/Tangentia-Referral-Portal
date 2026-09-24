@@ -1,0 +1,317 @@
+{
+  "test-role-qa:qa engineer": {
+    "hiring_guidance": "For this QA Engineer role, prioritize candidates who can demonstrate hands-on experience building maintainable test suites from scratch rather than just executing pre-written scripts. Distinguish true automation practitioners by asking them to explain how they handle flaky tests and asynchronous operations in Cypress and Jest. A major red flag is a candidate who focuses solely on manual testing without showing a strong programmatic understanding of JavaScript-based automation frameworks.",
+    "selection_criteria": [
+      "Can the candidate explain how they structure Cypress and Jest test suites for scalability and maintainability?",
+      "Does the resume demonstrate practical experience integrating automated regression tests into CI/CD pipelines?",
+      "How does the candidate approach test prioritization and determine what to automate versus what to test manually?",
+      "Can they walk through a specific scenario where they diagnosed and resolved a flaky or failing asynchronous test?"
+    ],
+    "key_qualities": [
+      "Test Automation Expertise",
+      "JavaScript Proficiency",
+      "Regression Testing Focus",
+      "Detail-Oriented Problem Solver"
+    ]
+  },
+  "job-001:senior backend developer (python / fastapi)": {
+    "hiring_guidance": "For Tangentia's Senior Backend Developer role, prioritize candidates who demonstrate deep architectural understanding of asynchronous Python and FastAPI rather than just syntax familiarity. Distinguish true experts by their ability to explain how they handle concurrency, dependency injection, and performance bottlenecks in cloud distributed systems. A major red flag is a resume focused solely on basic CRUD APIs without any mention of cloud scalability, containerization, or robust system design.",
+    "selection_criteria": [
+      "Can the candidate explain how FastAPI utilizes Python's asyncio and Starlette under the hood for high-concurrency workloads?",
+      "Does the resume demonstrate hands-on experience designing and deploying microservices on cloud platforms (AWS, Azure, or GCP)?",
+      "How does the candidate approach automated testing, API documentation (OpenAPI/Swagger), and data validation using Pydantic?",
+      "Can they provide a concrete example of optimizing database queries and managing database connections efficiently within a FastAPI application?"
+    ],
+    "key_qualities": [
+      "FastAPI & Asyncio Expert",
+      "Cloud Architecture Design",
+      "Database Optimization Skills",
+      "Clean Code Advocate"
+    ]
+  },
+  "job-002:ai & machine learning engineer": {
+    "hiring_guidance": "For Tangentia's AI Innovations team, focus primarily on practical experience with Large Language Model (LLM) orchestration rather than theoretical machine learning. To separate genuine practitioners from superficial ones, ask them to walk through the exact failure modes they encountered while building agentic workflows or semantic search systems. A critical red flag is a candidate who only discusses fine-tuning public models without demonstrating a firm grasp of retrieval-augmented generation (RAG) evaluation metrics and latency optimization.",
+    "selection_criteria": [
+      "Can the candidate explain how they designed and measured the accuracy of an LLM evaluation pipeline?",
+      "What specific frameworks or tools (e.g., LangChain, LlamaIndex) has the candidate used to build multi-step agentic workflows?",
+      "How does the candidate approach vector database selection and semantic search optimization for enterprise-scale data?",
+      "Can they describe a specific scenario where they resolved hallucination or context-window limitations in a production LLM deployment?"
+    ],
+    "key_qualities": [
+      "LLM Orchestration Expertise",
+      "Agentic Workflow Design",
+      "Semantic Search Systems",
+      "Evaluation Pipeline Engineering"
+    ]
+  },
+  "job-003:senior cloud solutions architect": {
+    "hiring_guidance": "Prioritize candidates with proven hands-on leadership in multi-cloud (AWS and Azure) enterprise migrations and secure hybrid deployments. Distinguish genuine architects from surface-level candidates by asking for specific trade-off decisions made between cost, security, and performance in complex environments. A major red flag is a reliance on theoretical knowledge or certifications without clear experience handling production-level security, scaling, or governance challenges.",
+    "selection_criteria": [
+      "Ask for a detailed walk-through of a recent enterprise project that integrated both AWS and Azure within a secure hybrid deployment.",
+      "Verify hands-on experience establishing cloud governance, zero-trust security frameworks, and compliance standards across multi-cloud environments.",
+      "Inquire about specific metrics and strategies used to achieve cloud cost optimization and risk mitigation in large-scale modernizations.",
+      "Confirm advanced professional certifications (e.g., AWS Certified Solutions Architect - Professional or Azure Solutions Architect Expert) supported by verified project delivery."
+    ],
+    "key_qualities": [
+      "Multi-Cloud Enterprise Strategy",
+      "Hybrid Architecture Design",
+      "Cloud Security Governance",
+      "Cost Optimization Mastery"
+    ]
+  },
+  "job-004:frontend lead (react + typescript)": {
+    "hiring_guidance": "For a Frontend Lead, prioritize architectural depth in React 18+ and enterprise design systems over simple UI development experience. Distinguish true technical leads from senior individual contributors by assessing their ability to enforce strict TypeScript practices, optimize Core Web Vitals, and mentor cross-functional teams. A major red flag is an over-reliance on pre-built UI kits without an understanding of native browser rendering, custom CSS architecture, or complex state management.",
+    "selection_criteria": [
+      "Verify proven experience architecting scalable React 18+ applications and building or governing enterprise design systems with modern CSS.",
+      "Evaluate practical TypeScript expertise by asking how they enforce type safety, generics, and code quality standards across engineering teams.",
+      "Assess frontend performance optimization strategies, including state management approaches (e.g., Zustand, Redux, React Query) and Core Web Vitals profiling.",
+      "Confirm technical leadership track record, including driving frontend code reviews, defining CI/CD tooling, and mentoring junior developers."
+    ],
+    "key_qualities": [
+      "Frontend System Architecture",
+      "Advanced TypeScript Mastery",
+      "Design System Engineering",
+      "Technical Team Leadership"
+    ]
+  },
+  "job-005:devops & sre specialist": {
+    "hiring_guidance": "For this DevOps & SRE role at Tangentia, prioritize candidates who demonstrate hands-on production experience with Kubernetes and Infrastructure-as-Code rather than just theoretical tool knowledge. Distinguish true practitioners by asking them to walk through a specific incident where their CI/CD pipeline or zero-downtime release strategy prevented a catastrophic outage. A major red flag is a candidate who focuses solely on deployment speed without mentioning observability, automated rollbacks, or system reliability metrics.",
+    "selection_criteria": [
+      "Can the candidate explain how they implement zero-downtime releases and automated rollbacks in Kubernetes?",
+      "What is their hands-on experience managing state and modules in production-grade Terraform environments?",
+      "How do they approach monitoring, logging, and incident response within an SRE framework?",
+      "Can they describe a complex CI/CD pipeline optimization they designed and maintained?"
+    ],
+    "key_qualities": [
+      "Kubernetes orchestration expert",
+      "Infrastructure-as-Code practitioner",
+      "CI/CD pipeline builder",
+      "System reliability advocate"
+    ]
+  },
+  "cats-16856991:qa engineer": {
+    "hiring_guidance": "The core competency for this role is a strong foundation in test automation combined with specialized experience in testing AI systems like RAG pipelines and LLM agents. Distinguish true practitioners from superficial candidates by asking how they handle testing non-deterministic AI outputs, grounding, and hallucinations versus simply using ChatGPT for basic text drafting. A critical red flag is a candidate who lists AI or Agentic AI on their resume but cannot describe a specific methodology or metric used to evaluate AI accuracy and failure modes.",
+    "selection_criteria": [
+      "Ask the candidate to explain their specific approach to testing non-deterministic AI applications, RAG workflows, or measuring model hallucinations.",
+      "Verify hands-on experience writing automated test frameworks from scratch using Selenium or Playwright, rather than just running existing scripts.",
+      "Assess practical usage of API testing tools (e.g., Postman) and SQL queries to validate backend data integrity during integration testing.",
+      "Evaluate their familiarity with defect lifecycle management tools like Azure DevOps or Jira in an Agile sprint environment."
+    ],
+    "key_qualities": [
+      "Agentic AI Testing",
+      "Automation with Playwright",
+      "RAG Evaluation Expertise",
+      "End-to-End QA Ownership"
+    ]
+  },
+  "cats-16856641:senior software engineer \u2013 plm platform": {
+    "hiring_guidance": "Focus primarily on deep backend integration experience and cloud-native architecture, since PLM platforms require complex data synchronization with ERP and ECAD systems. Distinguish real practitioners by asking how they handle distributed transaction failures, API idempotency, and legacy system constraints rather than just theoretical design patterns. A major red flag is someone with 11+ years of experience who relies entirely on DevOps teams for deployment instead of taking end-to-end operational ownership.",
+    "selection_criteria": [
+      "Describe a time you integrated a monolithic enterprise system (like PLM or ERP) with modern microservices; how did you handle partial failures, retries, and data consistency?",
+      "What is your hands-on experience level with Azure (or AWS/GCP) infrastructure-as-code tools like Terraform or Bicep, and Kubernetes deployment troubleshooting?",
+      "With 11+ years of experience, walk through how you ensure robust API security, such as implementing OAuth 2.0 and OIDC in a high-throughput enterprise environment.",
+      "Are you comfortable working primarily in a C#/.NET backend stack, and what is your approach to modernizing legacy codebases while maintaining 99.9% uptime?"
+    ],
+    "key_qualities": [
+      "Enterprise Integration Expert",
+      "Cloud-Native Engineer",
+      "End-to-End Ownership",
+      "Robust Backend Developer"
+    ]
+  },
+  "cats-16856637:senior software engineer \u2013 plm platform": {
+    "hiring_guidance": "For this senior PLM backend role, prioritize candidates with deep cloud-native architecture experience and robust enterprise integration skills over raw PLM domain knowledge, which can be taught. Distinguish true experts by their ability to discuss handling distributed transaction failures, idempotency, and Kubernetes troubleshooting under pressure. A major red flag is a candidate who relies entirely on DevOps teams for CI/CD and infrastructure rather than owning the entire deployment lifecycle end-to-end.",
+    "selection_criteria": [
+      "Can you describe a specific time you implemented robust error handling for partial failures and retries in a high-throughput enterprise API integration?",
+      "Walk me through your hands-on experience with Infrastructure-as-Code (Terraform or Bicep) and setting up zero-downtime CI/CD pipelines in Azure or AWS.",
+      "How have you handled container orchestration and production troubleshooting in Kubernetes for complex backend microservices?",
+      "With 11+ years of experience, how comfortable are you transitioning to or leading projects in C#/.NET if your primary background is in Java or Go?"
+    ],
+    "key_qualities": [
+      "Cloud-Native Architecture",
+      "Enterprise System Integration",
+      "Kubernetes & DevOps",
+      "Backend Engineering Excellence"
+    ]
+  },
+  "cats-16856097:databricks technical architect": {
+    "hiring_guidance": "Focus on the candidate's practical experience designing enterprise-grade Data Lakehouse architectures on Databricks using AWS or Azure. To distinguish true architects from resume-padding generalists, probe deeply into their cost-optimization strategies and workload performance tuning. A major red flag is an inability to articulate how they handled governance, security, and CI/CD automation in production environments.",
+    "selection_criteria": [
+      "Can the candidate explain how they designed and implemented a Delta Lake architecture, specifically managing data governance and ACID transactions?",
+      "What specific strategies has the candidate used to optimize cloud infrastructure costs and query performance for large-scale PySpark/Databricks workloads?",
+      "How does the candidate approach CI/CD pipelines and DevOps automation for deploying Databricks notebooks and data pipelines across environments?",
+      "Can the candidate provide a concrete example of successfully migrating a legacy data platform to a cloud-based Databricks environment?"
+    ],
+    "key_qualities": [
+      "Databricks Lakehouse Expert",
+      "Cloud Architecture Leader",
+      "Performance Optimization Pro",
+      "Strong Stakeholder Communicator"
+    ]
+  },
+  "cats-16855744:rpa developer \u2013 automation anywhere + python": {
+    "hiring_guidance": "Focus on candidates who demonstrate true hybrid expertise by writing custom Python scripts to extend Automation Anywhere A360, rather than those who rely solely on pre-built drag-and-drop actions. Differentiate strong talent by asking how they handle dynamic UI changes, complex API integrations, and robust error handling in production. A key red flag is a candidate whose Python experience is purely academic or limited to basic scripting rather than production-grade RPA system integration.",
+    "selection_criteria": [
+      "Verify at least 2 years of hands-on bot delivery specifically in Automation Anywhere A360 (distinguishing it from older v11 deployments).",
+      "Assess practical Python usage: Ask them to describe a specific scenario where AA360's native actions were insufficient and required a custom Python script or API call.",
+      "Evaluate error handling and resilience: Ask how they implement logging, global exception handling, and automated recovery for bots running in unattended production.",
+      "Confirm database and API proficiency: Check for hands-on experience parsing JSON/REST payloads and executing SQL queries within automation workflows."
+    ],
+    "key_qualities": [
+      "AA360 Architecture Expertise",
+      "Applied Python Scripting",
+      "API & Database Integration",
+      "Resilient Exception Handling"
+    ]
+  },
+  "cats-16855743:rpa developer + apa \u2014 3\u20135 years": {
+    "hiring_guidance": "Focus primarily on verifying hands-on implementation experience with Automation Anywhere A360 and APA, rather than just theoretical certification knowledge. A genuine practitioner will readily discuss specific exception handling frameworks, API integrations, and production bot debugging challenges. A major red flag is a candidate who focuses solely on recorder-based bot building without demonstrating robust analytical process design or integration capabilities.",
+    "selection_criteria": [
+      "Can you describe a complex process you automated using Automation Anywhere A360 and APA, specifically how you handled exceptions and edge cases?",
+      "How have you integrated your A360 bots with external APIs, databases, or enterprise applications?",
+      "What is your experience with Python scripting, and in what context did you integrate Python code into your RPA workflows?",
+      "Walk me through your approach to monitoring bots in production and troubleshooting sudden process failures."
+    ],
+    "key_qualities": [
+      "A360 & APA Expertise",
+      "API & Database Integration",
+      "Robust Exception Handling",
+      "Analytical Problem Solver"
+    ]
+  },
+  "cats-16855742:rpa developer + da \u2014 3\u20135 years": {
+    "hiring_guidance": "Focus primarily on hands-on proficiency with Automation Anywhere A360 and Intelligent Document Processing (IQ Bot/DA) rather than just theoretical RPA knowledge. To distinguish a true expert, ask them to walk through a specific exception-handling scenario involving unstructured document extraction failures. A major red flag is a candidate who only knows legacy Automation Anywhere V11 and struggles to articulate A360 cloud architecture or API integrations.",
+    "selection_criteria": [
+      "Can the candidate explain how they configure document classification, extraction, and validation rules in A360 Document Automation?",
+      "Do they have demonstrable experience integrating A360 bots with external APIs and databases?",
+      "Can they provide a concrete example of how they designed robust exception handling and bot monitoring for production failures?",
+      "How have they utilized Python or AI/ML-based tools to enhance document processing or handle custom data manipulation?"
+    ],
+    "key_qualities": [
+      "A360 Expertise",
+      "Document Automation",
+      "Problem Solving",
+      "API Integration"
+    ]
+  },
+  "cats-16850937:rpa developer \u2013 power automate": {
+    "hiring_guidance": "Focus primarily on hands-on proficiency in Microsoft Power Automate and Power Automate Desktop, backed by practical API and database integration experience. To spot a genuine practitioner, ask them to walk through a complex exception handling scenario they built rather than just listing tools. A major red flag is an inability to explain how they secure credentials or manage state changes during unattended bot runs.",
+    "selection_criteria": [
+      "Can the candidate explain how they handle transient errors and exceptions in Power Automate desktop flows?",
+      "Do they have demonstrable experience integrating Power Automate with REST APIs using HTTP actions and parsing JSON payloads?",
+      "Can they write and optimize basic SQL queries to fetch or update data as part of an automated workflow?",
+      "How do they approach process discovery and determine whether a manual business process is actually a good candidate for RPA?"
+    ],
+    "key_qualities": [
+      "Power Automate Expert",
+      "API Integration Skilled",
+      "Strong Problem Solver",
+      "Process Analysis Mindset"
+    ]
+  },
+  "cats-16849726:it engineer (aws)": {
+    "hiring_guidance": "Prioritize candidates who demonstrate a balanced mix of hands-on AWS cloud administration (EC2, VPC, IAM) and practical Microsoft 365 IT operations support. Distinguish genuine practitioners by verifying their direct involvement in configuring AWS networking and IAM security policies rather than just basic ticket routing or user creation. A major red flag is a candidate who claims AWS expertise but lacks practical experience troubleshooting VPC routing or M365 tenant configurations, or a pure cloud engineer unwilling to handle day-to-day user support.",
+    "selection_criteria": [
+      "Can you describe a specific scenario where you configured or troubleshot an AWS service (such as EC2 networking or IAM permissions) alongside managing M365 tenant access?",
+      "Walk me through your process for onboarding a new employee, covering both M365 license assignment and AWS IAM user provisioning.",
+      "How have you used basic AI tools or automation scripts to streamline routine IT support or system monitoring tasks?",
+      "Verify 3+ years of hands-on experience covering combined desktop/network troubleshooting, Microsoft 365 administration, and core AWS service maintenance."
+    ],
+    "key_qualities": [
+      "AWS Infrastructure Administration",
+      "Microsoft 365 Management",
+      "End-User Technical Support",
+      "Pragmatic IT Automation"
+    ]
+  },
+  "cats-16846695:rpa developer (automation anywhere a360 and python scripting)": {
+    "hiring_guidance": "To evaluate candidates for Tangentia's Intelligent Automation team, focus heavily on their hands-on proficiency with Automation Anywhere A360 combined with practical Python scripting. Distinguish genuine practitioners by asking them to walk through a complex exception-handling scenario or a bot failure they personally debugged in production. A major red flag is a candidate who can only discuss high-level concepts without being able to explain how they implemented custom logic, API integrations, or error logging in A360.",
+    "selection_criteria": [
+      "Can the candidate clearly describe their hands-on experience building end-to-end bots in Automation Anywhere A360, including specific challenges overcome?",
+      "Do they demonstrate practical proficiency in Python scripting, particularly in parsing data or handling tasks outside standard A360 packages?",
+      "Have they successfully translated a Business Requirement Document (BRD) into a Process Design Document (PDD) and working automation?",
+      "Do they possess relevant certifications, such as Automation Anywhere Certified Advanced RPA Professional?"
+    ],
+    "key_qualities": [
+      "A360 Bot Development",
+      "Python Scripting Proficiency",
+      "Process Problem Solving",
+      "Stakeholder Collaboration"
+    ]
+  },
+  "cats-16793607:vice president, global sales": {
+    "hiring_guidance": "For a VP of Global Sales at Tangentia, prioritize candidates with proven experience scaling B2B enterprise technology sales and a strong grasp of emerging AI solutions like agentic platforms. Distinguish top performers by asking for specific metrics on multi-million-dollar revenue growth, global team leadership, and GTM execution rather than generic sales buzzwords. A major red flag is an inability to articulate a clear strategy for selling complex, AI-driven platforms alongside traditional enterprise services.",
+    "selection_criteria": [
+      "Can you detail a specific instance where you scaled a distributed global sales organization and met or exceeded multi-million-dollar revenue targets?",
+      "How have you successfully positioned and driven revenue growth for a disruptive technology product, such as AI, automation, or platform-based offerings?",
+      "Describe your approach to managing complex, high-value enterprise deal cycles involving C-level stakeholders across international regions.",
+      "What specific sales operations frameworks, forecasting models, and CRM best practices have you implemented to optimize sales productivity?"
+    ],
+    "key_qualities": [
+      "Strategic revenue driver",
+      "Global sales leader",
+      "Enterprise deal closer",
+      "Agentic AI advocate"
+    ]
+  },
+  "cats-16699887:business architect - senior": {
+    "hiring_guidance": "For this senior public-sector modernization role, prioritize candidates with proven enterprise-level experience in process transformation and legacy system consolidation. Distinguish true architects from business analysts by evaluating their ability to map high-level capability models to actionable transformation blueprints rather than just gathering requirements. A major red flag is a candidate who focuses exclusively on IT tools without demonstrating a strong grasp of stakeholder management, government standards, and enterprise architecture frameworks.",
+    "selection_criteria": [
+      "Describe your experience leading business architecture and process redesign for large-scale legacy modernization or case management replacement projects, preferably in the public sector.",
+      "How do you approach business capability modeling and aligning stakeholder requirements with enterprise transformation roadmaps?",
+      "Can you provide an example of how you successfully managed application consolidation or retirement to reduce redundancies?",
+      "Explain your familiarity with BPMN and enterprise architecture frameworks in the context of large transformations."
+    ],
+    "key_qualities": [
+      "Enterprise Architecture",
+      "Business Process Modeling",
+      "Stakeholder Management",
+      "Legacy System Modernization"
+    ]
+  },
+  "job-pos-multi:full stack engineer": {
+    "hiring_guidance": "Prioritize candidates who demonstrate cohesive end-to-end application design using both Python for robust backend APIs and React for dynamic frontends. Distinguish true full-stack developers from single-domain specialists by assessing their understanding of state management, API integration, and database operations. A major red flag is an inability to explain how frontend state changes sync cleanly with backend data persistence.",
+    "selection_criteria": [
+      "Can the candidate explain how they structure a Python API (e.g., FastAPI, Django, Flask) and consume it effectively within a React application?",
+      "Look on the resume for evidence of delivering complete, production-grade web applications end-to-end rather than isolated UI tweaks or backend scripts.",
+      "How does the candidate approach state management in React and database ORM/query optimization in Python?",
+      "Has the candidate handled full-stack deployment, containerization (Docker), or basic CI/CD pipelines for Python/React projects?"
+    ],
+    "key_qualities": [
+      "Full-Stack Web Architecture",
+      "Python API Development",
+      "React State Management",
+      "End-to-End System Integration"
+    ]
+  },
+  "test-pos-guidance:business architect": {
+    "hiring_guidance": "For Tangentia's Business Architect role, prioritize candidates who can seamlessly bridge high-level enterprise strategy with detailed agile execution using BPMN. To separate true practitioners from resume-builders, ask them to walk through a specific process optimization they led that directly reduced operational friction or cost. A major red flag is a candidate who speaks exclusively in theoretical framework jargon without being able to tie architecture models directly to tangible business outcomes and agile sprint deliverables.",
+    "selection_criteria": [
+      "Can you provide a specific example of how you used BPMN to redesign a complex enterprise workflow within an Agile delivery model?",
+      "How do you ensure that your enterprise architecture frameworks remain adaptable and don't slow down rapid sprint cycles?",
+      "Describe a time when business stakeholders and technical teams had conflicting requirements; how did you reconcile them architecturally?",
+      "What specific enterprise architecture frameworks (e.g., TOGAF) have you applied practically in past digital transformation projects?"
+    ],
+    "key_qualities": [
+      "Process modeling expertise",
+      "Agile enterprise alignment",
+      "Stakeholder communication",
+      "Strategic systems thinking"
+    ]
+  },
+  "cats-16857426:it engineer (azure)": {
+    "hiring_guidance": "For this IT Engineer (Azure) role, prioritize candidates who demonstrate hands-on operational experience with both Azure cloud infrastructure and foundational IT support. Distinguish genuine practitioners by asking them to walk through a specific troubleshooting scenario involving hybrid Windows/Linux environments or Azure networking issues. A critical red flag is a candidate who focuses solely on theoretical cloud design without practical experience in day-to-day user support, device management, and Microsoft 365 administration.",
+    "selection_criteria": [
+      "Can you describe your hands-on experience managing Azure core services such as Virtual Machines, Blob Storage, and Azure Entra ID in a production environment?",
+      "How do you typically troubleshoot network connectivity or performance issues between on-premises systems and Azure Virtual Networks?",
+      "What has been your experience administering Microsoft 365, handling user licensing, and managing onboarding/offboarding workflows?",
+      "Describe a time when you had to troubleshoot a complex issue involving a Linux or Windows operating system. What steps did you take?"
+    ],
+    "key_qualities": [
+      "Azure Cloud Support",
+      "System Administration",
+      "Network Troubleshooting",
+      "Strong Communication"
+    ]
+  }
+}

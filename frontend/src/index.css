@@ -502,6 +502,12 @@ input[type="number"] {
   background: var(--bg-card);
 }
 
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -787,6 +793,13 @@ input[type="number"] {
   padding: 4px 0;
 }
 
+.mobile-bottom-nav-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
 .mobile-bottom-nav-item:hover, .mobile-bottom-nav-item.active {
   color: #60a5fa;
 }
@@ -794,6 +807,16 @@ input[type="number"] {
 .mobile-bottom-nav-item.active svg {
   color: #60a5fa;
   transform: translateY(-1px);
+}
+
+/* Visibility Utilities */
+.visible-mobile,
+.visible-mobile-flex {
+  display: none !important;
+}
+
+.hidden-mobile {
+  display: block;
 }
 
 /* Animations */
@@ -874,6 +897,18 @@ input[type="number"] {
 
   .mobile-bottom-nav {
     display: flex;
+  }
+
+  .visible-mobile {
+    display: block !important;
+  }
+
+  .visible-mobile-flex {
+    display: flex !important;
+  }
+
+  .hidden-mobile {
+    display: none !important;
   }
 
   .responsive-banner {

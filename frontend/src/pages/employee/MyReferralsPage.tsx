@@ -160,69 +160,69 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
               <span>⇄ Swipe horizontally to view full table details</span>
             </div>
             <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Referral ID</th>
-                  <th>Candidate</th>
-                  <th>Job Opening</th>
-                  <th>Referred By</th>
-                  <th>Experience</th>
-                  <th>Relationship</th>
-                  <th>Date Submitted</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#93c5fd' }}>
-                        {r.referral_number}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{r.candidate_name}</div>
-                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{r.candidate_email}</div>
-                    </td>
-                    <td>
-                      <div style={{ color: 'var(--text-secondary)' }}>{r.position_title}</div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{r.position_department}</div>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-                        {r.referred_by_name || 'N/A'}
-                      </div>
-                      {r.referred_by_email && (
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                          {r.referred_by_email}
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Referral ID</th>
+                    <th>Candidate</th>
+                    <th>Job Opening</th>
+                    <th>Referred By</th>
+                    <th>Experience</th>
+                    {/* <th>Relationship</th> */}
+                    <th>Date Submitted</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#93c5fd' }}>
+                          {r.referral_number}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{r.candidate_name}</div>
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{r.candidate_email}</div>
+                      </td>
+                      <td>
+                        <div style={{ color: 'var(--text-secondary)' }}>{r.position_title}</div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{r.position_department}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {r.referred_by_name || 'N/A'}
                         </div>
-                      )}
-                    </td>
-                    <td>{r.years_of_experience} yrs</td>
-                    <td>{r.relationship}</td>
-                    <td>{new Date(r.created_at).toLocaleDateString()}</td>
-                    <td>
-                      <StatusBadge status={r.status} />
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => openDetail(r.id)}
-                          title="View Profile"
-                        >
-                          <ExternalLink size={14} /> View
-                        </button>
-                        <button
-                          className="btn btn-outline btn-sm"
-                          onClick={() => handleDownloadCV(r.id, r.original_filename)}
-                          title="Download CV"
-                        >
-                          <Download size={14} />
-                        </button>
-                        {/* {['Submitted', 'Under Review'].includes(r.status) && (
+                        {r.referred_by_email && (
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                            {r.referred_by_email}
+                          </div>
+                        )}
+                      </td>
+                      <td>{r.years_of_experience} yrs</td>
+                      {/* <td>{r.relationship}</td> */}
+                      <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                      <td>
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => openDetail(r.id)}
+                            title="View Profile"
+                          >
+                            <ExternalLink size={14} /> View
+                          </button>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => handleDownloadCV(r.id, r.original_filename)}
+                            title="Download CV"
+                          >
+                            <Download size={14} />
+                          </button>
+                          {/* {['Submitted', 'Under Review'].includes(r.status) && (
                           <button
                             className="btn btn-danger btn-sm"
                             onClick={() =>
@@ -237,16 +237,16 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
                             <RotateCcw size={14} />
                           </button>
                         )} */}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-    </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Referral Profile Modal */}
       {selectedReferral && (

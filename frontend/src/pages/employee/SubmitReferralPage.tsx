@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { JobPosition, DuplicateMatch } from '../../types';
+import { JobPosition, DuplicateMatch, CVExtractionPreview } from '../../types';
 import { api } from '../../services/api';
 import { DuplicateModal } from '../../components/common/DuplicateModal';
 import { JobUnavailableModal } from '../../components/common/JobUnavailableModal';
@@ -13,6 +13,7 @@ import {
   X,
   ShieldCheck,
   Building2,
+  Sparkles,
 } from 'lucide-react';
 
 const COUNTRY_CODES = [
@@ -76,9 +77,16 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
   const [referralNote, setReferralNote] = useState<string>('');
   const [candidateConsent, setCandidateConsent] = useState<boolean>(false);
 
-  // CV File
+  // CV File & Extraction State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  const [isExtractingCV, setIsExtractingCV] = useState<boolean>(false);
+  const [autofilledFields, setAutofilledFields] = useState<Set<string>>(new Set());
+  const [missingFields, setMissingFields] = useState<Set<string>>(new Set());
+  const [extractionNotice, setExtractionNotice] = useState<{
+    type: 'success' | 'warning' | 'info';
+    message: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Submission State
@@ -128,7 +136,19 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
   const selectedJob = positions.find((p) => p.id === positionId);
 
-  const handleFileChange = (file: File | null) => {
+  const parseExtractedPhone = (rawPhone: string) => {
+    const clean = rawPhone.trim().replace(/^\(+/, '');
+    const sortedCodes = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
+    for (const c of sortedCodes) {
+      if (clean.startsWith(c.code)) {
+        const rest = clean.substring(c.code.length).replace(/^[\s\-()]+/, '');
+        return { code: c.code, number: rest };
+      }
+    }
+    return { code: '+91', number: clean };
+  };
+
+  const handleFileChange = async (file: File | null) => {
     if (!file) return;
 
     // Validate extension
@@ -146,6 +166,102 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
     setErrorMessage(null);
     setSelectedFile(file);
+    setIsExtractingCV(true);
+    setExtractionNotice(null);
+
+    const filled = new Set<string>();
+    const missing = new Set<string>();
+
+    try {
+      const result: CVExtractionPreview = await api.extractCV(file);
+
+      // Autofill Name
+      if (result.candidate_name) {
+        setReferralName(result.candidate_name);
+        filled.add('name');
+      } else {
+        missing.add('name');
+      }
+
+      // Autofill Email
+      if (result.candidate_email) {
+        setReferralEmail(result.candidate_email);
+        filled.add('email');
+      } else {
+        missing.add('email');
+      }
+
+      // Autofill Phone
+      if (result.candidate_phone) {
+        const parsed = parseExtractedPhone(result.candidate_phone);
+        setReferralCountryCode(parsed.code);
+        setReferralPhone(parsed.number);
+        filled.add('phone');
+      } else {
+        missing.add('phone');
+      }
+
+      // Autofill Years of Experience
+      if (result.years_of_experience && result.years_of_experience > 0) {
+        setYearsOfExperience(String(result.years_of_experience));
+        filled.add('experience');
+      }
+
+      // Autofill LinkedIn URL
+      if (result.linkedin_url) {
+        setLinkedinUrl(result.linkedin_url);
+        filled.add('linkedin');
+      }
+
+      // Autofill GitHub URL
+      if (result.github_url) {
+        setGithubUrl(result.github_url);
+        filled.add('github');
+      }
+
+      setAutofilledFields(filled);
+      setMissingFields(missing);
+
+      // Construct notification message
+      const notFoundLabels: string[] = [];
+      if (!result.candidate_name) notFoundLabels.push('Candidate Name');
+      if (!result.candidate_email) notFoundLabels.push('Email Address');
+      if (!result.candidate_phone) notFoundLabels.push('Phone Number');
+
+      if (notFoundLabels.length === 0) {
+        setExtractionNotice({
+          type: 'success',
+          message: 'Candidate Name, Email, and Phone were successfully detected from the CV and autofilled below. Please review before submitting.',
+        });
+      } else {
+        setExtractionNotice({
+          type: 'warning',
+          message: `Could not detect ${notFoundLabels.join(' and ')} in the CV. Please fill these details manually in the form below.`,
+        });
+      }
+    } catch (err: any) {
+      console.warn('Auto-extraction from CV failed:', err);
+      missing.add('name');
+      missing.add('email');
+      missing.add('phone');
+      setMissingFields(missing);
+      setExtractionNotice({
+        type: 'warning',
+        message: 'Could not auto-extract details from this CV. Please fill the candidate details manually in the form below.',
+      });
+    } finally {
+      setIsExtractingCV(false);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setExtractionNotice(null);
+    setAutofilledFields(new Set());
+    setMissingFields(new Set());
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -427,9 +543,9 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
         <form onSubmit={handleSubmit}>
           {/* Section 1: Employee Information */}
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '28px' }}>
             <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
-              1. Employee Information
+              1. Your Employee Information
             </h4>
 
             <div className="responsive-form-row">
@@ -498,34 +614,162 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                   />
                 </div>
               </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Name of the Referral <span className="required">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="form-input"
-                  placeholder="e.g. Priya Patel (Candidate being referred)"
-                  value={referralName}
-                  onChange={(e) => {
-                    setReferralName(e.target.value);
-                    setDuplicateConfirmed(false);
-                    if (errorMessage && errorMessage.includes('Duplicate Referral')) {
-                      setErrorMessage(null);
-                    }
-                  }}
-                  onBlur={performDuplicateCheck}
-                />
-              </div>
             </div>
           </div>
 
-          {/* Section 2: Position & Referral Context */}
+          {/* Section 2: Upload Referral's CV / Resume (Instant Autofill) */}
+          <div style={{ marginBottom: '28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+              <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                2. Upload Referral's CV / Resume <span className="required">*</span>
+              </h4>
+              <span
+                style={{
+                  fontSize: '0.74rem',
+                  color: '#60a5fa',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Sparkles size={12} /> Auto-extracts candidate details
+              </span>
+            </div>
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Upload the candidate's CV. Our system will automatically read and autofill the candidate's name, email, phone number, and experience below. If any detail is not found, you can fill it in manually.
+            </p>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              accept=".pdf,.docx"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  handleFileChange(e.target.files[0]);
+                }
+              }}
+            />
+
+            {isExtractingCV ? (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  padding: '36px 20px',
+                  background: 'rgba(59, 130, 246, 0.06)',
+                  borderRadius: '10px',
+                  border: '1px dashed rgba(59, 130, 246, 0.4)',
+                  textAlign: 'center',
+                }}
+              >
+                <RefreshCw size={30} className="spin" color="#60a5fa" />
+                <div>
+                  <div style={{ fontSize: '0.94rem', fontWeight: 700, color: '#93c5fd' }}>
+                    Analyzing CV & extracting candidate details...
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Reading name, email, phone, and career profile from {selectedFile?.name}
+                  </div>
+                </div>
+              </div>
+            ) : !selectedFile ? (
+              <div
+                className={`upload-dropzone ${isDragOver ? 'active' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <UploadCloud size={38} color="#3b82f6" />
+                <div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Click to browse or drag and drop referral's CV
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Supported formats: PDF (.pdf) or Word (.docx) • Max size: 10 MB
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '16px 20px',
+                    background: 'var(--bg-secondary)',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <FileText size={28} color="#3b82f6" />
+                    <div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {selectedFile.name}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Ready for SharePoint sync
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={handleRemoveFile}
+                  >
+                    <X size={14} /> Remove
+                  </button>
+                </div>
+
+                {extractionNotice && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      marginTop: '12px',
+                      background:
+                        extractionNotice.type === 'success'
+                          ? 'rgba(16, 185, 129, 0.12)'
+                          : 'rgba(245, 158, 11, 0.12)',
+                      border:
+                        extractionNotice.type === 'success'
+                          ? '1px solid rgba(16, 185, 129, 0.3)'
+                          : '1px solid rgba(245, 158, 11, 0.3)',
+                      color: extractionNotice.type === 'success' ? '#34d399' : '#fbbf24',
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    {extractionNotice.type === 'success' ? (
+                      <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    ) : (
+                      <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    )}
+                    <div style={{ lineHeight: 1.4 }}>{extractionNotice.message}</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Candidate & Referral Details */}
           <div style={{ marginBottom: '24px' }}>
             <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
-              2. Position & Referral Context
+              3. Candidate & Referral Details
             </h4>
 
             {preselectedJobId && selectedJob && (
@@ -647,8 +891,49 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
             <div className="responsive-form-row">
               <div className="form-group">
-                <label className="form-label">
-                  Referral's Email Address <span className="required">*</span>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Candidate Full Name <span className="required">*</span></span>
+                  {autofilledFields.has('name') && (
+                    <span style={{ fontSize: '0.72rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                      <CheckCircle2 size={12} /> Autofilled from CV
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="form-input"
+                  placeholder="e.g. Priya Patel"
+                  value={referralName}
+                  onChange={(e) => {
+                    setReferralName(e.target.value);
+                    setDuplicateConfirmed(false);
+                    if (missingFields.has('name')) {
+                      const updated = new Set(missingFields);
+                      updated.delete('name');
+                      setMissingFields(updated);
+                    }
+                    if (errorMessage && errorMessage.includes('Duplicate Referral')) {
+                      setErrorMessage(null);
+                    }
+                  }}
+                  onBlur={performDuplicateCheck}
+                />
+                {missingFields.has('name') && (
+                  <span style={{ fontSize: '0.74rem', color: '#fbbf24', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                    <AlertCircle size={12} /> Cannot find candidate name in CV — please fill manually
+                  </span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Referral's Email Address <span className="required">*</span></span>
+                  {autofilledFields.has('email') && (
+                    <span style={{ fontSize: '0.72rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                      <CheckCircle2 size={12} /> Autofilled from CV
+                    </span>
+                  )}
                 </label>
                 <input
                   type="email"
@@ -659,17 +944,34 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                   onChange={(e) => {
                     setReferralEmail(e.target.value);
                     setDuplicateConfirmed(false);
+                    if (missingFields.has('email')) {
+                      const updated = new Set(missingFields);
+                      updated.delete('email');
+                      setMissingFields(updated);
+                    }
                     if (errorMessage && errorMessage.includes('Duplicate Referral')) {
                       setErrorMessage(null);
                     }
                   }}
                   onBlur={performDuplicateCheck}
                 />
+                {missingFields.has('email') && (
+                  <span style={{ fontSize: '0.74rem', color: '#fbbf24', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                    <AlertCircle size={12} /> Cannot find email in CV — please fill manually
+                  </span>
+                )}
               </div>
+            </div>
 
+            <div className="responsive-form-row">
               <div className="form-group">
-                <label className="form-label">
-                  Referral's Phone Number <span className="required">*</span>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Referral's Phone Number <span className="required">*</span></span>
+                  {autofilledFields.has('phone') && (
+                    <span style={{ fontSize: '0.72rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                      <CheckCircle2 size={12} /> Autofilled from CV
+                    </span>
+                  )}
                 </label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <select
@@ -704,6 +1006,11 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                     onChange={(e) => {
                       setReferralPhone(e.target.value);
                       setDuplicateConfirmed(false);
+                      if (missingFields.has('phone')) {
+                        const updated = new Set(missingFields);
+                        updated.delete('phone');
+                        setMissingFields(updated);
+                      }
                       if (errorMessage && errorMessage.includes('Duplicate Referral')) {
                         setErrorMessage(null);
                       }
@@ -711,16 +1018,25 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                     onBlur={performDuplicateCheck}
                   />
                 </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  Stored in Excel as: {getFullReferralPhone(referralPhone, referralCountryCode) || `${referralCountryCode} [phone]`}
-                </span>
+                {missingFields.has('phone') ? (
+                  <span style={{ fontSize: '0.74rem', color: '#fbbf24', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                    <AlertCircle size={12} /> Cannot find phone number in CV — please fill manually
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    Stored in Excel as: {getFullReferralPhone(referralPhone, referralCountryCode) || `${referralCountryCode} [phone]`}
+                  </span>
+                )}
               </div>
-            </div>
 
-            <div className="responsive-form-row">
               <div className="form-group">
-                <label className="form-label">
-                  Years of Relevant Experience <span className="required">*</span>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Years of Relevant Experience <span className="required">*</span></span>
+                  {autofilledFields.has('experience') && (
+                    <span style={{ fontSize: '0.72rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                      <CheckCircle2 size={12} /> Autofilled from CV
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
@@ -738,9 +1054,18 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                   }}
                 />
               </div>
+            </div>
 
+            <div className="responsive-form-row">
               <div className="form-group">
-                <label className="form-label">Referral's LinkedIn Profile URL</label>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Referral's LinkedIn Profile URL</span>
+                  {autofilledFields.has('linkedin') && (
+                    <span style={{ fontSize: '0.72rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                      <CheckCircle2 size={12} /> Autofilled
+                    </span>
+                  )}
+                </label>
                 <input
                   type="url"
                   className="form-input"
@@ -749,17 +1074,24 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                   onChange={(e) => setLinkedinUrl(e.target.value)}
                 />
               </div>
-            </div>
 
-            <div className="form-group" style={{ marginBottom: '16px' }}>
-              <label className="form-label">Referral's GitHub or Portfolio URL</label>
-              <input
-                type="url"
-                className="form-input"
-                placeholder="https://github.com/referral"
-                value={githubUrl}
-                onChange={(e) => setGithubUrl(e.target.value)}
-              />
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Referral's GitHub or Portfolio URL</span>
+                  {autofilledFields.has('github') && (
+                    <span style={{ fontSize: '0.72rem', color: '#34d399', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                      <CheckCircle2 size={12} /> Autofilled
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="url"
+                  className="form-input"
+                  placeholder="https://github.com/referral"
+                  value={githubUrl}
+                  onChange={(e) => setGithubUrl(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="form-group">
@@ -778,77 +1110,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                 Min. 10 characters. This note is shared directly with the hiring committee.
               </span>
             </div>
-          </div>
-
-          {/* Section 3: CV Upload */}
-          <div style={{ marginBottom: '28px' }}>
-            <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
-              3. Referral CV / Resume Upload
-            </h4>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              accept=".pdf,.docx"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  handleFileChange(e.target.files[0]);
-                }
-              }}
-            />
-
-            {!selectedFile ? (
-              <div
-                className={`upload-dropzone ${isDragOver ? 'active' : ''}`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <UploadCloud size={38} color="#3b82f6" />
-                <div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Click to browse or drag and drop referral's CV
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    Supported formats: PDF (.pdf) or Word (.docx) • Max size: 10 MB
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px 20px',
-                  background: 'var(--bg-secondary)',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border-subtle)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <FileText size={28} color="#3b82f6" />
-                  <div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {selectedFile.name}
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Ready for SharePoint sync
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => setSelectedFile(null)}
-                >
-                  <X size={14} /> Remove
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Section 4: Mandatory Confirmation */}

@@ -88,5 +88,18 @@ class HiredHistoryResponse(BaseModel):
     referred_by_name: Optional[str] = None
     hired_at: datetime
     status: str = "Hired"
-
     model_config = ConfigDict(from_attributes=True)
+
+
+class CVExtractionPreviewResponse(BaseModel):
+    success: bool = True
+    candidate_name: Optional[str] = None
+    candidate_email: Optional[str] = None
+    candidate_phone: Optional[str] = None
+    years_of_experience: Optional[float] = None
+    linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
+    skills: List[str] = Field(default_factory=list)
+    found_fields: List[str] = Field(default_factory=list)
+    not_found_fields: List[str] = Field(default_factory=list)
+    message: Optional[str] = None

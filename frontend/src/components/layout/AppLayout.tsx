@@ -40,6 +40,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     if (path.startsWith('/employee/openings')) return 'Available Openings';
     if (path.startsWith('/employee')) return 'Employee Dashboard';
     if (path.includes('/hr/referrals')) return 'Enterprise Candidate Database';
+    if (path.includes('/hr/suggestions')) return 'Candidate AI Suggestions';
     if (path.includes('/hr/jobs')) return 'Job Openings Management';
     if (path.includes('/hr/analytics')) return 'Referral Funnel & Analytics';
     if (path.startsWith('/hr')) return 'HR Referral Overview';
@@ -104,11 +105,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           {!isHR ? (
             <>
               <div
-                className={`nav-item ${
-                  location.pathname === '/employee' || location.pathname === '/employee/dashboard'
-                    ? 'active'
-                    : ''
-                }`}
+                className={`nav-item ${location.pathname === '/employee' || location.pathname === '/employee/dashboard'
+                  ? 'active'
+                  : ''
+                  }`}
                 onClick={() => handleNavClick('/employee/dashboard')}
               >
                 <Layers size={18} />
@@ -132,11 +132,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               </div>
 
               <div
-                className={`nav-item ${
-                  location.pathname === '/employee/referrals' || location.pathname === '/employee/my-referrals'
-                    ? 'active'
-                    : ''
-                }`}
+                className={`nav-item ${location.pathname === '/employee/referrals' || location.pathname === '/employee/my-referrals'
+                  ? 'active'
+                  : ''
+                  }`}
                 onClick={() => handleNavClick('/employee/referrals')}
               >
                 <Users size={18} />
@@ -154,9 +153,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           ) : (
             <>
               <div
-                className={`nav-item ${
-                  location.pathname === '/hr' || location.pathname === '/hr/dashboard' ? 'active' : ''
-                }`}
+                className={`nav-item ${location.pathname === '/hr' || location.pathname === '/hr/dashboard' ? 'active' : ''
+                  }`}
                 onClick={() => handleNavClick('/hr/dashboard')}
               >
                 <Layers size={18} />
@@ -169,6 +167,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               >
                 <FolderKanban size={18} />
                 <span>All Candidates</span>
+              </div>
+
+              <div
+                className={`nav-item ${location.pathname === '/hr/suggestions' ? 'active' : ''}`}
+                onClick={() => handleNavClick('/hr/suggestions')}
+              >
+                <Sparkles size={18} />
+                <span>HR Suggestions</span>
               </div>
 
               <div
@@ -273,7 +279,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   </span>
                 </div>
 
-                <button
+                {/* <button
                   className="btn btn-secondary btn-sm"
                   onClick={handleLogout}
                   style={{
@@ -287,26 +293,59 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 >
                   <LogOut size={14} />
                   <span className="hidden-mobile">Sign Out</span>
-                </button>
+                </button> */}
               </>
             ) : (
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => navigate('/login')}
-                style={{
-                  fontSize: '0.82rem',
-                  padding: '6px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderColor: 'rgba(59, 130, 246, 0.35)',
-                  background: 'rgba(59, 130, 246, 0.12)',
-                  color: '#93c5fd',
-                }}
+              // <button
+              //   className="btn btn-secondary btn-sm"
+              //   onClick={() => navigate('/login')}
+              //   style={{
+              //     fontSize: '0.82rem',
+              //     padding: '6px 14px',
+              //     display: 'flex',
+              //     alignItems: 'center',
+              //     gap: '6px',
+              //     borderColor: 'rgba(59, 130, 246, 0.35)',
+              //     background: 'rgba(59, 130, 246, 0.12)',
+              //     color: '#93c5fd',
+              //   }}
+              // >
+              //   <ShieldCheck size={15} color="#60a5fa" />
+              //   <span>HR Login</span>
+              // </button>
+
+              // <div>
+              //   {/* <div className="header-user-avatar" style={{ background: 'rgba(139, 92, 246, 0.25)', color: '#c4b5fd' }}>
+              //     <ShieldCheck size={16} />
+              //   </div> */}
+              //   <span
+              //     style={{
+              //       fontSize: '0.68rem',
+              //       fontWeight: 700,
+              //       padding: '2px 7px',
+              //       borderRadius: '10px',
+              //       background: 'rgba(139, 92, 246, 0.25)',
+              //       color: '#c4b5fd',
+              //       textTransform: 'uppercase',
+              //       letterSpacing: '0.04em',
+              //     }}
+              //   >
+              //     Employee
+              //   </span>
+              // </div>
+
+              <div
+                className="header-user-pill"
+                title={'Employee Dashboard'}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
               >
-                <ShieldCheck size={15} color="#60a5fa" />
-                <span>HR Login</span>
-              </button>
+                <div className="header-user-avatar" style={{ background: 'rgba(139, 92, 246, 0.25)', color: '#c4b5fd' }}>
+                  <ShieldCheck size={16} />
+                </div>
+                <span className="header-user-name">
+                  Employee
+                </span>
+              </div>
             )}
           </div>
         </header>
@@ -318,40 +357,36 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           {!isHR ? (
             <>
               <div
-                className={`mobile-bottom-nav-item ${
-                  location.pathname === '/employee' || location.pathname === '/employee/dashboard'
-                    ? 'active'
-                    : ''
-                }`}
+                className={`mobile-bottom-nav-item ${location.pathname === '/employee' || location.pathname === '/employee/dashboard'
+                  ? 'active'
+                  : ''
+                  }`}
                 onClick={() => handleNavClick('/employee/dashboard')}
               >
                 <Layers size={18} />
                 <span>Dashboard</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${
-                  location.pathname === '/employee/openings' ? 'active' : ''
-                }`}
+                className={`mobile-bottom-nav-item ${location.pathname === '/employee/openings' ? 'active' : ''
+                  }`}
                 onClick={() => handleNavClick('/employee/openings')}
               >
                 <Briefcase size={18} />
                 <span>Openings</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${
-                  location.pathname === '/employee/submit' ? 'active' : ''
-                }`}
+                className={`mobile-bottom-nav-item ${location.pathname === '/employee/submit' ? 'active' : ''
+                  }`}
                 onClick={() => handleNavClick('/employee/submit')}
               >
                 <PlusCircle size={18} />
                 <span>Submit</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${
-                  location.pathname === '/employee/referrals' || location.pathname === '/employee/my-referrals'
-                    ? 'active'
-                    : ''
-                }`}
+                className={`mobile-bottom-nav-item ${location.pathname === '/employee/referrals' || location.pathname === '/employee/my-referrals'
+                  ? 'active'
+                  : ''
+                  }`}
                 onClick={() => handleNavClick('/employee/referrals')}
               >
                 <Users size={18} />
@@ -361,22 +396,28 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           ) : (
             <>
               <div
-                className={`mobile-bottom-nav-item ${
-                  location.pathname === '/hr' || location.pathname === '/hr/dashboard' ? 'active' : ''
-                }`}
+                className={`mobile-bottom-nav-item ${location.pathname === '/hr' || location.pathname === '/hr/dashboard' ? 'active' : ''
+                  }`}
                 onClick={() => handleNavClick('/hr/dashboard')}
               >
                 <Layers size={18} />
                 <span>Dashboard</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${
-                  location.pathname === '/hr/referrals' ? 'active' : ''
-                }`}
+                className={`mobile-bottom-nav-item ${location.pathname === '/hr/referrals' ? 'active' : ''
+                  }`}
                 onClick={() => handleNavClick('/hr/referrals')}
               >
                 <FolderKanban size={18} />
                 <span>Candidates</span>
+              </div>
+              <div
+                className={`mobile-bottom-nav-item ${location.pathname === '/hr/suggestions' ? 'active' : ''
+                  }`}
+                onClick={() => handleNavClick('/hr/suggestions')}
+              >
+                <Sparkles size={18} />
+                <span>Suggestions</span>
               </div>
               <div
                 className={`mobile-bottom-nav-item ${location.pathname === '/hr/jobs' ? 'active' : ''}`}
@@ -386,9 +427,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 <span>Openings</span>
               </div>
               <div
-                className={`mobile-bottom-nav-item ${
-                  location.pathname === '/hr/analytics' ? 'active' : ''
-                }`}
+                className={`mobile-bottom-nav-item ${location.pathname === '/hr/analytics' ? 'active' : ''
+                  }`}
                 onClick={() => handleNavClick('/hr/analytics')}
               >
                 <BarChart3 size={18} />

@@ -62,6 +62,38 @@ class Settings(BaseSettings):
         "application/msword",
     ]
 
+    # CV Intelligence & HR Suggestions (Isolated & Local-Only)
+    CV_INTELLIGENCE_ENABLED: bool = Field(default=False, description="Enable CV Intelligence and HR Suggestions")
+    CV_INTELLIGENCE_DB_PATH: str = Field(
+        default=os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "cv_intelligence.db"),
+        description="Path to separate SQLite database for CV Intelligence",
+    )
+    CV_LLM_PROVIDER: str = Field(default="gemini", description="LLM provider")
+    CV_LLM_MODEL: str = Field(default="gemini-3.5-flash", description="LLM model identifier")
+    GEMINI_API_KEY: str = Field(default="", description="Gemini API Key")
+    CV_STORAGE_TYPE: str = Field(
+        default="local",
+        description="'blob' to sync cv_intelligence.db with Azure Blob Storage, 'local' for local SQLite file only",
+    )
+    BLOB_CV_INTELLIGENCE_NAME: str = Field(
+        default="cv_intelligence.db",
+        description="Blob name for cv_intelligence.db in BLOB_DATA_CONTAINER",
+    )
+
+    # Historical Referral Suggestions (Isolated & Local-Only)
+    HISTORICAL_REFERRAL_SEARCH_ENABLED: bool = Field(
+        default=False,
+        description="Enable Historical Referral Suggestions RAG search over archived candidates",
+    )
+    HISTORICAL_MATCH_THRESHOLD: float = Field(
+        default=0.45,
+        description="Minimum similarity/relevance threshold for historical candidate suggestions",
+    )
+    HISTORICAL_RAG_DB_PATH: str = Field(
+        default=os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "historical_rag.db"),
+        description="Path to separate SQLite database/index for Historical RAG embeddings",
+    )
+
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",

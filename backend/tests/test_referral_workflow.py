@@ -367,4 +367,59 @@ def test_referral_phone_stored_with_country_code_in_db_and_excel(client, seeded_
     wb.close()
 
 
+def test_extract_cv_preview_endpoint(client):
+    emp_headers = {"Authorization": "Bearer dev-employee-token"}
+
+    # 1. Test unsupported file format
+    txt_res = client.post(
+        "/api/referrals/extract-cv",
+        headers=emp_headers,
+        files={"file": ("test.txt", io.BytesIO(b"Hello world"), "text/plain")},
+    )
+    assert txt_res.status_code == 400
+    assert "PDF" in txt_res.json()["detail"] and "docx" in txt_res.json()["detail"].lower()
+
+    import zipfile
+
+    def _create_docx(text: str) -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            doc_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body>
+            </w:document>"""
+            z.writestr("word/document.xml", doc_xml.encode("utf-8"))
+            z.writestr("[Content_Types].xml", b"<Types></Types>")
+        return buf.getvalue()
+
+    # 2. Test extraction from a sample document with contact details
+    docx_bytes = _create_docx("Priya Sharma Email: priya.sharma@example.com Phone: +91 9876543210 Software Engineer with 6 years experience in Python and React")
+    res = client.post(
+        "/api/referrals/extract-cv",
+        headers=emp_headers,
+        files={"file": ("priya_cv.docx", io.BytesIO(docx_bytes), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "priya.sharma@example.com" in (data["candidate_email"] or "")
+    assert "9876543210" in (data["candidate_phone"] or "")
+    assert "email" in data["found_fields"]
+    assert "phone" in data["found_fields"]
+
+    # 3. Test extraction with missing email/phone
+    docx_bytes2 = _create_docx("Project Summary Worked on enterprise data migration for 3 years.")
+    res2 = client.post(
+        "/api/referrals/extract-cv",
+        headers=emp_headers,
+        files={"file": ("project_summary.docx", io.BytesIO(docx_bytes2), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
+    )
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["success"] is True
+    assert "email" in data2["not_found_fields"]
+    assert "phone" in data2["not_found_fields"]
+
+
+
 
