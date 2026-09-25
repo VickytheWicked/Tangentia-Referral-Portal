@@ -244,13 +244,18 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
           </div>
         )}
 
-        {/* CV Intelligence: AI Requirement Analysis */}
+        {/* CV Intelligence: AI Requirement Analysis & Match Suite */}
         {profile.match?.requirement_analysis ? (
           <AIRequirementAnalysisSection
             analysis={profile.match.requirement_analysis}
             candidateName={profile.candidate_name || undefined}
             positionTitle={profile.position_title || undefined}
             positionId={profile.position_id || undefined}
+            fitSummary={profile.match.fit_summary}
+            matchLevel={profile.match.match_level}
+            experienceMatch={profile.match.experience_match}
+            matchedSkills={profile.match.matched_skills}
+            missingSkills={profile.match.missing_skills}
           />
         ) : (
           /* Legacy fallback — shown for candidates not yet reprocessed with the new pipeline */
