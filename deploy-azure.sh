@@ -84,11 +84,12 @@ az webapp create \
   --runtime "PYTHON:3.11" \
   --output none 2>/dev/null
 
-# Set startup command
+# Set startup command and enable Always On (prevents cold start sleep on B1 plan)
 az webapp config set \
   --name "$BACKEND_APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
   --startup-file "uvicorn app.main:app --host 0.0.0.0 --port 8000" \
+  --always-on true \
   --output none 2>/dev/null
 
 BACKEND_URL="https://${BACKEND_APP_NAME}.azurewebsites.net"
