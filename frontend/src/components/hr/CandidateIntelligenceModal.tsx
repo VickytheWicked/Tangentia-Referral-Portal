@@ -250,6 +250,7 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
             analysis={profile.match.requirement_analysis}
             candidateName={profile.candidate_name || undefined}
             positionTitle={profile.position_title || undefined}
+            positionId={profile.position_id || undefined}
           />
         ) : (
           /* Legacy fallback — shown for candidates not yet reprocessed with the new pipeline */
