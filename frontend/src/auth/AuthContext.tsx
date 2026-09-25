@@ -43,7 +43,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    fetchUser();
+    // Safety watchdog: ensure isLoading is never stuck indefinitely (e.g. during backend cold starts)
+    const watchdog = setTimeout(() => {
+      setIsLoading(false);
+    }, 4000);
+
+    fetchUser().finally(() => {
+      clearTimeout(watchdog);
+    });
+
+    return () => clearTimeout(watchdog);
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {

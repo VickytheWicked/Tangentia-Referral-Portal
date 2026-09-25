@@ -66,6 +66,27 @@ const getHeaders = (isMultipart: boolean = false): HeadersInit => {
   return headers;
 };
 
+// Resilient fetch wrapper with 25s timeout to prevent UI hangs during network stalls
+const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  try {
+    return await window.fetch(input, {
+      ...init,
+      signal: init?.signal || controller.signal,
+    });
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error('Network request timed out. Please check your connection and try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const fetch = fetchWithTimeout;
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let errorDetail = 'An unexpected error occurred';
