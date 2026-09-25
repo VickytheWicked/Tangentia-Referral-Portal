@@ -6,7 +6,6 @@ import {
   Award,
   FolderGit2,
   Sparkles,
-  RefreshCw,
   CheckCircle2,
   AlertCircle,
   Layers,
@@ -34,7 +33,6 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
 }) => {
   const [profile, setProfile] = useState<CandidateProfileDetail>(initialProfile);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
-  const [isReprocessing, setIsReprocessing] = useState<boolean>(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -47,22 +45,6 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
       setErrorMsg(err.message || 'Failed to download original CV.');
     } finally {
       setIsDownloading(false);
-    }
-  };
-
-  const handleReprocess = async () => {
-    try {
-      setIsReprocessing(true);
-      setErrorMsg(null);
-      const updated = await api.processCandidateCV(profile.referral_id, true);
-      setProfile(updated);
-      if (onProfileUpdated) {
-        onProfileUpdated(updated);
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to re-extract CV.');
-    } finally {
-      setIsReprocessing(false);
     }
   };
 
@@ -96,16 +78,6 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
             >
               <Edit3 size={14} />
               <span>Change Status</span>
-            </button>
-            <button
-              onClick={handleReprocess}
-              disabled={isReprocessing}
-              className="btn btn-secondary btn-sm"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-              title="Re-extract CV data"
-            >
-              <RefreshCw size={14} className={isReprocessing ? 'spin' : ''} />
-              <span>{isReprocessing ? 'Extracting...' : 'Re-extract CV'}</span>
             </button>
             <button
               onClick={handleDownloadCV}
@@ -339,7 +311,7 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
           ) : (
             <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-muted)' }}>
               {profile.extraction_status === 'COMPLETED'
-                ? 'Candidate profile parsed. Click "Re-extract CV" to refresh matching evaluation.'
+                ? 'Candidate profile parsed successfully.'
                 : 'CV extraction is pending or not yet processed.'}
             </p>
           )}
