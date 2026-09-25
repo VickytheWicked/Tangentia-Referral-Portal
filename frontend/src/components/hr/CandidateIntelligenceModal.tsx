@@ -19,6 +19,7 @@ import { api } from '../../services/api';
 import { Modal } from '../common/Modal';
 import { StatusBadge } from '../common/StatusBadge';
 import { StatusChangeModal } from './StatusChangeModal';
+import { AIRequirementAnalysisSection } from './AIRequirementAnalysisSection';
 
 interface CandidateIntelligenceModalProps {
   profile: CandidateProfileDetail;
@@ -243,136 +244,145 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
           </div>
         )}
 
-        {/* CV Intelligence: Why This Candidate is Relevant */}
-        <div
-          style={{
-            background: 'rgba(30, 58, 138, 0.08)',
-            border: '1px solid rgba(59, 130, 246, 0.25)',
-            borderRadius: '10px',
-            padding: '16px 18px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <Sparkles size={18} color="#60a5fa" />
-            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#93c5fd' }}>
-              Relevance & Requirement Alignment
-            </h4>
-          </div>
+        {/* CV Intelligence: AI Requirement Analysis */}
+        {profile.match?.requirement_analysis ? (
+          <AIRequirementAnalysisSection
+            analysis={profile.match.requirement_analysis}
+            candidateName={profile.candidate_name || undefined}
+            positionTitle={profile.position_title || undefined}
+          />
+        ) : (
+          /* Legacy fallback — shown for candidates not yet reprocessed with the new pipeline */
+          <div
+            style={{
+              background: 'rgba(30, 58, 138, 0.08)',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              borderRadius: '10px',
+              padding: '16px 18px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <Sparkles size={18} color="#60a5fa" />
+              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#93c5fd' }}>
+                Relevance &amp; Requirement Alignment
+              </h4>
+            </div>
 
-          {profile.match?.fit_summary && (
-            <div
-              style={{
-                marginBottom: '14px',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: 'rgba(59, 130, 246, 0.12)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                fontSize: '0.88rem',
-                lineHeight: 1.5,
-                color: '#e0f2fe',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px',
-              }}
-            >
-              <Sparkles size={15} color="#38bdf8" style={{ marginTop: '3px', flexShrink: 0 }} />
-              <div>
-                <strong style={{ color: '#93c5fd' }}>AI Fit Summary: </strong>
-                <span style={{ fontStyle: 'italic' }}>{profile.match.fit_summary}</span>
+            {profile.match?.fit_summary && (
+              <div
+                style={{
+                  marginBottom: '14px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  fontSize: '0.88rem',
+                  lineHeight: 1.5,
+                  color: '#e0f2fe',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                }}
+              >
+                <Sparkles size={15} color="#38bdf8" style={{ marginTop: '3px', flexShrink: 0 }} />
+                <div>
+                  <strong style={{ color: '#93c5fd' }}>AI Fit Summary: </strong>
+                  <span style={{ fontStyle: 'italic' }}>{profile.match.fit_summary}</span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {profile.match && profile.match.explanation && profile.match.explanation.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {profile.match.explanation.map((item, idx) => {
-                const isCheck = item.startsWith('✓');
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                      fontSize: '0.88rem',
-                      color: isCheck ? '#34d399' : 'var(--text-muted)',
-                    }}
-                  >
-                    {isCheck ? (
-                      <CheckCircle2 size={15} color="#34d399" style={{ marginTop: '2px', flexShrink: 0 }} />
-                    ) : (
-                      <span style={{ width: '15px', textAlign: 'center', color: '#94a3b8', flexShrink: 0 }}>•</span>
-                    )}
-                    <span>{item.replace(/^[✓•]\s*/, '')}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-muted)' }}>
-              {profile.extraction_status === 'COMPLETED'
-                ? 'Candidate profile parsed successfully.'
-                : 'CV extraction is pending or not yet processed.'}
-            </p>
-          )}
+            {profile.match && profile.match.explanation && profile.match.explanation.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {profile.match.explanation.map((item, idx) => {
+                  const isCheck = item.startsWith('✓');
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '8px',
+                        fontSize: '0.88rem',
+                        color: isCheck ? '#34d399' : 'var(--text-muted)',
+                      }}
+                    >
+                      {isCheck ? (
+                        <CheckCircle2 size={15} color="#34d399" style={{ marginTop: '2px', flexShrink: 0 }} />
+                      ) : (
+                        <span style={{ width: '15px', textAlign: 'center', color: '#94a3b8', flexShrink: 0 }}>•</span>
+                      )}
+                      <span>{item.replace(/^[✓•]\s*/, '')}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-muted)' }}>
+                {profile.extraction_status === 'COMPLETED'
+                  ? 'Candidate profile parsed successfully.'
+                  : 'CV extraction is pending or not yet processed.'}
+              </p>
+            )}
 
-          {/* Matched & Missing Skills Badges */}
-          {profile.match && (
-            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(59, 130, 246, 0.15)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {profile.match.matched_skills.length > 0 && (
-                <div>
-                  <span style={{ fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 700, color: '#34d399', letterSpacing: '0.5px' }}>
-                    Matched Skills:
-                  </span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-                    {profile.match.matched_skills.map((s, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          fontSize: '0.78rem',
-                          padding: '2px 8px',
-                          borderRadius: '10px',
-                          background: 'rgba(16, 185, 129, 0.15)',
-                          color: '#34d399',
-                          border: '1px solid rgba(16, 185, 129, 0.3)',
-                          fontWeight: 600,
-                        }}
-                      >
-                        ✓ {s}
-                      </span>
-                    ))}
+            {/* Matched & Missing Skills Badges */}
+            {profile.match && (
+              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(59, 130, 246, 0.15)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {profile.match.matched_skills.length > 0 && (
+                  <div>
+                    <span style={{ fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 700, color: '#34d399', letterSpacing: '0.5px' }}>
+                      Matched Skills:
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                      {profile.match.matched_skills.map((s, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            fontSize: '0.78rem',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            color: '#34d399',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✓ {s}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {profile.match.missing_skills.length > 0 && (
-                <div>
-                  <span style={{ fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 700, color: '#fbbf24', letterSpacing: '0.5px' }}>
-                    Missing / Unmentioned Requirements:
-                  </span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-                    {profile.match.missing_skills.map((m, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          fontSize: '0.78rem',
-                          padding: '2px 8px',
-                          borderRadius: '10px',
-                          background: 'rgba(245, 158, 11, 0.15)',
-                          color: '#fbbf24',
-                          border: '1px solid rgba(245, 158, 11, 0.3)',
-                          fontWeight: 600,
-                        }}
-                      >
-                        • {m}
-                      </span>
-                    ))}
+                {profile.match.missing_skills.length > 0 && (
+                  <div>
+                    <span style={{ fontSize: '0.76rem', textTransform: 'uppercase', fontWeight: 700, color: '#fbbf24', letterSpacing: '0.5px' }}>
+                      Missing / Unmentioned Requirements:
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                      {profile.match.missing_skills.map((m, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            fontSize: '0.78rem',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            background: 'rgba(245, 158, 11, 0.15)',
+                            color: '#fbbf24',
+                            border: '1px solid rgba(245, 158, 11, 0.3)',
+                            fontWeight: 600,
+                          }}
+                        >
+                          • {m}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Extracted Skills Section */}
         {profile.skills && profile.skills.length > 0 && (

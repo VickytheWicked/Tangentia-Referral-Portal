@@ -2,6 +2,40 @@ export type ExtractionStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 
 export type MatchLevel = 'Strong Match' | 'Good Match' | 'Potential Match';
 
+export type RequirementStatus =
+  | 'SUPPORTED'
+  | 'NOT_MET'
+  | 'NOT_DEMONSTRATED'
+  | 'PARTIALLY_SUPPORTED';
+
+export type RequirementCategory =
+  | 'MANDATORY'
+  | 'REQUIRED_EXPERIENCE'
+  | 'REQUIRED_SKILLS'
+  | 'REQUIRED_DOMAIN'
+  | 'REQUIRED_FRAMEWORKS'
+  | 'REQUIRED_ARCHITECTURE'
+  | 'PREFERRED'
+  | 'OTHER';
+
+export interface RequirementAnalysisItem {
+  requirement: string;
+  category: RequirementCategory;
+  required_value: string;
+  status: RequirementStatus;
+  cv_evidence: string;
+  reasoning: string;
+}
+
+export interface OverallAnalysis {
+  key_observations: string[];
+  mandatory_requirements: RequirementAnalysisItem[];
+  supported_requirements: RequirementAnalysisItem[];
+  partially_supported_requirements: RequirementAnalysisItem[];
+  not_demonstrated_requirements: RequirementAnalysisItem[];
+  analyzed_at?: string;
+}
+
 export interface EducationItem {
   degree?: string;
   institution?: string;
@@ -38,6 +72,7 @@ export interface JobMatchItem {
   experience_match?: string;
   explanation: string[];
   fit_summary?: string;
+  requirement_analysis?: OverallAnalysis; // New evidence-based analysis
 }
 
 export interface SuggestedCandidateSummary {

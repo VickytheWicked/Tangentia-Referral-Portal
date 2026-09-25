@@ -154,6 +154,9 @@ zip -r "$DEPLOY_ZIP" . \
   -x ".env" \
   -x ".env.example" \
   -x "storage/mock_sharepoint/*" \
+  -x "data/*.db" \
+  -x "data/*.xlsx" \
+  -x "data/*.json" \
   > /dev/null
 
 log "Deploying backend to Azure App Service (this may take 2-3 minutes)..."

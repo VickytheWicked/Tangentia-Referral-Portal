@@ -1,4 +1,5 @@
 import re
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -350,6 +351,33 @@ class CVIntelligenceService:
                 job_match.explanation = explanation
                 job_match.fit_summary = fit_summary
 
+                # Generate evidence-based requirement analysis (new — additive)
+                try:
+                    from app.cv_intelligence.requirement_analyzer import generate_requirement_analysis
+                    req_analysis = generate_requirement_analysis(
+                        position_id=position.id,
+                        job_title=position.title,
+                        department=position.department,
+                        job_description=position.description or "",
+                        candidate_name=profile.candidate_name or "",
+                        candidate_years_exp=profile.years_of_experience,
+                        candidate_skills=profile.skills or [],
+                        candidate_experience=profile.experience or [],
+                        cv_text=cv_text,
+                    )
+                    if req_analysis is not None:
+                        job_match.requirement_analysis = req_analysis.model_dump_json()
+                        logger.info(
+                            f"Requirement analysis stored for referral {referral_id} "
+                            f"({len(req_analysis.mandatory_requirements)} mandatory, "
+                            f"{len(req_analysis.supported_requirements)} supported)"
+                        )
+                except Exception as ra_err:
+                    logger.warning(
+                        f"Requirement analysis failed for referral {referral_id}: {ra_err}. "
+                        "Existing match data is preserved."
+                    )
+
             cv_db.commit()
             cv_db.refresh(profile)
             logger.info(f"Successfully processed CV intelligence for referral {referral_id} (Gemini available={gemini_available})")
@@ -547,6 +575,19 @@ class CVIntelligenceService:
 
         match_item = None
         if match_record:
+            # Deserialise stored requirement_analysis JSON if present
+            req_analysis_obj = None
+            if match_record.requirement_analysis:
+                try:
+                    from app.cv_intelligence.schemas import OverallAnalysis
+                    req_analysis_obj = OverallAnalysis.model_validate_json(
+                        match_record.requirement_analysis
+                    )
+                except Exception as parse_err:
+                    logger.warning(
+                        f"Failed to parse requirement_analysis for match {match_record.id}: {parse_err}"
+                    )
+
             match_item = JobMatchItem(
                 id=match_record.id,
                 position_id=match_record.position_id,
@@ -556,6 +597,7 @@ class CVIntelligenceService:
                 experience_match=match_record.experience_match,
                 explanation=match_record.explanation or [],
                 fit_summary=match_record.fit_summary,
+                requirement_analysis=req_analysis_obj,
             )
 
         return CandidateProfileDetailResponse(

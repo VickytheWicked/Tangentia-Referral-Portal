@@ -49,6 +49,10 @@ def init_cv_db():
                     cur.execute("ALTER TABLE job_matches ADD COLUMN fit_summary TEXT")
                     conn.commit()
                     logger.info("Migrated job_matches table: successfully added fit_summary column.")
+                if cols and "requirement_analysis" not in cols:
+                    cur.execute("ALTER TABLE job_matches ADD COLUMN requirement_analysis TEXT")
+                    conn.commit()
+                    logger.info("Migrated job_matches table: successfully added requirement_analysis column.")
                 conn.close()
         except Exception as mig_err:
             logger.warning(f"Failed to check/migrate job_matches columns: {mig_err}")

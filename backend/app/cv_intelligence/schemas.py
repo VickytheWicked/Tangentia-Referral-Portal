@@ -1,6 +1,54 @@
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional, Any, Dict, Union
 from pydantic import BaseModel, Field, field_validator
+
+
+# -------------------------------------------------------------------------
+# Evidence-Based Requirement Analysis Schemas (new — additive)
+# -------------------------------------------------------------------------
+
+class RequirementStatus(str, Enum):
+    SUPPORTED = "SUPPORTED"
+    NOT_MET = "NOT_MET"
+    NOT_DEMONSTRATED = "NOT_DEMONSTRATED"
+    PARTIALLY_SUPPORTED = "PARTIALLY_SUPPORTED"
+
+
+class RequirementCategory(str, Enum):
+    MANDATORY = "MANDATORY"
+    REQUIRED_EXPERIENCE = "REQUIRED_EXPERIENCE"
+    REQUIRED_SKILLS = "REQUIRED_SKILLS"
+    REQUIRED_DOMAIN = "REQUIRED_DOMAIN"
+    REQUIRED_FRAMEWORKS = "REQUIRED_FRAMEWORKS"
+    REQUIRED_ARCHITECTURE = "REQUIRED_ARCHITECTURE"
+    PREFERRED = "PREFERRED"
+    OTHER = "OTHER"
+
+
+class RequirementAnalysisItem(BaseModel):
+    """A single job requirement with its evidence-based evaluation."""
+    requirement: str = Field(description="Short name of the requirement")
+    category: RequirementCategory
+    required_value: str = Field(description="What the job requires")
+    status: RequirementStatus
+    cv_evidence: str = Field(
+        description="Direct CV quote/summary or 'No explicit evidence found in CV.'"
+    )
+    reasoning: str = Field(description="Brief explanation of the classification")
+
+
+class OverallAnalysis(BaseModel):
+    """Complete evidence-based analysis of a candidate against a job position."""
+    key_observations: List[str] = Field(
+        default_factory=list,
+        description="3-6 factual observations grounded in the requirement matrix",
+    )
+    mandatory_requirements: List[RequirementAnalysisItem] = Field(default_factory=list)
+    supported_requirements: List[RequirementAnalysisItem] = Field(default_factory=list)
+    partially_supported_requirements: List[RequirementAnalysisItem] = Field(default_factory=list)
+    not_demonstrated_requirements: List[RequirementAnalysisItem] = Field(default_factory=list)
+    analyzed_at: Optional[str] = Field(default=None)
 
 
 # -------------------------------------------------------------------------
@@ -86,6 +134,7 @@ class JobMatchItem(BaseModel):
     experience_match: Optional[str] = None
     explanation: List[str]
     fit_summary: Optional[str] = None
+    requirement_analysis: Optional[OverallAnalysis] = None  # New evidence-based analysis
 
 
 class SuggestedCandidateSummary(BaseModel):

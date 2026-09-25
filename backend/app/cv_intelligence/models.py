@@ -76,6 +76,10 @@ class JobMatch(CVBase):
     explanation = Column(JSON, default=list, nullable=False)  # List of explainable bullets
     fit_summary = Column(Text, nullable=True)  # 1-2 sentence human-readable LLM fit narrative
 
+    # Evidence-Based Requirement Analysis (new — additive only)
+    # Stores serialised OverallAnalysis JSON from requirement_analyzer.py
+    requirement_analysis = Column(Text, nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
