@@ -438,11 +438,6 @@ For each requirement, provide:
   "No explicit evidence found in CV." if NOT_DEMONSTRATED
 - reasoning: One concise sentence explaining the classification
 
-Generate 3-6 KEY OBSERVATIONS that are:
-- Grounded only in the requirement matrix
-- Factual, not evaluative
-- Do NOT include phrases like "Strong candidate" or "Recommended for hire"
-
 ---
 
 Job Title: {job_title}
@@ -468,7 +463,6 @@ CV Text (first 3000 chars):
 
 Return ONLY a valid JSON object with EXACTLY this schema:
 {{
-  "key_observations": ["observation 1", "observation 2", ...],
   "mandatory_requirements": [
     {{
       "requirement": "...",
@@ -580,7 +574,11 @@ def run_semantic_analysis(
                 )
                 if response and response.text:
                     parsed = json.loads(response.text)
-                    if isinstance(parsed, dict) and "key_observations" in parsed:
+                    if isinstance(parsed, dict) and (
+                        "mandatory_requirements" in parsed
+                        or "supported_requirements" in parsed
+                        or "key_observations" in parsed
+                    ):
                         logger.info(
                             f"Semantic requirement analysis completed for '{candidate_name}' "
                             f"vs '{job_title}' using {model_name}"
