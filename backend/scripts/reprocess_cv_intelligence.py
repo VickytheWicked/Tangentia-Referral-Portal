@@ -198,6 +198,7 @@ async def process_one_candidate(
             candidate_skills=profile.skills or [],
             candidate_experience=profile.experience or [],
             cv_text=cv_text,
+            candidate_education=profile.education or [],
         )
     except Exception as e:
         logger.error(f"  [FAIL] Requirement analysis error for {referral.referral_number}: {e}")

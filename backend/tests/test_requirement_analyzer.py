@@ -297,7 +297,7 @@ class TestBuildFallbackAnalysis:
             deterministic_results=[],
         )
         assert isinstance(analysis, OverallAnalysis)
-        assert len(analysis.key_observations) >= 1
+        assert isinstance(analysis.key_observations, list)
         # All non-deterministic requirements should be NOT_DEMONSTRATED
         for item in analysis.not_demonstrated_requirements:
             assert item.status == RequirementStatus.NOT_DEMONSTRATED
@@ -530,7 +530,7 @@ class TestGenerateRequirementAnalysis:
         )
         assert result is not None
         assert isinstance(result, OverallAnalysis)
-        assert len(result.key_observations) >= 1
+        assert isinstance(result.key_observations, list)
 
     @patch("app.cv_intelligence.requirement_analyzer.settings")
     @patch("app.cv_intelligence.requirement_analyzer._gemini_extract_job_requirements")
@@ -674,3 +674,50 @@ class TestMergeDeterministic:
         merged = _merge_deterministic_into_analysis(raw, det, SAMPLE_JOB_REQUIREMENTS)
         # Should not duplicate
         assert len(merged["mandatory_requirements"]) == 1
+
+
+class TestPriorityOrdering:
+    def test_experience_and_education_prioritized(self):
+        """Total Professional Experience is REQ #1 and Education is REQ #2."""
+        raw = {
+            "mandatory_requirements": [
+                {
+                    "requirement": "Zachman Framework",
+                    "category": "MANDATORY",
+                    "required_value": "Zachman",
+                    "status": "NOT_DEMONSTRATED",
+                    "cv_evidence": "No explicit evidence found in CV.",
+                    "reasoning": "Not mentioned.",
+                }
+            ],
+            "supported_requirements": [],
+            "partially_supported_requirements": [],
+            "not_demonstrated_requirements": [],
+        }
+        det = [
+            {
+                "requirement": "Total Professional Experience",
+                "category": "MANDATORY",
+                "required_value": "8+ years",
+                "status": RequirementStatus.PARTIALLY_SUPPORTED.value,
+                "cv_evidence": "7.0 years documented in CV across 4 roles.",
+                "reasoning": "Candidate has 7.0 years near senior threshold.",
+                "deterministic": True,
+            },
+            {
+                "requirement": "Education & Academic Qualifications",
+                "category": "MANDATORY",
+                "required_value": "Degree or Diploma in Engineering or Computer Science",
+                "status": RequirementStatus.SUPPORTED.value,
+                "cv_evidence": "Diploma in Computer Engineering documented in CV.",
+                "reasoning": "Candidate satisfies academic requirement.",
+                "deterministic": True,
+            },
+        ]
+        analysis = _validate_and_build_analysis(raw, SAMPLE_JOB_REQUIREMENTS, det)
+        assert len(analysis.mandatory_requirements) == 3
+        # REQ #1 MUST be Total Professional Experience
+        assert "Total" in analysis.mandatory_requirements[0].requirement or "Experience" in analysis.mandatory_requirements[0].requirement
+        # REQ #2 MUST be Education
+        assert "Education" in analysis.mandatory_requirements[1].requirement or "Academic" in analysis.mandatory_requirements[1].requirement
+

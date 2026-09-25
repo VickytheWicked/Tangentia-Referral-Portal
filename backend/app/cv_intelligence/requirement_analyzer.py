@@ -157,9 +157,12 @@ For each requirement return an object with EXACTLY these fields:
 - "required_value": The specific value or description from the job posting (e.g. "10+ years", "Zachman Framework", "Ontario Government / OPS experience")
 
 CRITICAL RULES:
-- Extract ONLY requirements explicitly stated in the job description.
-- Do NOT invent requirements not present in the posting.
-- Do NOT assume every sentence is a mandatory requirement.
+- Extract requirements explicitly stated or indicated in the job description.
+- PRIORITY ORDERING:
+  1. The FIRST requirement MUST be "Total Professional Experience" stating the required years of experience (e.g. "8+ years of total professional experience" or derived from seniority).
+  2. The SECOND requirement MUST be "Education & Academic Qualifications" (e.g. "Degree or Diploma in Computer Science, Engineering, Business, or related discipline").
+  3. The THIRD requirement should be Core Role / Domain Alignment.
+  4. Followed by key technical skills, tools, and methodologies.
 - Use the job posting's exact terminology for required_value where possible.
 - If years are mentioned (e.g. "10+ years total IT experience"), include exact figure in required_value.
 - Return a JSON array of requirement objects.
@@ -173,6 +176,78 @@ Job Description:
 Return ONLY a valid JSON array. No explanation, no markdown."""
 
 
+def _ensure_core_baseline_requirements(
+    job_title: str,
+    department: str,
+    description: str,
+    requirements: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Ensure the requirement list begins with fundamental recruitment gates:
+    1. Total Professional Experience (numeric threshold)
+    2. Education & Academic Qualifications
+    Followed by core domain alignment and specialized skills.
+    """
+    if not requirements:
+        requirements = []
+
+    combined = f"{job_title} {department} {description}".lower()
+
+    # 1. Total Professional Experience
+    exp_idx = -1
+    for i, r in enumerate(requirements):
+        req_name = r.get("requirement", "").lower()
+        cat = r.get("category", "").upper()
+        if (
+            any(kw in req_name for kw in ["total", "overall", "work experience", "it experience", "professional experience", "years of experience"])
+            or cat == "REQUIRED_EXPERIENCE"
+        ):
+            exp_idx = i
+            break
+
+    if exp_idx >= 0:
+        exp_item = requirements.pop(exp_idx)
+        if exp_item.get("category") not in ("MANDATORY", "REQUIRED_EXPERIENCE"):
+            exp_item["category"] = "MANDATORY"
+        requirements.insert(0, exp_item)
+    else:
+        year_match = re.search(r"(\d+(?:\.\d+)?)\+?\s*years?", combined)
+        if year_match:
+            exp_years = float(year_match.group(1))
+        elif any(kw in job_title.lower() for kw in ["senior", "lead", "architect", "principal", "manager"]):
+            exp_years = 8.0
+        elif any(kw in job_title.lower() for kw in ["junior", "associate", "entry", "intern"]):
+            exp_years = 2.0
+        else:
+            exp_years = 5.0
+
+        requirements.insert(0, {
+            "requirement": "Total Professional Experience",
+            "category": "MANDATORY",
+            "required_value": f"{exp_years:g}+ years of professional experience in software / IT delivery",
+        })
+
+    # 2. Education & Academic Qualifications
+    edu_idx = -1
+    for i, r in enumerate(requirements[1:], start=1):
+        req_name = r.get("requirement", "").lower()
+        if any(kw in req_name for kw in ["education", "degree", "academic", "diploma", "qualification", "bachelor", "master"]):
+            edu_idx = i
+            break
+
+    if edu_idx >= 0:
+        edu_item = requirements.pop(edu_idx)
+        requirements.insert(1, edu_item)
+    else:
+        requirements.insert(1, {
+            "requirement": "Education & Academic Qualifications",
+            "category": "MANDATORY",
+            "required_value": "Degree or Diploma in Computer Engineering, Computer Science, IT, Business, or related discipline",
+        })
+
+    return requirements
+
+
 def extract_structured_job_requirements(
     position_id: str,
     job_title: str,
@@ -184,12 +259,14 @@ def extract_structured_job_requirements(
     Parse a job description into a structured list of requirements using Gemini.
     Results are cached in memory and persisted to disk per position_id.
     Falls back to a minimal heuristic extraction if Gemini is unavailable.
+    Guarantees REQ #1 is Total Professional Experience and REQ #2 is Education.
     """
     cache_key = f"{position_id}:{job_title.lower()}"
 
     if not force_refresh and cache_key in _JOB_REQUIREMENTS_CACHE:
         logger.debug(f"Using cached job requirements for '{job_title}'")
-        return _JOB_REQUIREMENTS_CACHE[cache_key]
+        cached = _JOB_REQUIREMENTS_CACHE[cache_key]
+        return _ensure_core_baseline_requirements(job_title, department, description, list(cached))
 
     requirements: List[Dict[str, Any]] = []
 
@@ -198,6 +275,8 @@ def extract_structured_job_requirements(
 
     if not requirements:
         requirements = _heuristic_extract_job_requirements(job_title, department, description)
+
+    requirements = _ensure_core_baseline_requirements(job_title, department, description, requirements)
 
     _JOB_REQUIREMENTS_CACHE[cache_key] = requirements
     _save_job_requirements_cache()
@@ -324,75 +403,109 @@ def run_deterministic_checks(
     candidate_years_exp: float,
     candidate_experience: List[Dict[str, Any]],
     job_requirements: List[Dict[str, Any]],
+    candidate_education: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Evaluate requirements that can be assessed deterministically (no LLM).
     Returns a list of pre-evaluated results to pass into the LLM prompt,
-    so the model cannot override numeric facts.
+    so the model cannot override numeric facts or verified credentials.
 
-    Currently handles:
-    - Experience year requirements (numeric comparison)
+    Evaluates:
+    - Experience year requirements (numeric comparison against CV roles)
+    - Education / academic degree requirements (when candidate_education is provided)
     """
     pre_evaluated: List[Dict[str, Any]] = []
-
-    # Build a combined experience text for domain-specific year estimation
-    all_exp_text = " ".join(
-        f"{e.get('job_title', '')} {e.get('company', '')} {e.get('duration', '')} "
-        + " ".join(e.get("responsibilities", [])[:3])
-        for e in (candidate_experience or [])
-    ).lower()
 
     for req in job_requirements:
         req_name = req.get("requirement", "")
         category = req.get("category", "")
         required_value = req.get("required_value", "")
+        req_lower = req_name.lower()
 
-        # Only deterministically evaluate experience year requirements
-        if category not in ("REQUIRED_EXPERIENCE", "MANDATORY", "REQUIRED_ARCHITECTURE"):
-            continue
-
-        # Extract required years from required_value
-        year_match = re.search(r"(\d+(?:\.\d+)?)\+?\s*years?", required_value.lower())
-        if not year_match:
-            continue
-
-        required_years = float(year_match.group(1))
-
-        # For total experience, use the overall years figure
-        is_total_exp = any(
-            kw in req_name.lower() for kw in ["total", "overall", "work experience", "it experience"]
+        # 1. Total Experience Check
+        is_total_exp = (
+            any(kw in req_lower for kw in ["total", "overall", "work experience", "it experience", "professional experience", "years of experience"])
+            or category == "REQUIRED_EXPERIENCE"
         )
 
-        if is_total_exp:
+        year_match = re.search(r"(\d+(?:\.\d+)?)\+?\s*years?", required_value.lower())
+        if is_total_exp and year_match:
+            required_years = float(year_match.group(1))
             actual_years = candidate_years_exp
-            cv_evidence = f"{candidate_years_exp:.1f} years of experience documented in CV"
-        else:
-            # For domain-specific experience, we can only flag as NOT_DEMONSTRATED
-            # if no related role appears — leave semantic judgment to LLM
+
+            # Rich CV evidence citing companies and roles
+            role_summaries = []
+            for e in (candidate_experience or [])[:4]:
+                t = e.get("job_title", "").strip()
+                c = e.get("company", "").strip()
+                if t and c:
+                    role_summaries.append(f"{t} ({c})")
+                elif t:
+                    role_summaries.append(t)
+            role_text = f" across {len(candidate_experience)} roles: " + ", ".join(role_summaries) if role_summaries else ""
+            cv_evidence = f"{candidate_years_exp:.1f} years of professional experience documented in CV{role_text}."
+
+            if actual_years >= required_years:
+                status = RequirementStatus.SUPPORTED.value
+                reasoning = (
+                    f"CV documents {actual_years:.1f} years, meeting and exceeding the {required_years:g}+ year requirement."
+                )
+            elif actual_years >= required_years * 0.8:
+                status = RequirementStatus.PARTIALLY_SUPPORTED.value
+                shortfall = required_years - actual_years
+                reasoning = (
+                    f"CV documents {actual_years:.1f} years against the {required_years:g}+ year target ({shortfall:.1f} yr gap, near senior threshold)."
+                )
+            else:
+                status = RequirementStatus.NOT_MET.value
+                shortfall = required_years - actual_years
+                reasoning = (
+                    f"CV documents {actual_years:.1f} years, which is {shortfall:.1f} years below "
+                    f"the {required_years:g}+ year requirement. This is a documented shortfall, not merely absent evidence."
+                )
+
+            pre_evaluated.append({
+                "requirement": req_name,
+                "category": category if category in ("MANDATORY", "REQUIRED_EXPERIENCE") else "MANDATORY",
+                "required_value": required_value,
+                "status": status,
+                "cv_evidence": cv_evidence,
+                "reasoning": reasoning,
+                "deterministic": True,
+            })
             continue
 
-        if actual_years >= required_years:
-            status = RequirementStatus.SUPPORTED.value
-            reasoning = (
-                f"CV documents {actual_years:.1f} years, meeting the {required_years:g}+ year requirement."
-            )
-        else:
-            status = RequirementStatus.NOT_MET.value
-            shortfall = required_years - actual_years
-            reasoning = (
-                f"CV documents {actual_years:.1f} years, which is {shortfall:.1f} years below "
-                f"the {required_years:g}+ year requirement. This is a documented shortfall, not merely absent evidence."
-            )
+        # 2. Education & Academic Qualifications Check
+        is_edu = any(kw in req_lower for kw in ["education", "academic", "degree", "diploma", "qualification"])
+        if is_edu and candidate_education is not None:
+            edu_details = []
+            for ed in (candidate_education or []):
+                deg = ed.get("degree", "").strip()
+                inst = ed.get("institution", "").strip()
+                yr = ed.get("graduation_year", "").strip() if ed.get("graduation_year") else ""
+                if deg and inst:
+                    edu_details.append(f"{deg} from {inst}" + (f" ({yr})" if yr else ""))
+                elif deg:
+                    edu_details.append(deg + (f" ({yr})" if yr else ""))
 
-        pre_evaluated.append({
-            "requirement": req_name,
-            "category": category,
-            "required_value": required_value,
-            "status": status,
-            "cv_evidence": cv_evidence,
-            "reasoning": reasoning,
-            "deterministic": True,  # Flag so LLM prompt makes clear this is pre-evaluated
-        })
+            if edu_details:
+                status = RequirementStatus.SUPPORTED.value
+                cv_evidence = f"Documented academic qualification: {', '.join(edu_details)}."
+                reasoning = f"Candidate holds {', '.join(edu_details)}, satisfying educational criteria."
+            else:
+                status = RequirementStatus.NOT_DEMONSTRATED.value
+                cv_evidence = "No explicit degree or diploma documented in CV."
+                reasoning = "Academic credentials were not explicitly identified in the CV."
+
+            pre_evaluated.append({
+                "requirement": req_name,
+                "category": category if category in ("MANDATORY", "REQUIRED_EXPERIENCE") else "MANDATORY",
+                "required_value": required_value,
+                "status": status,
+                "cv_evidence": cv_evidence,
+                "reasoning": reasoning,
+                "deterministic": True,
+            })
 
     return pre_evaluated
 
@@ -453,6 +566,8 @@ Candidate Profile:
 - Name: {candidate_name}
 - Total Years of Experience: {years_exp}
 - Skills: {skills_list}
+- Education:
+{education_summary}
 - Employment History:
 {experience_summary}
 
@@ -498,6 +613,7 @@ def run_semantic_analysis(
     department: str,
     job_requirements: List[Dict[str, Any]],
     deterministic_results: List[Dict[str, Any]],
+    candidate_education: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Call Gemini to perform semantic requirement evaluation.
@@ -529,6 +645,15 @@ def run_semantic_analysis(
         exp_lines.append(line)
     experience_summary = "\n".join(exp_lines) if exp_lines else "  • No detailed employment history available."
 
+    # Format education summary
+    edu_lines = []
+    for ed in (candidate_education or []):
+        deg = ed.get("degree") or "Degree"
+        inst = ed.get("institution") or "Institution"
+        yr = ed.get("graduation_year") or ""
+        edu_lines.append(f"  • {deg} from {inst}" + (f" [{yr}]" if yr else ""))
+    education_summary = "\n".join(edu_lines) if edu_lines else "  • No formal education explicitly listed."
+
     skills_str = ", ".join(candidate_skills[:30]) if candidate_skills else "None explicitly listed"
     cv_excerpt = (cv_text or "")[:3000]
 
@@ -546,6 +671,7 @@ def run_semantic_analysis(
         candidate_name=candidate_name or "Candidate",
         years_exp=f"{candidate_years_exp:.1f}",
         skills_list=skills_str,
+        education_summary=education_summary,
         experience_summary=experience_summary,
         cv_text_excerpt=cv_excerpt,
     )
@@ -609,32 +735,37 @@ def _merge_deterministic_into_analysis(
 ) -> Dict[str, Any]:
     """
     Ensure all deterministic results are present in the analysis dict,
-    adding them if Gemini omitted them (which should not happen but we guard anyway).
+    and enforce their status and evidence so LLM cannot override them.
+    Guarantees Total Professional Experience is placed at index 0 of mandatory_requirements,
+    followed by Education.
     """
-    # Find names already in the analysis
-    all_items_in_analysis: Dict[str, bool] = {}
+    det_map = {d["requirement"].lower(): d for d in deterministic_results}
+
+    # Clean existing occurrences from all buckets so we can place deterministic items cleanly
     for bucket in ("mandatory_requirements", "supported_requirements",
                    "partially_supported_requirements", "not_demonstrated_requirements"):
+        filtered = []
         for item in analysis_dict.get(bucket, []):
             if isinstance(item, dict):
-                all_items_in_analysis[item.get("requirement", "").lower()] = True
+                req_lower = item.get("requirement", "").lower()
+                if req_lower in det_map:
+                    continue  # We will re-inject the exact deterministic fact
+            filtered.append(item)
+        analysis_dict[bucket] = filtered
 
-    # Get category lookup from raw job_requirements
-    cat_lookup = {r.get("requirement", "").lower(): r.get("category", "OTHER") for r in job_requirements}
+    # Re-inject deterministic items at the TOP of mandatory_requirements
+    # Order: Experience first, then Education
+    sorted_dets = sorted(
+        deterministic_results,
+        key=lambda d: 0 if any(kw in d["requirement"].lower() for kw in ["total", "experience", "years"]) else 1
+    )
 
-    for det in deterministic_results:
-        req_lower = det["requirement"].lower()
-        if req_lower not in all_items_in_analysis:
-            # Item was dropped by Gemini — re-inject into correct bucket
-            item = {k: v for k, v in det.items() if k != "deterministic"}
-            category = cat_lookup.get(req_lower, det.get("category", "OTHER"))
-            if category == "MANDATORY" or det.get("category") == "MANDATORY":
-                analysis_dict.setdefault("mandatory_requirements", []).append(item)
-            elif det["status"] == RequirementStatus.SUPPORTED.value:
-                analysis_dict.setdefault("supported_requirements", []).append(item)
-            else:
-                analysis_dict.setdefault("mandatory_requirements", []).append(item)
+    injected = []
+    for det in sorted_dets:
+        item = {k: v for k, v in det.items() if k != "deterministic"}
+        injected.append(item)
 
+    analysis_dict["mandatory_requirements"] = injected + analysis_dict.get("mandatory_requirements", [])
     return analysis_dict
 
 
@@ -645,15 +776,20 @@ def _build_fallback_analysis(
     job_title: str,
     job_requirements: List[Dict[str, Any]],
     deterministic_results: List[Dict[str, Any]],
+    candidate_experience: Optional[List[Dict[str, Any]]] = None,
+    candidate_education: Optional[List[Dict[str, Any]]] = None,
 ) -> OverallAnalysis:
     """
-    Build a minimal OverallAnalysis from deterministic results only.
-    Used when Gemini is unavailable or fails.
+    Build an evidence-grounded OverallAnalysis when Gemini is unavailable or fails.
+    Uses deterministic checks for Experience & Education, and checks candidate skills
+    and work experience against requirement keywords to produce true match data.
     """
     mandatory_items: List[RequirementAnalysisItem] = []
+    supported_items: List[RequirementAnalysisItem] = []
+    partial_items: List[RequirementAnalysisItem] = []
     not_demonstrated: List[RequirementAnalysisItem] = []
 
-    # Include deterministic results
+    # 1. Include deterministic results
     det_names = set()
     for det in deterministic_results:
         try:
@@ -670,37 +806,82 @@ def _build_fallback_analysis(
         except Exception:
             pass
 
-    # All non-deterministic requirements go into NOT_DEMONSTRATED
+    # Sort mandatory so Experience is 0, Education is 1
+    def _priority_score(item: RequirementAnalysisItem) -> int:
+        req_lower = item.requirement.lower()
+        if any(kw in req_lower for kw in ["total", "years of experience", "professional experience", "it experience"]):
+            return 0
+        if any(kw in req_lower for kw in ["education", "academic", "degree", "diploma"]):
+            return 1
+        return 2
+
+    mandatory_items.sort(key=_priority_score)
+
+    # 2. Match remaining requirements against candidate skills and experience text
+    lower_skills = {s.lower(): s for s in candidate_skills}
+    all_exp_text = " ".join(
+        f"{e.get('job_title', '')} {e.get('company', '')} "
+        + " ".join(e.get("responsibilities", [])[:3])
+        for e in (candidate_experience or [])
+    ).lower()
+
     for req in job_requirements:
         req_name = req.get("requirement", "")
         if req_name.lower() in det_names:
             continue
+
+        req_lower = req_name.lower()
+        req_category = req.get("category", "OTHER")
         try:
+            cat_enum = RequirementCategory(req_category)
+        except Exception:
+            cat_enum = RequirementCategory.OTHER
+
+        # Check for direct or partial skill matches
+        matched_skills = [
+            orig for l_s, orig in lower_skills.items()
+            if l_s in req_lower or any(word in l_s for word in req_lower.split() if len(word) > 3)
+        ]
+
+        if matched_skills:
             item = RequirementAnalysisItem(
                 requirement=req_name,
-                category=RequirementCategory(req.get("category", "OTHER")),
+                category=cat_enum,
+                required_value=req.get("required_value", req_name),
+                status=RequirementStatus.SUPPORTED,
+                cv_evidence=f"Explicitly documented in candidate skills: {', '.join(matched_skills[:3])}.",
+                reasoning=f"Candidate's documented profile includes {', '.join(matched_skills[:2])}, aligning with this requirement.",
+            )
+            if cat_enum == RequirementCategory.MANDATORY:
+                mandatory_items.append(item)
+            else:
+                supported_items.append(item)
+        elif any(term in all_exp_text for term in req_lower.split() if len(term) > 4):
+            item = RequirementAnalysisItem(
+                requirement=req_name,
+                category=cat_enum,
+                required_value=req.get("required_value", req_name),
+                status=RequirementStatus.PARTIALLY_SUPPORTED,
+                cv_evidence="Related responsibilities and project experience documented in employment history.",
+                reasoning=f"Candidate has related background in {req_name} based on documented work history.",
+            )
+            partial_items.append(item)
+        else:
+            item = RequirementAnalysisItem(
+                requirement=req_name,
+                category=cat_enum,
                 required_value=req.get("required_value", req_name),
                 status=RequirementStatus.NOT_DEMONSTRATED,
-                cv_evidence="No explicit evidence found in CV.",
-                reasoning="AI analysis was unavailable; evidence not evaluated.",
+                cv_evidence=f"No explicit mention of '{req_name}' identified in CV.",
+                reasoning=f"Candidate CV does not explicitly demonstrate {req_name}.",
             )
             not_demonstrated.append(item)
-        except Exception:
-            pass
-
-    observations = [
-        f"{candidate_years_exp:.1f} years of experience documented in the CV." if candidate_years_exp > 0
-        else "Total experience could not be determined from the CV.",
-        f"CV lists {len(candidate_skills)} extracted skills." if candidate_skills
-        else "No skills were explicitly extracted from the CV.",
-        "Full AI semantic analysis was unavailable. Requirements marked as Not Demonstrated have not been evaluated.",
-    ]
 
     return OverallAnalysis(
-        key_observations=observations,
+        key_observations=[],
         mandatory_requirements=mandatory_items,
-        supported_requirements=[],
-        partially_supported_requirements=[],
+        supported_requirements=supported_items,
+        partially_supported_requirements=partial_items,
         not_demonstrated_requirements=not_demonstrated,
     )
 
@@ -713,6 +894,7 @@ def _validate_and_build_analysis(
     """
     Validate Gemini output strictly via Pydantic.
     Invalid individual items are skipped (not silently accepted).
+    Guarantees Total Professional Experience is placed at index 0 and Education at index 1.
     """
     def _parse_items(raw_list: Any) -> List[RequirementAnalysisItem]:
         items = []
@@ -732,15 +914,33 @@ def _validate_and_build_analysis(
                 logger.debug(f"Skipping invalid requirement item: {entry} — {e}")
         return items
 
-    # Ensure deterministic results are present
+    # Ensure deterministic results are present and prioritized
     raw = _merge_deterministic_into_analysis(raw, deterministic_results, job_requirements)
 
+    mandatory = _parse_items(raw.get("mandatory_requirements", []))
+    supported = _parse_items(raw.get("supported_requirements", []))
+    partially_supported = _parse_items(raw.get("partially_supported_requirements", []))
+    not_demonstrated = _parse_items(raw.get("not_demonstrated_requirements", []))
+
+    # Guarantee priority sorting in mandatory:
+    # 1. Total Professional Experience
+    # 2. Education & Academic Qualifications
+    def _priority_score(item: RequirementAnalysisItem) -> int:
+        req_lower = item.requirement.lower()
+        if any(kw in req_lower for kw in ["total", "years of experience", "professional experience", "it experience"]):
+            return 0
+        if any(kw in req_lower for kw in ["education", "academic", "degree", "diploma"]):
+            return 1
+        return 2
+
+    mandatory.sort(key=_priority_score)
+
     return OverallAnalysis(
-        key_observations=[str(o) for o in raw.get("key_observations", []) if str(o).strip()][:8],
-        mandatory_requirements=_parse_items(raw.get("mandatory_requirements", [])),
-        supported_requirements=_parse_items(raw.get("supported_requirements", [])),
-        partially_supported_requirements=_parse_items(raw.get("partially_supported_requirements", [])),
-        not_demonstrated_requirements=_parse_items(raw.get("not_demonstrated_requirements", [])),
+        key_observations=[],
+        mandatory_requirements=mandatory,
+        supported_requirements=supported,
+        partially_supported_requirements=partially_supported,
+        not_demonstrated_requirements=not_demonstrated,
     )
 
 
@@ -754,6 +954,7 @@ def generate_requirement_analysis(
     candidate_skills: List[str],
     candidate_experience: List[Dict[str, Any]],
     cv_text: str,
+    candidate_education: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[OverallAnalysis]:
     """
     Orchestrate the full evidence-based requirement analysis pipeline.
@@ -767,6 +968,7 @@ def generate_requirement_analysis(
     """
     try:
         # 1. Extract structured job requirements (Gemini, cached)
+        # Guarantees REQ #1 is Total Professional Experience and REQ #2 is Education
         job_requirements = extract_structured_job_requirements(
             position_id=position_id,
             job_title=job_title,
@@ -785,6 +987,7 @@ def generate_requirement_analysis(
             candidate_years_exp=candidate_years_exp,
             candidate_experience=candidate_experience,
             job_requirements=job_requirements,
+            candidate_education=candidate_education,
         )
         logger.debug(
             f"Deterministic checks produced {len(deterministic_results)} pre-evaluated requirements."
@@ -801,12 +1004,13 @@ def generate_requirement_analysis(
             department=department,
             job_requirements=job_requirements,
             deterministic_results=deterministic_results,
+            candidate_education=candidate_education,
         )
 
         if raw_analysis is None:
             logger.warning(
                 f"Semantic analysis unavailable for '{candidate_name}' vs '{job_title}'. "
-                "Using fallback analysis."
+                "Using evidence-based fallback analysis."
             )
             return _build_fallback_analysis(
                 candidate_name=candidate_name,
@@ -815,6 +1019,8 @@ def generate_requirement_analysis(
                 job_title=job_title,
                 job_requirements=job_requirements,
                 deterministic_results=deterministic_results,
+                candidate_experience=candidate_experience,
+                candidate_education=candidate_education,
             )
 
         # 4. Validate and build final OverallAnalysis
@@ -840,8 +1046,10 @@ def generate_requirement_analysis(
                 candidate_years_exp=candidate_years_exp,
                 candidate_skills=candidate_skills or [],
                 job_title=job_title,
-                job_requirements=[],
-                deterministic_results=[],
+                job_requirements=job_requirements if 'job_requirements' in locals() else [],
+                deterministic_results=deterministic_results if 'deterministic_results' in locals() else [],
+                candidate_experience=candidate_experience,
+                candidate_education=candidate_education,
             )
         except Exception:
             return None

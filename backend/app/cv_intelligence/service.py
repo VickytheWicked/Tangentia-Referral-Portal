@@ -364,6 +364,7 @@ class CVIntelligenceService:
                         candidate_skills=profile.skills or [],
                         candidate_experience=profile.experience or [],
                         cv_text=cv_text,
+                        candidate_education=profile.education or [],
                     )
                     if req_analysis is not None:
                         job_match.requirement_analysis = req_analysis.model_dump_json()
