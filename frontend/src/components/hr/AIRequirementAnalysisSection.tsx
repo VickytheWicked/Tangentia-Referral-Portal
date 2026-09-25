@@ -604,55 +604,6 @@ export const AIRequirementAnalysisSection: React.FC<AIRequirementAnalysisSection
         </div>
       </div>
 
-      {/* Key Observations Card */}
-      {analysis.key_observations && analysis.key_observations.length > 0 && (
-        <div
-          style={{
-            padding: '12px 14px',
-            borderRadius: '8px',
-            background: 'rgba(59, 130, 246, 0.08)',
-            border: '1px solid rgba(59, 130, 246, 0.22)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '0.74rem',
-              fontWeight: 800,
-              color: '#93c5fd',
-              textTransform: 'uppercase',
-              letterSpacing: '0.6px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <Sparkles size={13} color="#60a5fa" />
-            <span>Key Observations from Resume Analysis</span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
-            {analysis.key_observations.map((obs, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '8px',
-                  fontSize: '0.85rem',
-                  color: '#e2e8f0',
-                  lineHeight: 1.4,
-                }}
-              >
-                <span style={{ color: '#60a5fa', fontWeight: 800, flexShrink: 0 }}>•</span>
-                <span>{obs}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Comparison Section Header & Controls */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
