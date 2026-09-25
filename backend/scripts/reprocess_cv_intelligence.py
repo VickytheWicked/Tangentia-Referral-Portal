@@ -64,6 +64,8 @@ from app.models.job_position import JobPosition  # noqa: E402
 from app.cv_intelligence.text_extractor import extract_cv_text, TextExtractionError  # noqa: E402
 from app.cv_intelligence.requirement_analyzer import generate_requirement_analysis  # noqa: E402
 from app.services.sharepoint import get_sharepoint_service  # noqa: E402
+from app.services.excel import get_excel_service  # noqa: E402
+from app.services.excel.sync import initialize_and_sync_excel  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Counters
@@ -94,8 +96,9 @@ async def process_one_candidate(
     force: bool,
     dry_run: bool,
     counters: Counters,
-) -> None:
-    """Process a single candidate profile for requirement analysis."""
+) -> bool:
+    """Process a single candidate profile for requirement analysis.
+    Returns True if an LLM analysis was executed (caller may throttle), False otherwise."""
     referral_id = profile.referral_id
 
     # Fetch referral from main DB
@@ -104,7 +107,7 @@ async def process_one_candidate(
         logger.warning(f"  [SKIP] Referral {referral_id} not found in main DB.")
         counters.skipped_no_match += 1
         counters.failures.append((referral_id, profile.candidate_name or "?", "Referral not found in main DB"))
-        return
+        return False
 
     # Fetch job position
     position = db.query(JobPosition).filter(JobPosition.id == referral.position_id).first()
@@ -112,7 +115,7 @@ async def process_one_candidate(
         logger.warning(f"  [SKIP] Position {referral.position_id} not found for referral {referral.referral_number}.")
         counters.skipped_no_position += 1
         counters.failures.append((referral.referral_number, profile.candidate_name or "?", "Position not found"))
-        return
+        return False
 
     # Fetch existing job match
     job_match = (
@@ -130,7 +133,7 @@ async def process_one_candidate(
         )
         counters.skipped_no_match += 1
         counters.failures.append((referral.referral_number, profile.candidate_name or "?", "No JobMatch record"))
-        return
+        return False
 
     # Skip if already done (unless --force)
     if job_match.requirement_analysis and not force:
@@ -139,7 +142,7 @@ async def process_one_candidate(
             "requirement_analysis already exists. Use --force to regenerate."
         )
         counters.skipped_already_done += 1
-        return
+        return False
 
     if dry_run:
         logger.info(
@@ -147,9 +150,10 @@ async def process_one_candidate(
             f"{profile.candidate_name} → {position.title}"
         )
         counters.processed += 1
-        return
+        return False
 
-    # Download CV
+    # Download CV and extract text (with graceful fallback to profile data)
+    cv_text = ""
     try:
         sharepoint_svc = get_sharepoint_service()
         cv_bytes, filename, content_type = await sharepoint_svc.download_cv(
@@ -160,24 +164,27 @@ async def process_one_candidate(
             original_filename=referral.original_filename,
             candidate_name=referral.candidate_name,
         )
-    except Exception as e:
-        logger.error(f"  [FAIL] CV download failed for {referral.referral_number}: {e}")
-        counters.failed_cv_download += 1
-        counters.failures.append((referral.referral_number, profile.candidate_name or "?", f"CV download failed: {e}"))
-        return
-
-    # Extract CV text
-    try:
         cv_text = extract_cv_text(
             file_bytes=cv_bytes,
             filename=referral.original_filename or filename,
             content_type=content_type,
         )
-    except TextExtractionError as e:
-        logger.error(f"  [FAIL] CV text extraction failed for {referral.referral_number}: {e}")
-        counters.failed_cv_download += 1
-        counters.failures.append((referral.referral_number, profile.candidate_name or "?", f"Text extraction failed: {e}"))
-        return
+    except Exception as e:
+        logger.debug(f"  CV extraction note for {referral.referral_number}: {e}")
+
+    if not cv_text or not cv_text.strip():
+        # Fallback: synthesize CV text from CandidateProfile structured fields
+        parts = [f"Candidate Name: {profile.candidate_name or referral.candidate_name or 'Candidate'}"]
+        if profile.years_of_experience:
+            parts.append(f"Total Experience: {profile.years_of_experience:.1f} years")
+        if profile.skills:
+            parts.append("Skills: " + ", ".join(profile.skills))
+        if profile.experience:
+            parts.append("Experience:\n" + "\n".join(str(exp) for exp in profile.experience))
+        if profile.education:
+            parts.append("Education:\n" + "\n".join(str(edu) for edu in profile.education))
+        cv_text = "\n\n".join(parts)
+
 
     # Generate requirement analysis
     try:
@@ -196,13 +203,13 @@ async def process_one_candidate(
         logger.error(f"  [FAIL] Requirement analysis error for {referral.referral_number}: {e}")
         counters.failed_analysis += 1
         counters.failures.append((referral.referral_number, profile.candidate_name or "?", f"Analysis error: {e}"))
-        return
+        return False
 
     if analysis is None:
         logger.warning(f"  [FAIL] Requirement analysis returned None for {referral.referral_number}.")
         counters.failed_analysis += 1
         counters.failures.append((referral.referral_number, profile.candidate_name or "?", "Analysis returned None"))
-        return
+        return False
 
     # Persist — only updating requirement_analysis, nothing else
     was_new = job_match.requirement_analysis is None
@@ -222,13 +229,20 @@ async def process_one_candidate(
         f"{len(analysis.partially_supported_requirements)} partial, "
         f"{len(analysis.not_demonstrated_requirements)} not demonstrated)"
     )
+    return True
 
 
 # ---------------------------------------------------------------------------
 # Main reprocessing orchestrator
 # ---------------------------------------------------------------------------
 
-async def run_reprocessing(force: bool, dry_run: bool, referral_id_filter: str | None) -> None:
+async def run_reprocessing(
+    force: bool,
+    dry_run: bool,
+    referral_id_filter: str | None,
+    delay: float = 5.0,
+    limit: int | None = None,
+) -> None:
     """Orchestrate the full reprocessing run."""
 
     print()
@@ -241,12 +255,34 @@ async def run_reprocessing(force: bool, dry_run: bool, referral_id_filter: str |
         print("  MODE: FORCE (existing analysis will be overwritten)")
     if referral_id_filter:
         print(f"  FILTER: Only referral {referral_id_filter}")
+    if limit:
+        print(f"  LIMIT: Up to {limit} candidate(s)")
+    print(f"  RATE LIMIT SAFETY: {delay:.1f}s delay between LLM calls (~{int(60 / max(delay, 0.1))} RPM max)")
     print()
 
-    # Initialise CV intelligence DB (ensures schema + column migrations run)
+    # Step 1: Ensure Azure Blob cv_intelligence.db is downloaded if CV_STORAGE_TYPE == blob
+    try:
+        from app.cv_intelligence.blob_sync import download_cv_db_from_blob, upload_cv_db_to_blob, is_cv_blob_sync_enabled
+        if is_cv_blob_sync_enabled():
+            print("  [BLOB] Downloading cv_intelligence.db from Azure Blob Storage...")
+            download_cv_db_from_blob()
+            print("  [BLOB] Download completed.")
+    except Exception as e:
+        logger.warning(f"Could not download cv_intelligence.db from Azure Blob: {e}")
+
+    # Step 2: Initialise CV intelligence DB (ensures schema + column migrations run)
     init_cv_db()
 
+    # Step 3: Populate main DB (Referral, JobPosition) from Excel
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
+    try:
+        excel_svc = get_excel_service()
+        initialize_and_sync_excel(db, excel_svc)
+        print("  [EXCEL] Synchronized referrals & job positions into runtime memory.")
+    except Exception as e:
+        logger.error(f"Failed to sync with Excel storage: {e}")
+
     cv_db = CVSessionLocal()
     counters = Counters()
 
@@ -260,6 +296,9 @@ async def run_reprocessing(force: bool, dry_run: bool, referral_id_filter: str |
             query = query.filter(CandidateProfile.referral_id == referral_id_filter)
 
         profiles = query.order_by(CandidateProfile.created_at).all()
+        if limit and limit > 0:
+            profiles = profiles[:limit]
+
         counters.total = len(profiles)
 
         print(f"  Found {counters.total} candidate profile(s) with COMPLETED extraction status.")
@@ -270,8 +309,9 @@ async def run_reprocessing(force: bool, dry_run: bool, referral_id_filter: str |
             sys.stdout.flush()
             print()
 
+            did_call_llm = False
             try:
-                await process_one_candidate(
+                did_call_llm = await process_one_candidate(
                     db=db,
                     cv_db=cv_db,
                     profile=profile,
@@ -296,13 +336,19 @@ async def run_reprocessing(force: bool, dry_run: bool, referral_id_filter: str |
                 except Exception:
                     pass
 
-        # Sync to Azure Blob if configured
+            # Safe throttling: delay only if an LLM call occurred and more candidates remain
+            if did_call_llm and not dry_run and delay > 0 and i < len(profiles):
+                logger.info(f"  [THROTTLE] Waiting {delay:.1f}s to respect Gemini Free Tier rate limits...")
+                await asyncio.sleep(delay)
+
+        # Sync back to Azure Blob if configured
         if not dry_run:
             try:
                 from app.cv_intelligence.blob_sync import upload_cv_db_to_blob, is_cv_blob_sync_enabled
                 if is_cv_blob_sync_enabled():
+                    print("\n  [BLOB] Uploading updated cv_intelligence.db to Azure Blob Storage...")
                     upload_cv_db_to_blob()
-                    print("\n  Synced cv_intelligence.db to Azure Blob Storage.")
+                    print("  [BLOB] Sync complete!")
             except Exception as blob_err:
                 logger.warning(f"Azure Blob sync after reprocessing failed: {blob_err}")
 
@@ -364,6 +410,18 @@ def main():
         action="store_true",
         help="Show what would be processed without making any database changes.",
     )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=5.0,
+        help="Delay in seconds between candidate LLM requests to stay within free tier rate limits (default: 5.0s = 12 RPM max).",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Maximum number of candidates to process in this run (useful for testing batches).",
+    )
 
     args = parser.parse_args()
 
@@ -383,9 +441,12 @@ def main():
             force=args.force,
             dry_run=args.dry_run,
             referral_id_filter=args.referral_id,
+            delay=args.delay,
+            limit=args.limit,
         )
     )
 
 
 if __name__ == "__main__":
     main()
+
