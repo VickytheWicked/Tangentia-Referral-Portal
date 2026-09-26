@@ -174,7 +174,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>
-            Tangentia HR Portal
+            Refer2hire Portal
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
             Sign in to access candidate management, job positions, and referral analytics.
@@ -405,8 +405,8 @@ export const LoginPage: React.FC = () => {
                   errorType === 'user_not_found'
                     ? '#ef4444'
                     : email && !validateEmail(email)
-                    ? 'rgba(239, 68, 68, 0.5)'
-                    : undefined,
+                      ? 'rgba(239, 68, 68, 0.5)'
+                      : undefined,
                 boxShadow: errorType === 'user_not_found' ? '0 0 0 3px rgba(239, 68, 68, 0.2)' : undefined,
               }}
             />

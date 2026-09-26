@@ -39,6 +39,7 @@ TestCVSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_c
 @pytest.fixture(autouse=True)
 def setup_test_cv_db():
     CVBase.metadata.create_all(bind=test_cv_engine)
+    app.dependency_overrides[get_cv_db] = override_get_cv_db
     yield
     CVBase.metadata.drop_all(bind=test_cv_engine)
 
@@ -748,5 +749,139 @@ def test_heuristic_experience_projects_certifications():
     certs = extract_certifications_from_cv(sample_cv)
     assert len(certs) >= 1
     assert any("AWS" in c.get("name", "") or "Automation Anywhere" in c.get("name", "") for c in certs)
+
+
+# -------------------------------------------------------------------------
+# 28. Referral Deletion Cascades to CV Intelligence
+# -------------------------------------------------------------------------
+def test_delete_referral_cv_data_direct():
+    """Verify CVIntelligenceService.delete_referral_cv_data removes profile & job matches."""
+    import uuid
+    ref_id = f"test-del-ref-{uuid.uuid4()}"
+    cv_db = TestCVSessionLocal()
+    try:
+        profile = CandidateProfile(
+            referral_id=ref_id,
+            candidate_name="Deletion Test Candidate",
+            email="delete_me@example.com",
+            extraction_status=ExtractionStatus.COMPLETED.value,
+        )
+        cv_db.add(profile)
+        cv_db.commit()
+        cv_db.refresh(profile)
+
+        match = JobMatch(
+            candidate_profile_id=profile.id,
+            position_id="pos-del-test",
+            match_level="Good Match",
+            matched_skills=["Python"],
+            missing_skills=[],
+        )
+        cv_db.add(match)
+        cv_db.commit()
+
+        # Verify records exist
+        assert cv_db.query(CandidateProfile).filter(CandidateProfile.referral_id == ref_id).first() is not None
+        assert cv_db.query(JobMatch).filter(JobMatch.candidate_profile_id == profile.id).first() is not None
+
+        # Call deletion
+        deleted = CVIntelligenceService.delete_referral_cv_data(cv_db=cv_db, referral_id=ref_id)
+        assert deleted is True
+
+        # Verify records are completely removed
+        assert cv_db.query(CandidateProfile).filter(CandidateProfile.referral_id == ref_id).first() is None
+        assert cv_db.query(JobMatch).filter(JobMatch.candidate_profile_id == profile.id).first() is None
+
+        # Second call returns False (already gone)
+        assert CVIntelligenceService.delete_referral_cv_data(cv_db=cv_db, referral_id=ref_id) is False
+    finally:
+        cv_db.close()
+
+
+def test_hr_delete_referral_cleans_cv_intelligence():
+    """Verify that DELETE /api/hr/referrals/{referral_id} purges CV Intelligence data."""
+    import uuid
+    from app.database import SessionLocal
+    main_db = SessionLocal()
+    cv_db = TestCVSessionLocal()
+    ref_id = f"test-hr-del-{uuid.uuid4()}"
+
+    try:
+        pos = JobPosition(
+            id="job-pos-del",
+            title="DevOps Engineer",
+            department="IT",
+            description="Experience with DevOps and Python",
+            location="Remote",
+            is_active=True,
+        )
+        main_db.merge(pos)
+
+        ref = Referral(
+            id=ref_id,
+            referral_number=f"REF-DEL-{uuid.uuid4().hex[:6].upper()}",
+            candidate_name="Purge Candidate",
+            candidate_email=f"purge_{uuid.uuid4().hex[:6]}@example.com",
+            candidate_phone="+1-555-0199",
+            relationship="Former Colleague",
+            referral_note="Please evaluate",
+            position_id=pos.id,
+            referred_by_user_id="user-hr-001",
+            status=ReferralStatus.SUBMITTED.value,
+            original_filename="purge_cv.pdf",
+            stored_filename=f"cvs/{ref_id}.pdf",
+        )
+        main_db.merge(ref)
+        main_db.commit()
+
+        profile = CandidateProfile(
+            referral_id=ref_id,
+            candidate_name="Purge Candidate",
+            email=ref.candidate_email,
+            extraction_status=ExtractionStatus.COMPLETED.value,
+        )
+        cv_db.add(profile)
+        cv_db.commit()
+        cv_db.refresh(profile)
+
+        match = JobMatch(
+            candidate_profile_id=profile.id,
+            position_id=pos.id,
+            match_level="Strong Match",
+            matched_skills=["FastAPI", "Python"],
+            missing_skills=[],
+        )
+        cv_db.add(match)
+        cv_db.commit()
+
+        profile_id = profile.id
+
+        # Confirm data is present in CV intelligence
+        assert cv_db.query(CandidateProfile).filter(CandidateProfile.referral_id == ref_id).first() is not None
+        assert cv_db.query(JobMatch).filter(JobMatch.candidate_profile_id == profile_id).first() is not None
+        cv_db.close()
+
+        # HR Admin deletes the referral via API
+        del_resp = client.delete(f"/api/hr/referrals/{ref_id}", headers=HR_HEADERS)
+        assert del_resp.status_code == 200
+        assert "permanently deleted" in del_resp.json()["message"]
+
+        # Verify referral is deleted from portal DB
+        main_check_db = SessionLocal()
+        try:
+            assert main_check_db.query(Referral).filter(Referral.id == ref_id).first() is None
+        finally:
+            main_check_db.close()
+
+        # Verify profile and match are deleted from test cv_intelligence db
+        cv_check_db = TestCVSessionLocal()
+        try:
+            assert cv_check_db.query(CandidateProfile).filter(CandidateProfile.referral_id == ref_id).first() is None
+            assert cv_check_db.query(JobMatch).filter(JobMatch.candidate_profile_id == profile_id).first() is None
+        finally:
+            cv_check_db.close()
+    finally:
+        main_db.close()
+
 
 

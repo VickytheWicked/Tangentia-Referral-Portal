@@ -630,3 +630,49 @@ class CVIntelligenceService:
             referral_note=referral.referral_note,
             created_at=referral.created_at,
         )
+
+    @staticmethod
+    def delete_referral_cv_data(cv_db: Optional[Session] = None, referral_id: str = "") -> bool:
+        """
+        Permanently delete candidate profile and associated job match records from cv_intelligence.db.
+        Synchronizes database snapshot to Azure Blob if blob sync is enabled.
+        """
+        if not referral_id:
+            return False
+
+        from app.cv_intelligence.database import CVSessionLocal
+
+        own_session = False
+        if cv_db is None:
+            cv_db = CVSessionLocal()
+            own_session = True
+
+        try:
+            profiles = cv_db.query(CandidateProfile).filter(CandidateProfile.referral_id == referral_id).all()
+            deleted = False
+            for p in profiles:
+                # Explicitly delete related job matches and profile
+                cv_db.query(JobMatch).filter(JobMatch.candidate_profile_id == p.id).delete(synchronize_session=False)
+                cv_db.delete(p)
+                deleted = True
+
+            cv_db.commit()
+            if deleted:
+                logger.info(f"Permanently deleted CV intelligence profile and matches for referral {referral_id}")
+
+            try:
+                from app.cv_intelligence.blob_sync import upload_cv_db_to_blob, is_cv_blob_sync_enabled
+                if is_cv_blob_sync_enabled():
+                    upload_cv_db_to_blob()
+            except Exception as blob_err:
+                logger.warning(f"Failed to sync CV DB after referral {referral_id} deletion: {blob_err}")
+
+            return deleted
+        except Exception as err:
+            cv_db.rollback()
+            logger.error(f"Error deleting CV intelligence data for referral {referral_id}: {err}", exc_info=True)
+            raise
+        finally:
+            if own_session:
+                cv_db.close()
+

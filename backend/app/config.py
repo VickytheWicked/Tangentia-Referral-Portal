@@ -69,7 +69,7 @@ class Settings(BaseSettings):
         description="Path to separate SQLite database for CV Intelligence",
     )
     CV_LLM_PROVIDER: str = Field(default="gemini", description="LLM provider")
-    CV_LLM_MODEL: str = Field(default="gemini-3.5-flash", description="LLM model identifier")
+    CV_LLM_MODEL: str = Field(default="gemini-3.5-flash-lite", description="LLM model identifier")
     GEMINI_API_KEY: str = Field(default="", description="Gemini API Key")
     CV_STORAGE_TYPE: str = Field(
         default="local",
