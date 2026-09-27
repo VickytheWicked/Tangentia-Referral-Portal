@@ -77,14 +77,17 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       {/* Sidebar Navigation (Desktop Fixed & Mobile Drawer) */}
       <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="sidebar-header" style={{ justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="brand-logo-container">
-              <Sparkles size={20} color="#ffffff" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="brand-logo-badge" title="Tangentia">
+              <img
+                src="/Tangentia-Logo-2026-Black-scaled.png"
+                alt="Tangentia"
+                className="brand-logo-img"
+              />
             </div>
-            <div>
-              <h1 className="brand-name">Tangentia</h1>
-              <span className="brand-tag">{isHR ? 'HR Administration' : 'Referral Portal'}</span>
-            </div>
+            <span className="brand-tag" style={{ paddingLeft: '2px' }}>
+              {isHR ? 'HR Administration' : 'Referral Portal'}
+            </span>
           </div>
           {/* Close button inside mobile drawer */}
           <button
@@ -238,7 +241,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       {/* Main Content Area */}
       <div className="main-wrapper">
         <header className="top-navbar">
-          <div className="navbar-left">
+          <div className="navbar-left" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
               className="mobile-menu-btn"
               onClick={() => setMobileMenuOpen(true)}
@@ -246,6 +249,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             >
               <Menu size={20} />
             </button>
+            <div className="brand-logo-badge-sm visible-mobile-flex" title="Tangentia">
+              <img
+                src="/Tangentia-Logo-2026-Black-scaled.png"
+                alt="Tangentia"
+                className="brand-logo-img"
+              />
+            </div>
             <h2 className="page-title">{getPageTitle()}</h2>
           </div>
 

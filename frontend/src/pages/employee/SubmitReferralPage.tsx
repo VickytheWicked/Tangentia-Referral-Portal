@@ -512,13 +512,22 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
   return (
     <div className="fade-in" style={{ maxWidth: '840px', margin: '0 auto' }}>
       <div className="card">
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Submit a Referral
-          </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Provide your employee information and the referral's details. Resumes are stored directly in SharePoint and synced to Excel.
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
+              Submit a Referral
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Provide your employee information and the referral's details. Resumes are stored directly in SharePoint and synced to Excel.
+            </p>
+          </div>
+          <div className="brand-logo-badge-sm" title="Tangentia Referral Portal">
+            <img
+              src="/Tangentia-Logo-2026-Black-scaled.png"
+              alt="Tangentia"
+              className="brand-logo-img"
+            />
+          </div>
         </div>
 
         {errorMessage && (

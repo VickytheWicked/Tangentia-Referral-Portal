@@ -257,23 +257,32 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
             )}
           </div>
 
-          <span
-            style={{
-              fontSize: '0.76rem',
-              fontWeight: 600,
-              padding: '4px 10px',
-              borderRadius: '12px',
-              background: job.is_active ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              color: job.is_active ? '#34d399' : '#f87171',
-              border: `1px solid ${job.is_active ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-            }}
-          >
-            {job.is_active ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-            {job.is_active ? 'Active Opening' : 'Deactivated / Closed'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="brand-logo-badge-sm" title="Tangentia Career Opening">
+              <img
+                src="/Tangentia-Logo-2026-Black-scaled.png"
+                alt="Tangentia"
+                className="brand-logo-img"
+              />
+            </div>
+            <span
+              style={{
+                fontSize: '0.76rem',
+                fontWeight: 600,
+                padding: '4px 10px',
+                borderRadius: '12px',
+                background: job.is_active ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                color: job.is_active ? '#34d399' : '#f87171',
+                border: `1px solid ${job.is_active ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              {job.is_active ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+              {job.is_active ? 'Active Opening' : 'Deactivated / Closed'}
+            </span>
+          </div>
         </div>
 
         {/* Overview Grid */}

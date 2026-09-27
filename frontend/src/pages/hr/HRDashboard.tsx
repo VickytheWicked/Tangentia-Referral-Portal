@@ -64,6 +64,15 @@ export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCand
         }}
       >
         <div>
+          <div style={{ marginBottom: '12px' }}>
+            <div className="brand-logo-badge-sm" title="Tangentia Referral Portal">
+              <img
+                src="/Tangentia-Logo-2026-Black-scaled.png"
+                alt="Tangentia"
+                className="brand-logo-img"
+              />
+            </div>
+          </div>
           <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>
             HR & Talent Acquisition Hub
           </h2>

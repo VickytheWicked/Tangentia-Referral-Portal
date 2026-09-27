@@ -169,7 +169,14 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
             </div>
           </div>
 
-          <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+          <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+            <div className="brand-logo-badge-sm" title="Tangentia Referral Intelligence">
+              <img
+                src="/Tangentia-Logo-2026-Black-scaled.png"
+                alt="Tangentia"
+                className="brand-logo-img"
+              />
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {profile.match?.match_level && (
                 <span

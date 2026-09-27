@@ -158,19 +158,18 @@ export const LoginPage: React.FC = () => {
         {/* Top Logo & Title */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div
+            className="brand-logo-badge-lg"
             style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
               margin: '0 auto 16px auto',
-              boxShadow: '0 0 24px rgba(99, 102, 241, 0.45)',
+              display: 'inline-flex',
             }}
           >
-            <ShieldCheck size={30} color="#fff" />
+            <img
+              src="/Tangentia-Logo-2026-Black-scaled.png"
+              alt="Tangentia Logo"
+              className="brand-logo-img"
+              style={{ height: '36px' }}
+            />
           </div>
 
           <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#fff', marginBottom: '6px' }}>
