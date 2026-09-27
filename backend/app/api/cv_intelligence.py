@@ -137,3 +137,83 @@ async def process_all_candidates_for_opening(
         "candidate_count": len(ref_ids),
         "message": f"Queued {len(ref_ids)} candidate CV(s) for extraction.",
     }
+
+
+@router.get("/openings/{position_id}/requirements")
+async def get_opening_requirements(
+    position_id: str,
+    db: Session = Depends(get_db),
+    hr_user: User = Depends(require_hr_admin),
+):
+    """
+    Retrieve structured job requirements extracted by LLM for a specific opening.
+    """
+    verify_feature_enabled()
+    from app.models.job_position import JobPosition
+    from app.cv_intelligence.requirement_analyzer import (
+        is_job_requirements_cached,
+        extract_structured_job_requirements,
+    )
+    job = db.query(JobPosition).filter(JobPosition.id == position_id).first()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job opening not found.")
+
+    cached = is_job_requirements_cached(job.id, job.title)
+    reqs = extract_structured_job_requirements(
+        position_id=job.id,
+        job_title=job.title,
+        department=job.department,
+        description=job.description or "",
+        force_refresh=False,
+    )
+    return {
+        "position_id": job.id,
+        "title": job.title,
+        "department": job.department,
+        "is_cached": cached,
+        "requirements_count": len(reqs),
+        "requirements": reqs,
+    }
+
+
+@router.post("/openings/{position_id}/process-requirements")
+async def process_opening_requirements_endpoint(
+    position_id: str,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    hr_user: User = Depends(require_hr_admin),
+):
+    """
+    Process an opening's clean plain text description with LLM into structured requirements.
+    Runs once unless force=True.
+    """
+    verify_feature_enabled()
+    from app.models.job_position import JobPosition
+    from app.cv_intelligence.requirement_analyzer import (
+        process_opening_with_llm,
+        is_job_requirements_cached,
+    )
+    job = db.query(JobPosition).filter(JobPosition.id == position_id).first()
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job opening not found.")
+
+    was_cached = is_job_requirements_cached(job.id, job.title)
+    reqs = process_opening_with_llm(
+        position_id=job.id,
+        job_title=job.title,
+        department=job.department,
+        description=job.description or "",
+        force_refresh=force,
+    )
+    return {
+        "position_id": job.id,
+        "title": job.title,
+        "already_cached": was_cached and not force,
+        "requirements_count": len(reqs),
+        "requirements": reqs,
+        "message": (
+            "Requirements retrieved from cache (processed once)"
+            if (was_cached and not force)
+            else "Processed clean plain text description with LLM successfully."
+        ),
+    }

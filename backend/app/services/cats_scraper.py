@@ -364,6 +364,29 @@ def sync_cats_jobs_with_db(
     for j in synced_jobs:
         db.refresh(j)
 
+    # Process opening clean plain text descriptions with LLM strictly ONCE per opening
+    try:
+        from app.config import settings
+        if getattr(settings, "CV_INTELLIGENCE_ENABLED", False):
+            from app.cv_intelligence.requirement_analyzer import process_opening_with_llm
+            for item in scraped_jobs:
+                job_id = item["portal_id"]
+                clean_desc = item.get("description", "")
+                try:
+                    process_opening_with_llm(
+                        position_id=job_id,
+                        job_title=item["title"],
+                        department=item["department"],
+                        description=clean_desc,
+                        force_refresh=False,
+                    )
+                except Exception as opening_err:
+                    logger.warning(
+                        f"Failed to process opening '{item['title']}' ({job_id}) with LLM: {opening_err}"
+                    )
+    except Exception as ex:
+        logger.warning(f"Could not initialize opening requirements processing after CATS sync: {ex}")
+
     logger.info(
         f"CATS sync finished: {len(scraped_jobs)} scraped, {created_count} created, "
         f"{updated_count} updated, {deactivated_count} deactivated."

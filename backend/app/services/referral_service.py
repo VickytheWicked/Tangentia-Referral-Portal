@@ -148,6 +148,60 @@ async def create_referral_with_cv(
     file_bytes = await file.read()
     validate_cv_file(file.filename, file_bytes)
 
+    # ─── Jev CV Relevance Pre-Screen (Additive & Non-blocking) ─────────────────
+    if getattr(settings, "CV_RELEVANCE_CHECK_ENABLED", False):
+        try:
+            from app.cv_intelligence.text_extractor import extract_cv_text
+            from app.cv_intelligence.jev_relevance import check_cv_relevance
+
+            cv_text_snippet = ""
+            try:
+                cv_text_snippet = extract_cv_text(
+                    file_bytes=file_bytes,
+                    filename=file.filename or "",
+                    content_type=file.content_type or "",
+                )[:1200]
+            except Exception as tex_err:
+                logger.debug(f"CV text extraction for relevance check skipped: {tex_err}")
+
+            if cv_text_snippet:
+                relevance = check_cv_relevance(
+                    cv_snippet=cv_text_snippet,
+                    position_title=position.title,
+                    position_department=position.department or "",
+                    position_description=position.description or "",
+                    candidate_years_exp=form_data.years_of_experience or 0.0,
+                    referral_note=form_data.referral_note or "",
+                    api_key=getattr(settings, "TYPESAFE_API_KEY", ""),
+                )
+
+                if relevance.jev_available:
+                    if (
+                        getattr(settings, "CV_RELEVANCE_BLOCK_ENABLED", False)
+                        and relevance.score < getattr(settings, "CV_RELEVANCE_BLOCK_THRESHOLD", 0.30)
+                    ):
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=(
+                                f"This CV does not appear to match the '{position.title}' role "
+                                f"({position.department}). Please ensure the candidate's background "
+                                f"is relevant to the position before submitting. "
+                                f"If you believe this is an error, contact HR directly."
+                            ),
+                        )
+                    elif relevance.score < getattr(settings, "CV_RELEVANCE_WARN_THRESHOLD", 0.45):
+                        logger.warning(
+                            f"Low-relevance referral submitted: "
+                            f"candidate='{form_data.candidate_name}' "
+                            f"position='{position.title}' "
+                            f"jev_score={relevance.score:.2f}"
+                        )
+        except HTTPException:
+            raise
+        except Exception as jev_err:
+            logger.warning(f"Jev relevance gate skipped (non-blocking): {jev_err}")
+    # ─── End Jev Pre-Screen ────────────────────────────────────────────────────
+
     # Generate atomic referral number & standardized SharePoint filename
     ref_number = generate_referral_number(db)
     stored_filename = generate_sharepoint_filename(

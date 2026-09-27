@@ -248,6 +248,87 @@ def _ensure_core_baseline_requirements(
     return requirements
 
 
+def is_job_requirements_cached(position_id: str, job_title: str = "") -> bool:
+    """
+    Check if an opening's requirements have already been extracted and cached by LLM.
+    Ensures that LLM processing is performed strictly ONCE per opening.
+    """
+    if not position_id:
+        return False
+    cache_key = f"{position_id}:{job_title.lower()}" if job_title else position_id
+    if cache_key in _JOB_REQUIREMENTS_CACHE or position_id in _JOB_REQUIREMENTS_CACHE:
+        return True
+    prefix = f"{position_id}:"
+    return any(k.startswith(prefix) for k in _JOB_REQUIREMENTS_CACHE.keys())
+
+
+def process_opening_with_llm(
+    position_id: str,
+    job_title: str,
+    department: str,
+    description: str,
+    force_refresh: bool = False,
+) -> List[Dict[str, Any]]:
+    """
+    Given a clean plain text job description (e.g. from CATSOne after HTML stripping),
+    process it with the LLM to extract structured requirements.
+    Ensures it is done ONLY ONCE for each opening by checking the requirements cache.
+    """
+    if not force_refresh and is_job_requirements_cached(position_id, job_title):
+        logger.info(
+            f"Opening '{job_title}' ({position_id}) requirements already processed by LLM. Using cached requirements (processed once)."
+        )
+        return extract_structured_job_requirements(
+            position_id=position_id,
+            job_title=job_title,
+            department=department,
+            description=description,
+            force_refresh=False,
+        )
+
+    logger.info(
+        f"Processing clean plain text description with LLM for opening '{job_title}' ({position_id}) - running once..."
+    )
+    return extract_structured_job_requirements(
+        position_id=position_id,
+        job_title=job_title,
+        department=department,
+        description=description,
+        force_refresh=True,
+    )
+
+
+def ensure_all_openings_processed_by_llm(db) -> Dict[str, int]:
+    """
+    Scan all active openings in the database and ensure their clean plain text
+    descriptions have been processed by the LLM once.
+    Skips all openings that are already processed.
+    """
+    from app.models.job_position import JobPosition
+    positions = db.query(JobPosition).filter(JobPosition.is_active == True).all()
+    processed_count = 0
+    skipped_count = 0
+    for pos in positions:
+        if is_job_requirements_cached(pos.id, pos.title):
+            skipped_count += 1
+        else:
+            try:
+                process_opening_with_llm(
+                    position_id=pos.id,
+                    job_title=pos.title,
+                    department=pos.department,
+                    description=pos.description or "",
+                    force_refresh=False,
+                )
+                processed_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to process opening {pos.id} with LLM: {e}")
+    logger.info(
+        f"Openings LLM check completed: {processed_count} processed, {skipped_count} already cached (processed once)."
+    )
+    return {"processed": processed_count, "skipped": skipped_count}
+
+
 def extract_structured_job_requirements(
     position_id: str,
     job_title: str,
@@ -263,9 +344,21 @@ def extract_structured_job_requirements(
     """
     cache_key = f"{position_id}:{job_title.lower()}"
 
-    if not force_refresh and cache_key in _JOB_REQUIREMENTS_CACHE:
-        logger.debug(f"Using cached job requirements for '{job_title}'")
-        cached = _JOB_REQUIREMENTS_CACHE[cache_key]
+    cached = None
+    if not force_refresh:
+        if cache_key in _JOB_REQUIREMENTS_CACHE:
+            cached = _JOB_REQUIREMENTS_CACHE[cache_key]
+        elif position_id in _JOB_REQUIREMENTS_CACHE:
+            cached = _JOB_REQUIREMENTS_CACHE[position_id]
+        else:
+            prefix = f"{position_id}:"
+            for k, v in _JOB_REQUIREMENTS_CACHE.items():
+                if k.startswith(prefix):
+                    cached = v
+                    break
+
+    if cached:
+        logger.debug(f"Using cached job requirements for '{job_title}' ({position_id})")
         return _ensure_core_baseline_requirements(job_title, department, description, list(cached))
 
     requirements: List[Dict[str, Any]] = []
@@ -279,9 +372,10 @@ def extract_structured_job_requirements(
     requirements = _ensure_core_baseline_requirements(job_title, department, description, requirements)
 
     _JOB_REQUIREMENTS_CACHE[cache_key] = requirements
+    _JOB_REQUIREMENTS_CACHE[position_id] = requirements
     _save_job_requirements_cache()
     logger.info(
-        f"Extracted {len(requirements)} structured requirements for '{job_title}' (position {position_id})"
+        f"Extracted and cached {len(requirements)} structured requirements for '{job_title}' (position {position_id})"
     )
     return requirements
 
@@ -304,7 +398,7 @@ def _gemini_extract_job_requirements(
             description=desc_truncated or "No description provided.",
         )
 
-        candidate_models = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]
+        candidate_models = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.8-flash-lite"]
         if getattr(settings, "CV_LLM_MODEL", None) and settings.CV_LLM_MODEL not in candidate_models:
             candidate_models.insert(0, settings.CV_LLM_MODEL)
 
@@ -684,7 +778,7 @@ def run_semantic_analysis(
             api_key=settings.GEMINI_API_KEY, http_options={"timeout": 20000}
         )
 
-        candidate_models = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]
+        candidate_models = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.8-flash-lite"]
         if getattr(settings, "CV_LLM_MODEL", None) and settings.CV_LLM_MODEL not in candidate_models:
             candidate_models.insert(0, settings.CV_LLM_MODEL)
 
@@ -1046,11 +1140,22 @@ def generate_requirement_analysis(
     try:
         # 1. Extract structured job requirements (Gemini, cached)
         # Guarantees REQ #1 is Total Professional Experience and REQ #2 is Education
+        already_cached = is_job_requirements_cached(position_id, job_title)
+        if already_cached:
+            logger.info(
+                f"Using pre-processed requirements for opening '{job_title}' ({position_id}). Processing candidate '{candidate_name}' only."
+            )
+        else:
+            logger.info(
+                f"Opening '{job_title}' ({position_id}) requirements not yet cached. Processing opening with LLM once..."
+            )
+
         job_requirements = extract_structured_job_requirements(
             position_id=position_id,
             job_title=job_title,
             department=department,
             description=job_description,
+            force_refresh=False,
         )
 
         if not job_requirements:

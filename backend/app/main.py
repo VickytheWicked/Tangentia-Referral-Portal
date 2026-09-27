@@ -52,6 +52,16 @@ async def startup_event():
         except Exception as e:
             logger.error(f"Failed to initialize CV Intelligence database: {e}", exc_info=True)
 
+        try:
+            from app.cv_intelligence.requirement_analyzer import ensure_all_openings_processed_by_llm
+            startup_db = SessionLocal()
+            try:
+                ensure_all_openings_processed_by_llm(startup_db)
+            finally:
+                startup_db.close()
+        except Exception as e:
+            logger.warning(f"Failed to verify opening requirements on startup: {e}")
+
     # Start automatic background sync from Tangentia CATS One every 6 hours
     try:
         start_cats_scheduler()

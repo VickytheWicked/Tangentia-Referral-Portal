@@ -80,6 +80,25 @@ class Settings(BaseSettings):
         description="Blob name for cv_intelligence.db in BLOB_DATA_CONTAINER",
     )
 
+    # Jev Relevance Pre-Screen (Additive & Non-blocking)
+    TYPESAFE_API_KEY: str = Field(default="", description="TypeSafe AI API key for Jev relevance checks")
+    CV_RELEVANCE_CHECK_ENABLED: bool = Field(
+        default=False,
+        description="Enable Jev pre-screen relevance check at referral submission",
+    )
+    CV_RELEVANCE_BLOCK_THRESHOLD: float = Field(
+        default=0.30,
+        description="Jev score below this blocks submission (only if CV_RELEVANCE_BLOCK_ENABLED=True)",
+    )
+    CV_RELEVANCE_BLOCK_ENABLED: bool = Field(
+        default=False,
+        description="If True, block submissions below threshold; if False, log warning only",
+    )
+    CV_RELEVANCE_WARN_THRESHOLD: float = Field(
+        default=0.45,
+        description="Jev score below this logs a low-relevance warning",
+    )
+
     # Historical Referral Suggestions (Isolated & Local-Only)
     HISTORICAL_REFERRAL_SEARCH_ENABLED: bool = Field(
         default=False,
