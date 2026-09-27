@@ -91,39 +91,6 @@ body {
   background: #2d3748;
 }
 
-/* Openings Scroll Container for Candidate Suggestions */
-.openings-scroll-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: calc(100vh - 270px);
-  min-height: 420px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(59, 130, 246, 0.45) rgba(15, 23, 42, 0.6);
-}
-
-.openings-scroll-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.openings-scroll-container::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
-  border-radius: 6px;
-}
-
-.openings-scroll-container::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.35);
-  border-radius: 6px;
-  border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-.openings-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.6);
-}
-
 /* Layout */
 .app-container {
   display: flex;

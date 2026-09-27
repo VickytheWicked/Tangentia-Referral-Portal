@@ -257,7 +257,7 @@ export const HRSuggestionsPage: React.FC = () => {
             <p style={{ margin: 0 }}>No job openings found matching your filter criteria.</p>
           </div>
         ) : (
-          <div className="openings-scroll-container">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {sortedOpenings.map((opening) => {
               const isExpanded = !!expandedOpenings[opening.position_id];
               const hasCandidates = opening.total_candidates > 0;
@@ -364,7 +364,7 @@ export const HRSuggestionsPage: React.FC = () => {
                         ) : (
                           <>
                             {/* Desktop Data Table */}
-                            <div className="table-container hidden-mobile" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '480px', width: '100%', WebkitOverflowScrolling: 'touch', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                            <div className="table-container hidden-mobile" style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                             <table className="data-table" style={{ width: '100%', minWidth: '960px' }}>
                               <thead>
                                 <tr>
