@@ -245,6 +245,15 @@ async def create_referral_with_cv(
         except Exception as excel_err:
             logger.warning(f"Excel write-through failed: {excel_err}")
 
+        # Automatically enqueue referral for CV Intelligence extraction & matching (with Gemini rate limiting)
+        if getattr(settings, "CV_INTELLIGENCE_ENABLED", False):
+            try:
+                from app.cv_intelligence.queue import enqueue_referral_cv
+                enqueue_referral_cv(referral.id)
+                logger.info(f"Automatically enqueued referral {referral.id} ({referral.referral_number}) for background CV extraction.")
+            except Exception as cv_err:
+                logger.warning(f"Could not enqueue referral {referral.id} for auto CV extraction: {cv_err}")
+
         return referral
 
     except Exception as db_err:

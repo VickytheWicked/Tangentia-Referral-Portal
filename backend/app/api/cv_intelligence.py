@@ -125,23 +125,11 @@ async def process_all_candidates_for_opening(
 
     ref_ids = [r.id for r in referrals]
 
-    async def _batch_process(ids: List[str]):
-        from app.database import SessionLocal
-        from app.cv_intelligence.database import CVSessionLocal
-
-        b_db = SessionLocal()
-        b_cv_db = CVSessionLocal()
-        try:
-            for rid in ids:
-                try:
-                    await CVIntelligenceService.process_referral_cv(b_db, b_cv_db, rid)
-                except Exception as ex:
-                    logger.warning(f"Batch processing failed for referral {rid}: {ex}")
-        finally:
-            b_db.close()
-            b_cv_db.close()
-
-    background_tasks.add_task(_batch_process, ref_ids)
+    from app.cv_intelligence.queue import enqueue_referral_cv
+    queued_count = 0
+    for rid in ref_ids:
+        if enqueue_referral_cv(rid):
+            queued_count += 1
 
     return {
         "status": "processing_started",

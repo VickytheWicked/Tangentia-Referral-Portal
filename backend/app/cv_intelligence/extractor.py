@@ -727,22 +727,35 @@ class GeminiCVExtractor:
             from google import genai
             from google.genai import types
 
-            client = genai.Client(api_key=self.api_key, http_options={"timeout": 15000})
+            client = genai.Client(api_key=self.api_key, http_options={"timeout": 35000})
             prompt = f"{EXTRACTION_SYSTEM_PROMPT}\n\nCandidate CV Text:\n---\n{cv_text}\n---"
 
-            response = client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.1,
-                ),
-            )
+            candidate_models = [self.model_name, "gemini-flash-latest", "gemini-3.8-flash"]
+            response = None
+            last_err = None
+            for m_name in candidate_models:
+                if not m_name:
+                    continue
+                try:
+                    response = client.models.generate_content(
+                        model=m_name,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.1,
+                        ),
+                    )
+                    if response and response.text:
+                        break
+                except Exception as model_err:
+                    last_err = model_err
+                    logger.warning(f"Gemini model {m_name} failed: {model_err}, trying fallback...")
+                    continue
+
+            if not response or not response.text:
+                raise ExtractionServiceError(f"Gemini CV extraction failed: {last_err}")
 
             response_text = response.text
-            if not response_text:
-                raise ExtractionServiceError("Received empty response from Gemini API.")
-
             result = self._parse_and_validate(response_text)
 
             # Extra sanity check on candidate_name from AI

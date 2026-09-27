@@ -34,8 +34,7 @@ export const HRSuggestionsPage: React.FC = () => {
   // Keep ALL dropdowns closed initially
   const [expandedOpenings, setExpandedOpenings] = useState<Record<string, boolean>>({});
 
-  const [processingCandidateId, setProcessingCandidateId] = useState<string | null>(null);
-  const [processingPositionId, setProcessingPositionId] = useState<string | null>(null);
+
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateProfileDetail | null>(null);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [statusCandidate, setStatusCandidate] = useState<SuggestedCandidateSummary | null>(null);
@@ -82,33 +81,7 @@ export const HRSuggestionsPage: React.FC = () => {
     }
   };
 
-  const handleProcessCandidate = async (e: React.MouseEvent, referralId: string) => {
-    e.stopPropagation();
-    try {
-      setProcessingCandidateId(referralId);
-      await api.processCandidateCV(referralId, true);
-      await loadData();
-    } catch (err: any) {
-      alert(`CV extraction failed: ${err.message || 'Unknown error'}`);
-    } finally {
-      setProcessingCandidateId(null);
-    }
-  };
 
-  const handleProcessOpening = async (e: React.MouseEvent, positionId: string) => {
-    e.stopPropagation();
-    try {
-      setProcessingPositionId(positionId);
-      await api.processOpeningCVs(positionId);
-      setTimeout(() => {
-        loadData();
-      }, 2000);
-    } catch (err: any) {
-      alert(`Batch processing failed: ${err.message || 'Unknown error'}`);
-    } finally {
-      setProcessingPositionId(null);
-    }
-  };
 
   const handleDownloadCV = async (e: React.MouseEvent, refId: string, filename: string) => {
     e.stopPropagation();
@@ -369,24 +342,7 @@ export const HRSuggestionsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} onClick={(e) => e.stopPropagation()}>
-                      {opening.pending_extraction.length > 0 && (
-                        <button
-                          onClick={(e) => handleProcessOpening(e, opening.position_id)}
-                          disabled={processingPositionId === opening.position_id}
-                          className="btn btn-secondary btn-sm"
-                          style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                          title="Extract all pending candidate CVs for this opening"
-                        >
-                          <Sparkles size={13} className={processingPositionId === opening.position_id ? 'spin' : ''} />
-                          <span>
-                            {processingPositionId === opening.position_id
-                              ? 'Extracting...'
-                              : `Extract All (${opening.pending_extraction.length})`}
-                          </span>
-                        </button>
-                      )}
-                    </div>
+
                   </div>
 
                   {/* Expanded Content: NEW REFERRALS and OLD REFERRALS */}
@@ -625,16 +581,7 @@ export const HRSuggestionsPage: React.FC = () => {
                                           >
                                             <Download size={13} /> CV
                                           </button>
-                                          {c.extraction_status !== 'COMPLETED' && (
-                                            <button
-                                              className="btn btn-secondary btn-sm"
-                                              onClick={(e) => handleProcessCandidate(e, c.referral_id)}
-                                              disabled={processingCandidateId === c.referral_id}
-                                              title="Extract CV"
-                                            >
-                                              <Sparkles size={13} className={processingCandidateId === c.referral_id ? 'spin' : ''} />
-                                            </button>
-                                          )}
+
                                         </div>
                                       </td>
                                     </tr>
@@ -871,17 +818,7 @@ export const HRSuggestionsPage: React.FC = () => {
                                       <span>CV</span>
                                     </button>
 
-                                    {c.extraction_status !== 'COMPLETED' && (
-                                      <button
-                                        className="btn btn-secondary btn-sm"
-                                        style={{ minWidth: '36px', padding: '5px 8px', justifyContent: 'center' }}
-                                        onClick={(e) => handleProcessCandidate(e, c.referral_id)}
-                                        disabled={processingCandidateId === c.referral_id}
-                                        title="Extract CV"
-                                      >
-                                        <Sparkles size={13} className={processingCandidateId === c.referral_id ? 'spin' : ''} />
-                                      </button>
-                                    )}
+
                                   </div>
                                 </div>
                               );

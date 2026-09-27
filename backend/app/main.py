@@ -58,11 +58,24 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Failed to start CATS auto-sync scheduler: {e}", exc_info=True)
 
+    # Start automatic background CV Intelligence processing queue worker
+    if settings.CV_INTELLIGENCE_ENABLED:
+        try:
+            from app.cv_intelligence.queue import start_cv_queue_worker
+            start_cv_queue_worker()
+        except Exception as e:
+            logger.error(f"Failed to start CV queue worker: {e}", exc_info=True)
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     from app.services.cats_scheduler import stop_cats_scheduler
     stop_cats_scheduler()
+    try:
+        from app.cv_intelligence.queue import stop_cv_queue_worker
+        stop_cv_queue_worker()
+    except Exception as e:
+        logger.error(f"Failed to stop CV queue worker: {e}")
     try:
         from app.cv_intelligence.blob_sync import upload_cv_db_to_blob, is_cv_blob_sync_enabled
         if is_cv_blob_sync_enabled():
