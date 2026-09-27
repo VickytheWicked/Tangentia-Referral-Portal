@@ -89,8 +89,7 @@ az webapp deploy \
   --name "$BACKEND_APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
   --src-path "$DEPLOY_ZIP" \
-  --type zip \
-  --output none
+  --clean true
 
 rm -f "$DEPLOY_ZIP"
 ok "Zip deployed. Azure is now running pip install + starting the app..."
