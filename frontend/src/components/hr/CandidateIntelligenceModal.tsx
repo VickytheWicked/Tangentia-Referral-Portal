@@ -12,6 +12,7 @@ import {
   Building,
   Calendar,
   Edit3,
+  ExternalLink,
 } from 'lucide-react';
 import { CandidateProfileDetail } from '../../types/cv_intelligence';
 import { ReferralStatusType } from '../../types';
@@ -58,6 +59,11 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
   };
 
   const matchStyle = getMatchBadgeStyle(profile.match?.match_level);
+  const isCatsJob = Boolean(profile.position_id?.startsWith('cats-'));
+  const catsJobId = isCatsJob && profile.position_id ? profile.position_id.replace('cats-', '') : null;
+  const catsDirectUrl = catsJobId
+    ? `https://tangentia.catsone.com/careers/9463/jobs/${catsJobId}`
+    : 'https://tangentia.catsone.com/careers/9463-General';
 
   return (
     <Modal
@@ -70,7 +76,18 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
           <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
             Original CV: <strong style={{ color: 'var(--text-secondary)' }}>{profile.original_filename}</strong>
           </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <a
+              href={catsDirectUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+              title="Open requirement page in Tangentia CATS One"
+            >
+              <ExternalLink size={14} />
+              <span>Open in CATSOne</span>
+            </a>
             <button
               onClick={() => setIsStatusModalOpen(true)}
               className="btn btn-secondary btn-sm"
@@ -124,8 +141,31 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
             <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', margin: '4px 0' }}>
               {profile.candidate_name || 'Candidate'}
             </h3>
-            <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-              {profile.position_title}
+            <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+              <span>{profile.position_title}</span>
+              <a
+                href={catsDirectUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  color: '#38bdf8',
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Open job requirements in Tangentia CATS One"
+              >
+                <ExternalLink size={12} />
+                <span>Open in CATSOne</span>
+              </a>
             </div>
           </div>
 

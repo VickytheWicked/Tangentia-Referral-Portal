@@ -14,6 +14,7 @@ import {
   Clock,
   Check,
   Filter,
+  ExternalLink,
 } from 'lucide-react';
 import { OverallAnalysis, RequirementAnalysisItem, RequirementStatus } from '../../types/cv_intelligence';
 
@@ -389,6 +390,11 @@ export const AIRequirementAnalysisSection: React.FC<AIRequirementAnalysisSection
   }, [filteredRequirements, showAll, filterType]);
 
   const totalCount = allPrioritizedRequirements.length;
+  const isCatsJob = Boolean(positionId?.startsWith('cats-'));
+  const catsJobId = isCatsJob && positionId ? positionId.replace('cats-', '') : null;
+  const catsDirectUrl = catsJobId
+    ? `https://tangentia.catsone.com/careers/9463/jobs/${catsJobId}`
+    : 'https://tangentia.catsone.com/careers/9463-General';
 
   return (
     <div
@@ -423,24 +429,51 @@ export const AIRequirementAnalysisSection: React.FC<AIRequirementAnalysisSection
           </div>
         </div>
 
-        {/* Requirements Scope Badge */}
-        {totalCount > 0 && (
-          <span
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <a
+            href={catsDirectUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
               fontSize: '0.74rem',
               fontWeight: 700,
-              padding: '3px 9px',
+              padding: '3px 10px',
               borderRadius: '8px',
-              background: 'rgba(59, 130, 246, 0.15)',
-              color: '#60a5fa',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
+              background: 'rgba(56, 189, 248, 0.14)',
+              color: '#38bdf8',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
             }}
+            title="Open requirement page in Tangentia CATS One"
           >
-            {showAll || filterType !== 'ALL'
-              ? `${filteredRequirements.length} Requirements`
-              : `First ${Math.min(COMPARISON_LIMIT, totalCount)} of ${totalCount} Requirements`}
-          </span>
-        )}
+            <ExternalLink size={13} />
+            <span>Open in CATSOne</span>
+          </a>
+
+          {/* Requirements Scope Badge */}
+          {totalCount > 0 && (
+            <span
+              style={{
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                padding: '3px 9px',
+                borderRadius: '8px',
+                background: 'rgba(59, 130, 246, 0.15)',
+                color: '#60a5fa',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+              }}
+            >
+              {showAll || filterType !== 'ALL'
+                ? `${filteredRequirements.length} Requirements`
+                : `First ${Math.min(COMPARISON_LIMIT, totalCount)} of ${totalCount} Requirements`}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* AI Fit Summary (Executive Evaluation) */}
