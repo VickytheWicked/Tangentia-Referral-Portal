@@ -75,7 +75,6 @@ zip -r "$DEPLOY_ZIP" . \
   -x "storage/mock_sharepoint/*" \
   -x "data/*.db" \
   -x "data/*.xlsx" \
-  -x "data/*.json" \
   > /dev/null
 
 ZIP_SIZE=$(du -sh "$DEPLOY_ZIP" | cut -f1)
