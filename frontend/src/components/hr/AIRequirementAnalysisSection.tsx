@@ -389,10 +389,6 @@ export const AIRequirementAnalysisSection: React.FC<AIRequirementAnalysisSection
   }, [filteredRequirements, showAll, filterType]);
 
   const totalCount = allPrioritizedRequirements.length;
-  const supportedCount = analysis.supported_requirements.length;
-  const partialCount = analysis.partially_supported_requirements.length;
-  const notDemonstratedCount = analysis.not_demonstrated_requirements.length;
-  const mandatoryCount = analysis.mandatory_requirements.length;
 
   return (
     <div
@@ -546,63 +542,7 @@ export const AIRequirementAnalysisSection: React.FC<AIRequirementAnalysisSection
         </div>
       )}
 
-      {/* Metrics Summary Counters Bar */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-          gap: '8px',
-          padding: '10px 12px',
-          borderRadius: '8px',
-          background: 'rgba(15, 23, 42, 0.5)',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
-        }}
-      >
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-            Total Evaluated
-          </div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#93c5fd', marginTop: '1px' }}>
-            {totalCount}
-          </div>
-        </div>
 
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-            Mandatory
-          </div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f87171', marginTop: '1px' }}>
-            {mandatoryCount}
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-            Supported
-          </div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#34d399', marginTop: '1px' }}>
-            {supportedCount}
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-            Partially Met
-          </div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fb923c', marginTop: '1px' }}>
-            {partialCount}
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-            Missing / Unmet
-          </div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fbbf24', marginTop: '1px' }}>
-            {notDemonstratedCount}
-          </div>
-        </div>
-      </div>
 
 
       {/* Comparison Section Header & Controls */}
