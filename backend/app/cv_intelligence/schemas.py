@@ -169,6 +169,7 @@ class OpeningSuggestionsResponse(BaseModel):
     strong_matches: List[SuggestedCandidateSummary]
     good_matches: List[SuggestedCandidateSummary]
     potential_matches: List[SuggestedCandidateSummary]
+    irrelevant_matches: List[SuggestedCandidateSummary] = Field(default_factory=list)
     pending_extraction: List[SuggestedCandidateSummary]
     failed_extraction: List[SuggestedCandidateSummary]
     total_candidates: int

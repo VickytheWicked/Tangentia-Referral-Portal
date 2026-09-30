@@ -18,7 +18,6 @@ class ReferralCreateForm(BaseModel):
     position_id: str
     referred_by_name: Optional[str] = Field(None, max_length=255)
     referred_by_email: Optional[str] = Field(None, max_length=255)
-    referred_by_phone: Optional[str] = Field(None, max_length=50)
     candidate_consent: bool = Field(..., description="Must be true")
 
     @field_validator("referred_by_email")
@@ -56,7 +55,6 @@ class ReferralSummaryResponse(BaseModel):
     referred_by_id: str
     referred_by_name: Optional[str] = None
     referred_by_email: Optional[str] = None
-    referred_by_phone: Optional[str] = None
     original_filename: str
     created_at: datetime
     updated_at: datetime

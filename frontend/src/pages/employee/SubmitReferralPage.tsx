@@ -4,6 +4,8 @@ import { JobPosition, DuplicateMatch, CVExtractionPreview } from '../../types';
 import { api } from '../../services/api';
 import { DuplicateModal } from '../../components/common/DuplicateModal';
 import { JobUnavailableModal } from '../../components/common/JobUnavailableModal';
+import { Modal } from '../../components/common/Modal';
+import { notifyReferralUpdated } from '../../services/referralEvents';
 import {
   UploadCloud,
   FileText,
@@ -61,8 +63,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
   // Employee Information
   const [employeeName, setEmployeeName] = useState<string>('');
   const [employeeEmail, setEmployeeEmail] = useState<string>('');
-  const [employeeCountryCode, setEmployeeCountryCode] = useState<string>('+91');
-  const [employeePhone, setEmployeePhone] = useState<string>('');
 
   // Referral Information
   const [referralName, setReferralName] = useState<string>('');
@@ -289,13 +289,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
     return `${code} ${trimmed}`;
   };
 
-  const getFullEmployeePhone = (rawPhone: string, code: string) => {
-    const trimmed = rawPhone.trim();
-    if (!trimmed) return '';
-    if (trimmed.startsWith('+')) return trimmed;
-    return `${code} ${trimmed}`;
-  };
-
   const performDuplicateCheck = async () => {
     const emailToCheck = referralEmail.trim();
     const phoneToCheck = getFullReferralPhone(referralPhone, referralCountryCode);
@@ -319,7 +312,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
             .map((m) => `[Referral #${m.referral_number}: ${m.match_reason}]`)
             .join('; ');
           setErrorMessage(
-            `Duplicate Referral Warning: Found ${res.matches.length} existing record(s) matching your input. Exact duplicate reason(s): ${matchReasons}. Trimmed values checked — Name: "${nameToCheck}", Email: "${emailToCheck}"${phoneToCheck ? `, Phone: "${phoneToCheck}"` : ''}. Review the modal or click 'Confirm & Proceed with Submission' to override.`
+            `Duplicate Referral Warning: Found ${res.matches.length} active record(s) submitted within the past 6 months matching your input. Exact duplicate reason(s): ${matchReasons}. Trimmed values checked — Name: "${nameToCheck}", Email: "${emailToCheck}"${phoneToCheck ? `, Phone: "${phoneToCheck}"` : ''}. Review the modal or click 'Confirm & Proceed with Submission' to override.`
           );
           return true;
         }
@@ -338,7 +331,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
     const cleanEmployeeName = employeeName.trim();
     const cleanEmployeeEmail = employeeEmail.trim().toLowerCase();
-    const cleanEmployeePhone = getFullEmployeePhone(employeePhone, employeeCountryCode);
     const cleanReferralName = referralName.trim();
     const cleanReferralEmail = referralEmail.trim().toLowerCase();
     const cleanReferralPhone = getFullReferralPhone(referralPhone, referralCountryCode);
@@ -355,11 +347,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
     if (!cleanEmployeeEmail.endsWith('@tangentia.com')) {
       setErrorMessage('Access restricted: Employee Email Address must be an official @tangentia.com corporate email.');
-      return;
-    }
-
-    if (!employeePhone.trim()) {
-      setErrorMessage('Please enter your Employee Phone Number.');
       return;
     }
 
@@ -411,8 +398,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       formData.append('referred_by', cleanEmployeeName);
       formData.append('referred_by_email', cleanEmployeeEmail);
       formData.append('employee_email', cleanEmployeeEmail);
-      formData.append('referred_by_phone', cleanEmployeePhone);
-      formData.append('employee_phone', cleanEmployeePhone);
       if (linkedinUrl) formData.append('linkedin_url', linkedinUrl);
       if (githubUrl) formData.append('github_url', githubUrl);
       formData.append('position_id', positionId);
@@ -424,6 +409,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
 
       const result = await api.submitReferral(formData);
       setSuccessReferralNumber(result.referral_number);
+      notifyReferralUpdated();
     } catch (err: any) {
       if (err.message && (err.message.toLowerCase().includes('no longer open') || err.message.toLowerCase().includes('invalid or no longer open'))) {
         setUnavailableJobTitle(selectedJob?.title || 'Selected Position');
@@ -438,76 +424,27 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
     }
   };
 
-  if (successReferralNumber) {
-    return (
-      <div
-        className="card card-glass fade-in"
-        style={{ maxWidth: '640px', margin: '40px auto', textAlign: 'center', padding: '48px 36px' }}
-      >
-        <div
-          style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: 'rgba(16, 185, 129, 0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 20px auto',
-          }}
-        >
-          <CheckCircle2 size={36} color="#10b981" />
-        </div>
+  const handleCloseSuccessModal = () => {
+    setSuccessReferralNumber(null);
+    setReferralName('');
+    setReferralEmail('');
+    setReferralPhone('');
+    setYearsOfExperience('');
+    setLinkedinUrl('');
+    setGithubUrl('');
+    setReferralNote('');
+    setSelectedFile(null);
+    setDuplicateConfirmed(false);
+    setCandidateConsent(false);
+    setExtractionNotice(null);
+  };
 
-        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
-          Referral Submitted Successfully!
-        </h3>
-
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', marginBottom: '20px', lineHeight: 1.5 }}>
-          The CV has been safely encrypted and uploaded to the corporate <strong>Microsoft SharePoint document library</strong>, and our HR team has been notified.
-        </p>
-
-        <div
-          style={{
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: '10px',
-            padding: '16px',
-            marginBottom: '28px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: '1.1rem',
-            color: '#60a5fa',
-            fontWeight: 700,
-          }}
-        >
-          Referral ID: {successReferralNumber}
-        </div>
-
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={() => {
-              setSuccessReferralNumber(null);
-              setReferralName('');
-              setReferralEmail('');
-              setReferralPhone('');
-              setLinkedinUrl('');
-              setGithubUrl('');
-              setReferralNote('');
-              setSelectedFile(null);
-              setDuplicateConfirmed(false);
-            }}
-          >
-            Submit Another Referral
-          </button>
-
-          <button className="btn btn-primary" onClick={onReferralCreated}>
-            View Referrals
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const handleViewReferrals = () => {
+    handleCloseSuccessModal();
+    if (onReferralCreated) {
+      onReferralCreated();
+    }
+  };
 
   return (
     <div className="fade-in" style={{ maxWidth: '840px', margin: '0 auto' }}>
@@ -589,41 +526,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                 </span>
               </div>
             </div>
-
-            <div className="responsive-form-row">
-              <div className="form-group">
-                <label className="form-label">
-                  Employee Phone Number <span className="required">*</span>
-                </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <select
-                    className="form-select"
-                    style={{
-                      width: '120px',
-                      flexShrink: 0,
-                      cursor: 'pointer',
-                    }}
-                    value={employeeCountryCode}
-                    onChange={(e) => setEmployeeCountryCode(e.target.value)}
-                  >
-                    {COUNTRY_CODES.map((c) => (
-                      <option key={`emp-${c.code}-${c.country}`} value={c.code}>
-                        {c.code} ({c.country})
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="tel"
-                    required
-                    className="form-input"
-                    style={{ flex: 1 }}
-                    placeholder="e.g. 98200 12345 or 416-555-0192"
-                    value={employeePhone}
-                    onChange={(e) => setEmployeePhone(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Section 2: Upload Referral's CV / Resume (Instant Autofill) */}
@@ -672,18 +574,18 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '12px',
-                  padding: '36px 20px',
+                  gap: '10px',
+                  padding: '28px 20px',
                   background: 'rgba(59, 130, 246, 0.06)',
                   borderRadius: '10px',
                   border: '1px dashed rgba(59, 130, 246, 0.4)',
                   textAlign: 'center',
                 }}
               >
-                <RefreshCw size={30} className="spin" color="#60a5fa" />
+                <FileText size={26} color="#60a5fa" />
                 <div>
-                  <div style={{ fontSize: '0.94rem', fontWeight: 700, color: '#93c5fd' }}>
-                    Analyzing CV & extracting candidate details...
+                  <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#93c5fd' }}>
+                    Extracting candidate details from CV...
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                     Reading name, email, phone, and career profile from {selectedFile?.name}
@@ -1146,7 +1048,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               htmlFor="consent-checkbox"
               style={{ fontSize: '0.88rem', color: 'var(--text-primary)', cursor: 'pointer', lineHeight: 1.5 }}
             >
-              <strong>Referral Consent Confirmation:</strong> I confirm that the referral candidate has explicitly agreed to be referred for employment at Tangentia and consented to their CV being stored in our company SharePoint document repository.
+              <strong>Referral Consent Confirmation:</strong> I confirm that the referral candidate has explicitly agreed to be referred for employment at Tangentia and consented to their CV being stored in our company document repository.
             </label>
           </div>
 
@@ -1169,8 +1071,8 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
             >
               {isSubmitting ? (
                 <>
-                  <RefreshCw size={18} className="animate-spin" />
-                  Uploading CV to SharePoint...
+                  <UploadCloud size={18} />
+                  Uploading CV to System...
                 </>
               ) : (
                 <>
@@ -1204,6 +1106,65 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
         onClose={() => setShowUnavailableModal(false)}
         jobTitle={unavailableJobTitle}
       />
+
+      {/* Referral Submission Success Pop-up */}
+      <Modal
+        isOpen={Boolean(successReferralNumber)}
+        onClose={handleCloseSuccessModal}
+        title="Referral Submitted"
+        maxWidth="500px"
+        footer={
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', width: '100%' }}>
+            <button className="btn btn-secondary" onClick={handleCloseSuccessModal}>
+              Submit Another
+            </button>
+            <button className="btn btn-primary" onClick={handleViewReferrals}>
+              View My Referrals
+            </button>
+          </div>
+        }
+      >
+        <div style={{ textAlign: 'center', padding: '12px 6px' }}>
+          <div
+            style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '50%',
+              background: 'rgba(16, 185, 129, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px auto',
+            }}
+          >
+            <CheckCircle2 size={30} color="#10b981" />
+          </div>
+
+          <h4 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            Referral Successfully Recorded
+          </h4>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.5, marginBottom: '20px' }}>
+            The candidate referral has been stored and registered into the system. Both HR and employee pages have refreshed silently.
+          </p>
+
+          <div
+            style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '8px',
+              padding: '10px 18px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '1.05rem',
+              color: '#60a5fa',
+              fontWeight: 700,
+              display: 'inline-block',
+            }}
+          >
+            Referral ID: {successReferralNumber}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -124,7 +124,6 @@ def format_referral_summary(ref: Referral) -> ReferralSummaryResponse:
         referred_by_id=ref.referred_by_user_id,
         referred_by_name=referrer_name,
         referred_by_email=referrer_email,
-        referred_by_phone=ref.referred_by_phone,
         original_filename=ref.original_filename,
         created_at=ref.created_at,
         updated_at=ref.updated_at,
@@ -248,8 +247,6 @@ async def submit_referral(
     referred_by_name: Optional[str] = Form(None),
     referred_by_email: Optional[str] = Form(None),
     employee_email: Optional[str] = Form(None),
-    referred_by_phone: Optional[str] = Form(None),
-    employee_phone: Optional[str] = Form(None),
     linkedin_url: Optional[str] = Form(None),
     github_url: Optional[str] = Form(None),
     years_of_experience: float = Form(0.0),
@@ -263,12 +260,11 @@ async def submit_referral(
 ):
     """
     Submit a candidate referral with CV file without requiring employee login.
-    Uses the submitted employee details (name, email, phone) as the referrer identity.
+    Uses the submitted employee details (name, email) as the referrer identity.
     Strictly enforces @tangentia.com for employee email.
     """
     ref_by_name = (referred_by_name or referred_by or "").strip() or None
     ref_by_email = (referred_by_email or employee_email or "").strip().lower() or None
-    ref_by_phone = (referred_by_phone or employee_phone or "").strip() or None
 
     # Strictly enforce @tangentia.com for employee email
     effective_emp_email = ref_by_email or (current_user.email.strip().lower() if current_user and current_user.email else None) or "employee@tangentia.com"
@@ -284,7 +280,6 @@ async def submit_referral(
         candidate_phone=candidate_phone,
         referred_by_name=ref_by_name,
         referred_by_email=effective_emp_email,
-        referred_by_phone=ref_by_phone,
         linkedin_url=linkedin_url,
         github_url=github_url,
         years_of_experience=years_of_experience,

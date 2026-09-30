@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+env/
+data/*.xlsx
+data/*.db
+data/*.sqlite*
+data/cv_intelligence.db
+data/job_requirements_cache.json
+storage/
+.watchfiles.ignore

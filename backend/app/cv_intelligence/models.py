@@ -17,6 +17,7 @@ class MatchLevel(str, Enum):
     STRONG_MATCH = "Strong Match"
     GOOD_MATCH = "Good Match"
     POTENTIAL_MATCH = "Potential Match"
+    IRRELEVANT = "Irrelevant"
 
 
 class CandidateProfile(CVBase):

@@ -202,7 +202,6 @@ def test_referrer_email_custom_submitted_details(client, seeded_job):
         "candidate_phone": "+14165553333",
         "referred_by_name": "Sarah Connor",
         "referred_by_email": "sarah.connor@tangentia.com",
-        "referred_by_phone": "+14165554444",
         "relationship": "Former Colleague",
         "referral_note": "Exceptional team lead and systems architect.",
         "position_id": seeded_job.id,
@@ -284,7 +283,6 @@ def test_strict_employee_email_tangentia_validation(client, seeded_job):
         "candidate_email": "domain.test@example.com",
         "candidate_phone": "+1 416-555-0100",
         "referred_by_name": "Test Employee",
-        "referred_by_phone": "+1 416-555-0192",
         "relationship": "Former Colleague",
         "referral_note": "Testing corporate email domain enforcement strictly.",
         "position_id": seeded_job.id,
@@ -330,7 +328,6 @@ def test_referral_phone_stored_with_country_code_in_db_and_excel(client, seeded_
         "candidate_phone": candidate_phone_with_cc,
         "referred_by_name": "Rohan Mehra",
         "referred_by_email": "rohan.mehra@tangentia.com",
-        "referred_by_phone": "+91 98200 99999",
         "relationship": "Former Colleague",
         "referral_note": "Aarav is an outstanding senior engineer with deep cloud experience.",
         "position_id": seeded_job.id,
@@ -419,6 +416,130 @@ def test_extract_cv_preview_endpoint(client):
     assert data2["success"] is True
     assert "email" in data2["not_found_fields"]
     assert "phone" in data2["not_found_fields"]
+
+
+def test_duplicate_referral_after_six_months_is_treated_as_new(client, seeded_job, seeded_users, db_session):
+    """
+    Verify that if a referral was submitted more than 6 months ago (180+ days),
+    it is considered an eligible new submission:
+    - check-duplicate returns is_duplicate: False with no matches and no warning.
+    - Subsequent new referral submission succeeds.
+    - Candidates submitted within 6 months (<180 days) are flagged as duplicates.
+    """
+    from datetime import datetime, timezone, timedelta
+    from app.models.referral import Referral
+
+    emp = seeded_users["emp1"]
+    now = datetime.now(timezone.utc)
+
+    # 1. Seed a historical referral submitted 7 months ago (210 days ago)
+    old_referral = Referral(
+        referral_number="REF-2025-000088",
+        candidate_name="Alex Mercer",
+        candidate_email="alex.mercer@example.com",
+        candidate_phone="+14165551234",
+        years_of_experience=5.0,
+        relationship="Former Colleague",
+        referral_note="Great engineer from previous company.",
+        position_id=seeded_job.id,
+        referred_by_user_id=emp.id,
+        referred_by_name=emp.name,
+        referred_by_email=emp.email,
+        status=ReferralStatus.SUBMITTED.value,
+        original_filename="alex_old_cv.pdf",
+        stored_filename="REF-2025-000088_Alex_Mercer.pdf",
+        created_at=now - timedelta(days=210),
+        updated_at=now - timedelta(days=210),
+    )
+    db_session.add(old_referral)
+
+    # 2. Seed a recent referral submitted 1 month ago (30 days ago)
+    recent_referral = Referral(
+        referral_number="REF-2026-000099",
+        candidate_name="Bob Recent",
+        candidate_email="bob.recent@example.com",
+        candidate_phone="+14165559876",
+        years_of_experience=3.0,
+        relationship="Friend",
+        referral_note="Recent applicant.",
+        position_id=seeded_job.id,
+        referred_by_user_id=emp.id,
+        referred_by_name=emp.name,
+        referred_by_email=emp.email,
+        status=ReferralStatus.SUBMITTED.value,
+        original_filename="bob_cv.pdf",
+        stored_filename="REF-2026-000099_Bob_Recent.pdf",
+        created_at=now - timedelta(days=30),
+        updated_at=now - timedelta(days=30),
+    )
+    db_session.add(recent_referral)
+    db_session.commit()
+
+    # 3. Check duplicate for Bob Recent (submitted 30 days ago) -> MUST be flagged as duplicate
+    res_recent = client.post(
+        "/api/referrals/check-duplicate",
+        json={
+            "candidate_email": "bob.recent@example.com",
+            "candidate_phone": "+14165559876",
+            "candidate_name": "Bob Recent",
+            "position_id": seeded_job.id,
+        },
+    )
+    assert res_recent.status_code == 200
+    data_recent = res_recent.json()
+    assert data_recent["is_duplicate"] is True
+    assert len(data_recent["matches"]) == 1
+    assert data_recent["matches"][0]["referral_number"] == "REF-2026-000099"
+
+    # 4. Check duplicate for Alex Mercer (submitted 210 days ago > 6 months)
+    # -> MUST NOT be flagged as duplicate (treated as new submission)
+    res_old = client.post(
+        "/api/referrals/check-duplicate",
+        json={
+            "candidate_email": "alex.mercer@example.com",
+            "candidate_phone": "+14165551234",
+            "candidate_name": "Alex Mercer",
+            "position_id": seeded_job.id,
+        },
+    )
+    assert res_old.status_code == 200
+    data_old = res_old.json()
+    assert data_old["is_duplicate"] is False
+    assert len(data_old["matches"]) == 0
+
+    # 5. Submit new referral for Alex Mercer -> succeeds as a fresh submission
+    dummy_pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000052 00000 n\n0000000101 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n162\n%%EOF"
+    submit_res = client.post(
+        "/api/referrals",
+        data={
+            "candidate_name": "Alex Mercer",
+            "candidate_email": "alex.mercer@example.com",
+            "candidate_phone": "+14165551234",
+            "years_of_experience": "6.0",
+            "relationship": "Former Colleague",
+            "referral_note": "Re-submitting Alex after 7 months for new opening.",
+            "position_id": seeded_job.id,
+            "candidate_consent": "true",
+            "employee_name": "Sarah Jenkins",
+            "employee_email": "sarah.jenkins@tangentia.com",
+        },
+        files={"file": ("alex_updated_cv.pdf", io.BytesIO(dummy_pdf), "application/pdf")},
+    )
+    assert submit_res.status_code == 201
+    new_ref = submit_res.json()
+    assert new_ref["candidate_email"] == "alex.mercer@example.com"
+    # Overrides existing row rather than creating a new row
+    assert new_ref["id"] == old_referral.id
+    assert new_ref["referral_number"] == old_referral.referral_number
+    assert float(new_ref["years_of_experience"]) == 6.0
+    assert new_ref["status"] == ReferralStatus.SUBMITTED.value
+
+    # Verify only 1 row exists in the database for Alex Mercer and fields were overwritten in place
+    db_alex_refs = db_session.query(Referral).filter(Referral.candidate_email == "alex.mercer@example.com").all()
+    assert len(db_alex_refs) == 1
+    assert db_alex_refs[0].id == old_referral.id
+    assert db_alex_refs[0].referral_note == "Re-submitting Alex after 7 months for new opening."
+    assert float(db_alex_refs[0].years_of_experience) == 6.0
 
 
 

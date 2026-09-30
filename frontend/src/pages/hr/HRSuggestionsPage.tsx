@@ -23,10 +23,14 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { CandidateIntelligenceModal } from '../../components/hr/CandidateIntelligenceModal';
 import { StatusChangeModal } from '../../components/hr/StatusChangeModal';
 import { HistoricalReferralsSection } from '../../components/hr/HistoricalReferralsSection';
+import { onReferralUpdated } from '../../services/referralEvents';
+
+// Module-level cache to keep candidate suggestions instantly available across tab switches
+let cachedOpenings: OpeningSuggestions[] = [];
 
 export const HRSuggestionsPage: React.FC = () => {
-  const [openings, setOpenings] = useState<OpeningSuggestions[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [openings, setOpenings] = useState<OpeningSuggestions[]>(() => cachedOpenings);
+  const [loading, setLoading] = useState<boolean>(() => cachedOpenings.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
@@ -34,32 +38,58 @@ export const HRSuggestionsPage: React.FC = () => {
   // Keep ALL dropdowns closed initially
   const [expandedOpenings, setExpandedOpenings] = useState<Record<string, boolean>>({});
 
-
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateProfileDetail | null>(null);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
   const [statusCandidate, setStatusCandidate] = useState<SuggestedCandidateSummary | null>(null);
   const [featureDisabled, setFeatureDisabled] = useState<boolean>(false);
 
-  const loadData = async () => {
+  const loadData = async (isSilent = false) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (!isSilent && openings.length === 0 && cachedOpenings.length === 0) {
+        setLoading(true);
+      }
+      if (!isSilent) {
+        setError(null);
+      }
       const data = await api.getHRSuggestions();
-      setOpenings(data);
-      // NOTE: Dropdowns remain closed initially per requirement
+      if (Array.isArray(data) && data.length > 0) {
+        cachedOpenings = data;
+        setOpenings(data);
+      } else if (!isSilent && Array.isArray(data)) {
+        cachedOpenings = data;
+        setOpenings(data);
+      }
     } catch (err: any) {
       if (err.message && err.message.includes('disabled')) {
         setFeatureDisabled(true);
-      } else {
+      } else if (!isSilent) {
         setError(err.message || 'Failed to load candidate suggestions.');
       }
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   };
 
+  // Silent background auto-refresh:
+  // 1. Immediately on referral submission via onReferralUpdated
+  // 2. Automatically every 4.5s without any loading screen or flicker
   useEffect(() => {
     loadData();
+
+    const unsubscribe = onReferralUpdated(() => {
+      loadData(true);
+    });
+
+    const timer = setInterval(() => {
+      loadData(true);
+    }, 4500);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
   }, []);
 
   const toggleExpand = (positionId: string) => {
@@ -107,6 +137,7 @@ export const HRSuggestionsPage: React.FC = () => {
       ...op.strong_matches,
       ...op.good_matches,
       ...op.potential_matches,
+      ...(op.irrelevant_matches || []),
       ...op.pending_extraction,
       ...op.failed_extraction,
     ].some(
@@ -128,11 +159,30 @@ export const HRSuggestionsPage: React.FC = () => {
   });
 
   const getMatchBadgeStyle = (level?: string, status?: string) => {
-    if (level === 'Strong Match') return { bg: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: 'rgba(16, 185, 129, 0.3)', label: 'Strong Match' };
-    if (level === 'Good Match') return { bg: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: 'rgba(59, 130, 246, 0.3)', label: 'Good Match' };
-    if (level === 'Potential Match') return { bg: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: 'rgba(245, 158, 11, 0.3)', label: 'Potential Match' };
-    if (status === 'FAILED') return { bg: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'rgba(239, 68, 68, 0.3)', label: 'Failed' };
-    return { bg: 'rgba(100, 116, 139, 0.15)', color: '#94a3b8', border: 'rgba(100, 116, 139, 0.3)', label: 'Pending Extraction' };
+    if (status === 'PROCESSING') {
+      return {
+        bg: 'rgba(14, 165, 233, 0.16)',
+        color: '#38bdf8',
+        border: 'rgba(14, 165, 233, 0.45)',
+        label: 'Analyzing CV...',
+        isProcessing: true,
+      };
+    }
+    if (status === 'PENDING') {
+      return {
+        bg: 'rgba(168, 85, 247, 0.16)',
+        color: '#c084fc',
+        border: 'rgba(168, 85, 247, 0.45)',
+        label: 'Queued for AI...',
+        isProcessing: true,
+      };
+    }
+    if (level === 'Strong Match') return { bg: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: 'rgba(16, 185, 129, 0.3)', label: 'Strong Match', isProcessing: false };
+    if (level === 'Good Match') return { bg: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: 'rgba(59, 130, 246, 0.3)', label: 'Good Match', isProcessing: false };
+    if (level === 'Potential Match') return { bg: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: 'rgba(245, 158, 11, 0.3)', label: 'Potential Match', isProcessing: false };
+    if (level === 'Irrelevant') return { bg: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'rgba(239, 68, 68, 0.3)', label: 'Irrelevant', isProcessing: false };
+    if (status === 'FAILED') return { bg: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: 'rgba(239, 68, 68, 0.3)', label: 'Failed', isProcessing: false };
+    return { bg: 'rgba(100, 116, 139, 0.15)', color: '#94a3b8', border: 'rgba(100, 116, 139, 0.3)', label: 'Pending Extraction', isProcessing: false };
   };
 
   if (featureDisabled) {
@@ -182,11 +232,10 @@ export const HRSuggestionsPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
             <button
               className="btn btn-secondary btn-sm"
-              onClick={loadData}
-              disabled={loading}
+              onClick={() => loadData(true)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
-              <RefreshCw size={14} className={loading ? 'spin' : ''} />
+              <RefreshCw size={14} />
               <span>Refresh</span>
             </button>
 
@@ -246,10 +295,10 @@ export const HRSuggestionsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Openings Accordion List (Openings with most referrals placed on top) */}
-        {loading ? (
+        {/* Openings Accordion List */}
+        {loading && openings.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Loading candidate suggestions...
+            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>Loading candidate suggestions...</div>
           </div>
         ) : sortedOpenings.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -262,12 +311,13 @@ export const HRSuggestionsPage: React.FC = () => {
               const isExpanded = !!expandedOpenings[opening.position_id];
               const hasCandidates = opening.total_candidates > 0;
 
-              // Priority-ordered referrals: Strong -> Good -> Potential -> Pending -> Failed
+              // Priority-ordered referrals: Strong -> Good -> Potential -> Irrelevant -> Pending -> Failed
               // The candidate with the highest priority score is placed first
               const prioritizedCandidates: SuggestedCandidateSummary[] = [
                 ...opening.strong_matches,
                 ...opening.good_matches,
                 ...opening.potential_matches,
+                ...(opening.irrelevant_matches || []),
                 ...opening.pending_extraction,
                 ...opening.failed_extraction,
               ].sort((a, b) => {
@@ -338,6 +388,24 @@ export const HRSuggestionsPage: React.FC = () => {
                           <span style={{ fontWeight: 600, color: hasCandidates ? '#60a5fa' : 'inherit' }}>
                             {opening.total_candidates} referred candidate{opening.total_candidates !== 1 ? 's' : ''}
                           </span>
+                          {prioritizedCandidates.some((c) => c.extraction_status === 'PENDING' || c.extraction_status === 'PROCESSING') && (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontSize: '0.72rem',
+                                color: '#38bdf8',
+                                background: 'rgba(14, 165, 233, 0.16)',
+                                border: '1px solid rgba(14, 165, 233, 0.38)',
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                fontWeight: 600,
+                              }}
+                            >
+                              AI Analyzing Referral
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -381,19 +449,42 @@ export const HRSuggestionsPage: React.FC = () => {
                               <tbody>
                                 {prioritizedCandidates.map((c, idx) => {
                                   const badge = getMatchBadgeStyle(c.match_level, c.extraction_status);
-                                  const isFirstPriority = idx === 0 && (c.match_level === 'Strong Match' || c.match_level === 'Good Match' || c.match_level === 'Potential Match');
+                                  const isProcessing = c.extraction_status === 'PENDING' || c.extraction_status === 'PROCESSING';
+                                  const isFirstPriority = !isProcessing && idx === 0 && (c.match_level === 'Strong Match' || c.match_level === 'Good Match' || c.match_level === 'Potential Match');
 
                                   return (
                                     <tr
                                       key={c.referral_id}
-                                      onClick={() => handleOpenCandidate(c.referral_id)}
+                                      onClick={() => !isProcessing && handleOpenCandidate(c.referral_id)}
                                       style={{
-                                        cursor: 'pointer',
-                                        background: isFirstPriority ? 'rgba(234, 179, 8, 0.05)' : undefined,
+                                        cursor: isProcessing ? 'default' : 'pointer',
+                                        background: isProcessing
+                                          ? 'rgba(14, 165, 233, 0.04)'
+                                          : isFirstPriority
+                                          ? 'rgba(234, 179, 8, 0.05)'
+                                          : undefined,
                                       }}
                                     >
                                       <td>
-                                        {isFirstPriority ? (
+                                        {isProcessing ? (
+                                          <span
+                                            style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              padding: '3px 8px',
+                                              borderRadius: '12px',
+                                              fontSize: '0.72rem',
+                                              fontWeight: 700,
+                                              background: 'rgba(14, 165, 233, 0.16)',
+                                              color: '#38bdf8',
+                                              border: '1px solid rgba(14, 165, 233, 0.35)',
+                                              whiteSpace: 'nowrap',
+                                            }}
+                                          >
+                                            <RefreshCw size={11} className="spin" /> Processing
+                                          </span>
+                                        ) : isFirstPriority ? (
                                           <span
                                             style={{
                                               display: 'inline-flex',
@@ -466,7 +557,26 @@ export const HRSuggestionsPage: React.FC = () => {
                                         <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
                                           {c.candidate_email}
                                         </div>
-                                        {c.fit_summary && (
+                                        {isProcessing ? (
+                                          <div
+                                            className="pulse-subtle"
+                                            style={{
+                                              marginTop: '5px',
+                                              fontSize: '0.72rem',
+                                              color: '#38bdf8',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '5px',
+                                              background: 'rgba(14, 165, 233, 0.1)',
+                                              padding: '3px 8px',
+                                              borderRadius: '6px',
+                                              border: '1px solid rgba(14, 165, 233, 0.25)',
+                                            }}
+                                          >
+                                            <RefreshCw size={10} className="spin" />
+                                            <span>AI analyzing resume & requirements...</span>
+                                          </div>
+                                        ) : c.fit_summary ? (
                                           <div
                                             style={{
                                               marginTop: '5px',
@@ -497,7 +607,7 @@ export const HRSuggestionsPage: React.FC = () => {
                                               {c.fit_summary}
                                             </span>
                                           </div>
-                                        )}
+                                        ) : null}
                                       </td>
                                       <td>
                                         <span
@@ -510,8 +620,12 @@ export const HRSuggestionsPage: React.FC = () => {
                                             border: `1px solid ${badge.border}`,
                                             fontWeight: 700,
                                             whiteSpace: 'nowrap',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
                                           }}
                                         >
+                                          {badge.isProcessing && <RefreshCw size={10} className="spin" />}
                                           {badge.label}
                                         </span>
                                       </td>
@@ -521,50 +635,74 @@ export const HRSuggestionsPage: React.FC = () => {
                                         </span>
                                       </td>
                                       <td>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '180px' }}>
-                                          {c.matched_skills.slice(0, 3).map((s, sIdx) => (
-                                            <span
-                                              key={sIdx}
-                                              style={{
-                                                fontSize: '0.72rem',
-                                                padding: '2px 6px',
-                                                borderRadius: '4px',
-                                                background: 'rgba(59, 130, 246, 0.15)',
-                                                color: '#93c5fd',
-                                              }}
-                                            >
-                                              {s}
-                                            </span>
-                                          ))}
-                                          {c.matched_skills.length > 3 && (
-                                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
-                                              +{c.matched_skills.length - 3}
-                                            </span>
-                                          )}
-                                        </div>
+                                        {isProcessing ? (
+                                          <div className="pulse-subtle" style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#93c5fd', fontSize: '0.74rem' }}>
+                                            <Sparkles size={12} color="#38bdf8" />
+                                            <span style={{ fontStyle: 'italic', opacity: 0.9 }}>Extracting skills...</span>
+                                          </div>
+                                        ) : (
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '180px' }}>
+                                            {c.matched_skills.slice(0, 3).map((s, sIdx) => (
+                                              <span
+                                                key={sIdx}
+                                                style={{
+                                                  fontSize: '0.72rem',
+                                                  padding: '2px 6px',
+                                                  borderRadius: '4px',
+                                                  background: 'rgba(59, 130, 246, 0.15)',
+                                                  color: '#93c5fd',
+                                                }}
+                                              >
+                                                {s}
+                                              </span>
+                                            ))}
+                                            {c.matched_skills.length > 3 && (
+                                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                                                +{c.matched_skills.length - 3}
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
                                       </td>
                                       <td>
-                                        <div
-                                          style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                          title={c.explanation && c.explanation.length > 0 ? c.explanation[0] : undefined}
-                                        >
-                                          {c.explanation && c.explanation.length > 0 ? c.explanation[0] : '—'}
-                                        </div>
+                                        {isProcessing ? (
+                                          <div className="pulse-subtle" style={{ fontSize: '0.76rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                            Evaluating job requirements...
+                                          </div>
+                                        ) : (
+                                          <div
+                                            style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                            title={c.explanation && c.explanation.length > 0 ? c.explanation[0] : undefined}
+                                          >
+                                            {c.explanation && c.explanation.length > 0 ? c.explanation[0] : '—'}
+                                          </div>
+                                        )}
                                       </td>
                                       <td>
                                         <StatusBadge status={c.referral_status} />
                                       </td>
                                       <td style={{ width: '230px', minWidth: '230px', textAlign: 'right', whiteSpace: 'nowrap', paddingRight: '16px' }}>
                                         <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }} onClick={(e) => e.stopPropagation()}>
-                                          <button
-                                            className="btn btn-secondary btn-sm"
-                                            onClick={() => handleOpenCandidate(c.referral_id)}
-                                            disabled={loadingDetailId === c.referral_id}
-                                            title="View Complete Candidate Dossier"
-                                            style={{ whiteSpace: 'nowrap' }}
-                                          >
-                                            <ExternalLink size={13} /> {loadingDetailId === c.referral_id ? 'Loading...' : 'Profile'}
-                                          </button>
+                                          {isProcessing ? (
+                                            <button
+                                              className="btn btn-secondary btn-sm"
+                                              disabled={true}
+                                              title="AI extraction in progress for this referral"
+                                              style={{ whiteSpace: 'nowrap', opacity: 0.8, cursor: 'wait', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                                            >
+                                              <RefreshCw size={12} className="spin" /> Analyzing...
+                                            </button>
+                                          ) : (
+                                            <button
+                                              className="btn btn-secondary btn-sm"
+                                              onClick={() => handleOpenCandidate(c.referral_id)}
+                                              disabled={loadingDetailId === c.referral_id}
+                                              title="View Complete Candidate Dossier"
+                                              style={{ whiteSpace: 'nowrap' }}
+                                            >
+                                              <ExternalLink size={13} /> {loadingDetailId === c.referral_id ? 'Loading...' : 'Profile'}
+                                            </button>
+                                          )}
                                           <button
                                             className="btn btn-secondary btn-sm"
                                             onClick={() => setStatusCandidate(c)}
@@ -581,7 +719,6 @@ export const HRSuggestionsPage: React.FC = () => {
                                           >
                                             <Download size={13} /> CV
                                           </button>
-
                                         </div>
                                       </td>
                                     </tr>
@@ -595,19 +732,24 @@ export const HRSuggestionsPage: React.FC = () => {
                           <div className="visible-mobile" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {prioritizedCandidates.map((c, idx) => {
                               const badge = getMatchBadgeStyle(c.match_level, c.extraction_status);
-                              const isFirstPriority = idx === 0 && (c.match_level === 'Strong Match' || c.match_level === 'Good Match' || c.match_level === 'Potential Match');
+                              const isProcessing = c.extraction_status === 'PENDING' || c.extraction_status === 'PROCESSING';
+                              const isFirstPriority = !isProcessing && idx === 0 && (c.match_level === 'Strong Match' || c.match_level === 'Good Match' || c.match_level === 'Potential Match');
 
                               return (
                                 <div
                                   key={c.referral_id}
-                                  onClick={() => handleOpenCandidate(c.referral_id)}
+                                  onClick={() => !isProcessing && handleOpenCandidate(c.referral_id)}
                                   style={{
                                     padding: '14px',
                                     borderRadius: '10px',
-                                    background: isFirstPriority
+                                    background: isProcessing
+                                      ? 'rgba(14, 165, 233, 0.05)'
+                                      : isFirstPriority
                                       ? 'linear-gradient(135deg, rgba(234, 179, 8, 0.08), rgba(30, 41, 59, 0.7))'
                                       : 'rgba(30, 41, 59, 0.6)',
-                                    border: isFirstPriority
+                                    border: isProcessing
+                                      ? '1px solid rgba(14, 165, 233, 0.35)'
+                                      : isFirstPriority
                                       ? '1px solid rgba(245, 158, 11, 0.45)'
                                       : '1px solid var(--border-subtle)',
                                     boxShadow: isFirstPriority
@@ -616,13 +758,30 @@ export const HRSuggestionsPage: React.FC = () => {
                                     display: 'flex',
                                     flexDirection: 'column',
                                     gap: '10px',
-                                    cursor: 'pointer',
+                                    cursor: isProcessing ? 'default' : 'pointer',
                                   }}
                                 >
                                   {/* Header: Priority & Match Level */}
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
                                     <div>
-                                      {isFirstPriority ? (
+                                      {isProcessing ? (
+                                        <span
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            padding: '3px 8px',
+                                            borderRadius: '12px',
+                                            fontSize: '0.72rem',
+                                            fontWeight: 700,
+                                            background: 'rgba(14, 165, 233, 0.16)',
+                                            color: '#38bdf8',
+                                            border: '1px solid rgba(14, 165, 233, 0.35)',
+                                          }}
+                                        >
+                                          <RefreshCw size={10} className="spin" /> Processing
+                                        </span>
+                                      ) : isFirstPriority ? (
                                         <span
                                           style={{
                                             display: 'inline-flex',
@@ -696,8 +855,12 @@ export const HRSuggestionsPage: React.FC = () => {
                                         border: `1px solid ${badge.border}`,
                                         fontWeight: 700,
                                         whiteSpace: 'nowrap',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
                                       }}
                                     >
+                                      {badge.isProcessing && <RefreshCw size={10} className="spin" />}
                                       {badge.label}
                                     </span>
                                   </div>
@@ -710,7 +873,26 @@ export const HRSuggestionsPage: React.FC = () => {
                                     <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                                       {c.candidate_email}
                                     </div>
-                                    {c.fit_summary && (
+                                    {isProcessing ? (
+                                      <div
+                                        className="pulse-subtle"
+                                        style={{
+                                          marginTop: '6px',
+                                          fontSize: '0.74rem',
+                                          color: '#38bdf8',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px',
+                                          background: 'rgba(14, 165, 233, 0.1)',
+                                          padding: '4px 8px',
+                                          borderRadius: '6px',
+                                          border: '1px solid rgba(14, 165, 233, 0.25)',
+                                        }}
+                                      >
+                                        <RefreshCw size={10} className="spin" />
+                                        <span>AI analyzing resume & requirements...</span>
+                                      </div>
+                                    ) : c.fit_summary ? (
                                       <div
                                         style={{
                                           marginTop: '6px',
@@ -730,7 +912,7 @@ export const HRSuggestionsPage: React.FC = () => {
                                         <Sparkles size={13} color="#38bdf8" style={{ marginTop: '2px', flexShrink: 0 }} />
                                         <span>{c.fit_summary}</span>
                                       </div>
-                                    )}
+                                    ) : null}
                                   </div>
 
                                   {/* Metrics: Experience & Status */}
@@ -742,7 +924,12 @@ export const HRSuggestionsPage: React.FC = () => {
                                   </div>
 
                                   {/* Matched Skills */}
-                                  {c.matched_skills.length > 0 && (
+                                  {isProcessing ? (
+                                    <div className="pulse-subtle" style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#93c5fd', fontSize: '0.72rem' }}>
+                                      <Sparkles size={11} color="#38bdf8" />
+                                      <span style={{ fontStyle: 'italic' }}>Extracting skills & competencies...</span>
+                                    </div>
+                                  ) : c.matched_skills.length > 0 ? (
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                       {c.matched_skills.slice(0, 4).map((s, sIdx) => (
                                         <span
@@ -765,10 +952,10 @@ export const HRSuggestionsPage: React.FC = () => {
                                         </span>
                                       )}
                                     </div>
-                                  )}
+                                  ) : null}
 
                                   {/* Decision Highlight / Explanation */}
-                                  {c.explanation && c.explanation.length > 0 && (
+                                  {!isProcessing && c.explanation && c.explanation.length > 0 && (
                                     <div
                                       style={{
                                         fontSize: '0.78rem',
@@ -789,15 +976,26 @@ export const HRSuggestionsPage: React.FC = () => {
                                     style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '4px', flexWrap: 'wrap' }}
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <button
-                                      className="btn btn-secondary btn-sm"
-                                      style={{ flex: 1, minWidth: '85px', justifyContent: 'center', gap: '4px', fontSize: '0.78rem' }}
-                                      onClick={() => handleOpenCandidate(c.referral_id)}
-                                      disabled={loadingDetailId === c.referral_id}
-                                    >
-                                      <ExternalLink size={13} />
-                                      <span>{loadingDetailId === c.referral_id ? 'Loading...' : 'Profile'}</span>
-                                    </button>
+                                    {isProcessing ? (
+                                      <button
+                                        className="btn btn-secondary btn-sm"
+                                        disabled={true}
+                                        style={{ flex: 1, minWidth: '85px', justifyContent: 'center', gap: '4px', fontSize: '0.78rem', opacity: 0.8, cursor: 'wait' }}
+                                      >
+                                        <RefreshCw size={12} className="spin" />
+                                        <span>Analyzing...</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        className="btn btn-secondary btn-sm"
+                                        style={{ flex: 1, minWidth: '85px', justifyContent: 'center', gap: '4px', fontSize: '0.78rem' }}
+                                        onClick={() => handleOpenCandidate(c.referral_id)}
+                                        disabled={loadingDetailId === c.referral_id}
+                                      >
+                                        <ExternalLink size={13} />
+                                        <span>{loadingDetailId === c.referral_id ? 'Loading...' : 'Profile'}</span>
+                                      </button>
+                                    )}
 
                                     <button
                                       className="btn btn-secondary btn-sm"
@@ -817,8 +1015,6 @@ export const HRSuggestionsPage: React.FC = () => {
                                       <Download size={13} />
                                       <span>CV</span>
                                     </button>
-
-
                                   </div>
                                 </div>
                               );

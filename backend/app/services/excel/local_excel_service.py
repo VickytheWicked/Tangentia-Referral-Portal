@@ -259,7 +259,7 @@ class LocalExcelService(ExcelServiceInterface):
             return result
 
     def append_referral(self, ref: Dict[str, Any]) -> None:
-        """Append a new referral row to Referrals sheet"""
+        """Append a new referral row to Referrals sheet, or update existing row if ID already exists."""
         with self._lock:
             wb = openpyxl.load_workbook(self.file_path)
             ws = wb["Referrals"]
@@ -289,10 +289,24 @@ class LocalExcelService(ExcelServiceInterface):
                 ref.get("created_at", now_str),
                 ref.get("updated_at", now_str),
             ]
-            ws.append(row_values)
 
-            # Style appended row
-            row_idx = ws.max_row
+            target_id = str(ref.get("id") or "").strip()
+            existing_row = None
+            if target_id:
+                for r in range(2, ws.max_row + 1):
+                    if str(ws.cell(row=r, column=10).value or "").strip() == target_id:
+                        existing_row = r
+                        break
+
+            if existing_row:
+                for col_idx, val in enumerate(row_values, 1):
+                    ws.cell(row=existing_row, column=col_idx, value=val)
+                row_idx = existing_row
+            else:
+                ws.append(row_values)
+                row_idx = ws.max_row
+
+            # Style appended/updated row
             for col_idx in range(1, len(row_values) + 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
                 cell.font = DATA_FONT
@@ -302,17 +316,30 @@ class LocalExcelService(ExcelServiceInterface):
             # Also log to StatusHistory sheet
             ws_hist = wb["StatusHistory"]
             import uuid
+            hist_comment = (
+                f"Referral re-submitted after 6+ months by {ref.get('referred_by_name', 'Employee')} (updated record)."
+                if existing_row
+                else f"Referral submitted by {ref.get('referred_by_name', 'Employee')}."
+            )
             hist_row = [
                 str(uuid.uuid4()),
                 ref.get("id", ""),
                 ref.get("referral_number", ""),
-                "",
+                "Overridden" if existing_row else "",
                 ref.get("status", "Submitted"),
                 ref.get("referred_by_name", "Employee"),
-                f"Referral submitted by {ref.get('referred_by_name', 'Employee')}.",
+                hist_comment,
                 now_str,
             ]
             ws_hist.append(hist_row)
+
+            # If overridden and was previously in HiredHistory, clean up if status is no longer Hired
+            if existing_row and "HiredHistory" in wb.sheetnames and ref.get("status") != "Hired":
+                ws_hh = wb["HiredHistory"]
+                for r in range(2, ws_hh.max_row + 1):
+                    if str(ws_hh.cell(row=r, column=11).value or "").strip() == target_id:
+                        ws_hh.delete_rows(r)
+                        break
 
             self._auto_adjust_column_widths(ws)
             wb.save(self.file_path)

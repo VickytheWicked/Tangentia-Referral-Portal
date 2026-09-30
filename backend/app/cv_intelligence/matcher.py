@@ -184,7 +184,7 @@ def match_candidate_to_job(
     """
     Compare candidate profile with job requirements using domain taxonomy and semantic matching.
     Returns:
-    - match_level: Strong Match / Good Match / Potential Match
+    - match_level: Strong Match / Good Match / Potential Match / Irrelevant
     - matched_skills: List of skills matched
     - missing_skills: List of important skills not found
     - experience_match: Text description of experience alignment
@@ -401,7 +401,7 @@ Candidate Profile:
 Task:
 Evaluate the candidate and return a JSON object with EXACTLY this schema:
 {{
-  "match_level": "Strong Match" | "Good Match" | "Potential Match",
+  "match_level": "Strong Match" | "Good Match" | "Potential Match" | "Irrelevant",
   "matched_skills": ["Skill A", "Skill B"],
   "missing_skills": ["Gap 1", "Gap 2"],
   "experience_match": "X.X yrs (Meets requirement / target)",
@@ -417,16 +417,27 @@ Criteria for match_level:
 - "Strong Match": Candidate has direct domain experience and strongly covers required core skills.
 - "Good Match": Candidate possesses foundational relevant skills and experience, with minor domain gaps easily bridgeable.
 - "Potential Match": Candidate has adjacent technical or analytical background, or junior experience that could fit with mentoring.
+- "Irrelevant": Candidate has no relevant skills, domain experience, background, or qualifications for this position.
 
 Respond ONLY with valid JSON."""
 
         candidate_models = [
-            "gemini-3.6-flash",
-            "gemini-flash-latest",
+            # 1. Active Flash-Lite models (highest throughput, instant response, verified active)
             "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-3.1-flash-lite",
+            # 2. Configured model (if distinct)
+            getattr(settings, "CV_LLM_MODEL", None),
+            # 3. Next-gen standard & pro models recommended by Google
+            "gemini-3.8-flash",
+            "gemini-3.1-pro-preview",
+            "gemini-flash-latest",
+            # 4. Legacy models (kept as lower priority fallbacks)
+            "gemini-2.5-flash",
+            "gemini-1.5-flash",
+            "gemini-2.5-pro",
         ]
-        if getattr(settings, "CV_LLM_MODEL", None) and settings.CV_LLM_MODEL not in candidate_models:
-            candidate_models.append(settings.CV_LLM_MODEL)
+        candidate_models = list(dict.fromkeys([m for m in candidate_models if m]))
 
         last_error = None
         for model_name in candidate_models:
@@ -442,14 +453,17 @@ Respond ONLY with valid JSON."""
                 if response and response.text:
                     parsed = json.loads(response.text)
                     raw_level = parsed.get("match_level", "").strip()
-                    if raw_level == "Strong Match":
+                    raw_lower = raw_level.lower()
+                    if "strong" in raw_lower:
                         match_level = MatchLevel.STRONG_MATCH
-                    elif raw_level == "Good Match":
+                    elif "good" in raw_lower:
                         match_level = MatchLevel.GOOD_MATCH
-                    elif raw_level == "Potential Match":
+                    elif "potential" in raw_lower:
                         match_level = MatchLevel.POTENTIAL_MATCH
+                    elif "irrelevant" in raw_lower or "not relevant" in raw_lower:
+                        match_level = MatchLevel.IRRELEVANT
                     else:
-                        match_level = MatchLevel.GOOD_MATCH
+                        match_level = MatchLevel.POTENTIAL_MATCH
 
                     matched_skills = [str(s).strip() for s in parsed.get("matched_skills", []) if str(s).strip()][:8]
                     missing_skills = [str(m).strip() for m in parsed.get("missing_skills", []) if str(m).strip()][:5]
@@ -464,7 +478,12 @@ Respond ONLY with valid JSON."""
                     return match_level, matched_skills, missing_skills, exp_match, explanation, fit_summary
             except Exception as e:
                 last_error = e
-                logger.debug(f"Gemini LLM matching attempt with '{model_name}' failed: {e}")
+                is_exhausted = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+                log_fn = logger.warning if is_exhausted else logger.debug
+                log_fn(
+                    f"Gemini LLM matching attempt with '{model_name}' {'exhausted quota (429)' if is_exhausted else 'failed'}: {e}. "
+                    "Falling back to next model..."
+                )
                 continue
 
         if last_error:

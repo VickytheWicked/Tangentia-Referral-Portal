@@ -54,8 +54,8 @@ async def get_current_user(
     if credentials:
         token = credentials.credentials
 
-    # Test / Dev token fallback if explicitly provided
-    if not token and settings.DEV_MODE and x_dev_role:
+    # Test / Dev token fallback if explicitly provided (strictly disallowed in production)
+    if not token and settings.is_dev_token_allowed and x_dev_role:
         token = "dev-hr-token" if x_dev_role == "hr_admin" else "dev-employee-token"
 
     if not token:

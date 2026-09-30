@@ -338,27 +338,22 @@ REFERRERS = [
     {
         "name": "Priya Sharma",
         "email": "priya.sharma@tangentia.com",
-        "phone": "+91 98201 11223",
     },
     {
         "name": "Rahul Verma",
         "email": "rahul.verma@tangentia.com",
-        "phone": "+91 98202 22334",
     },
     {
         "name": "Sneha Patil",
         "email": "sneha.patil@tangentia.com",
-        "phone": "+91 98203 33445",
     },
     {
         "name": "Vikram Malhotra",
         "email": "vikram.malhotra@tangentia.com",
-        "phone": "+91 98204 44556",
     },
     {
         "name": "Alex Morgan",
         "email": "dev.user@tangentia.com",
-        "phone": "+1 416 555-0199",
     },
 ]
 
@@ -528,7 +523,6 @@ async def ingest_resumes_folder_cvs():
             referred_by_user_id="dev-user-001",
             referred_by_name=referrer["name"],
             referred_by_email=referrer["email"],
-            referred_by_phone=referrer["phone"],
             status=ref_status,
             sharepoint_drive_id=sp_result.drive_id,
             sharepoint_item_id=sp_result.item_id,

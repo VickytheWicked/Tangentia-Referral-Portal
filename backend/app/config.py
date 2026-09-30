@@ -1,6 +1,6 @@
 import os
 import json
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
@@ -25,11 +25,32 @@ class Settings(BaseSettings):
     EXCEL_FILE_ITEM_ID: str = Field(default="", description="Microsoft Graph item ID for the Excel workbook")
     EXCEL_WORKBOOK_NAME: str = Field(default="Tangentia_Referrals.xlsx", description="Name of the Excel workbook file")
     
-    # Microsoft Entra ID (Azure AD)
+    # Microsoft Entra ID (Azure AD) & Authentication
+    JWT_SECRET_KEY: str = Field(default="", description="Secret key for signing JWT tokens")
+    ALLOW_DEV_TOKENS: bool = Field(default=False, description="Explicitly allow dev/test tokens. NEVER allowed in production")
     AZURE_TENANT_ID: str = Field(default="common", description="Azure AD Tenant ID")
     AZURE_CLIENT_ID: str = Field(default="", description="Azure AD App Registration Client ID")
     AZURE_CLIENT_SECRET: str = Field(default="", description="Azure AD Client Secret")
     AZURE_HR_GROUP_ID: str = Field(default="", description="Entra ID Security Group ID for HR Admins")
+    
+    @property
+    def jwt_secret_key(self) -> str:
+        """Retrieve JWT signing secret with production safety enforcement."""
+        if self.JWT_SECRET_KEY and self.JWT_SECRET_KEY.strip():
+            return self.JWT_SECRET_KEY.strip()
+        if self.ENVIRONMENT == "production":
+            raise RuntimeError(
+                "CRITICAL SECURITY CONFIGURATION ERROR: JWT_SECRET_KEY must be configured in production!"
+            )
+        return "tangentia-portal-dev-insecure-jwt-key-do-not-use-in-production"
+
+    @property
+    def is_dev_token_allowed(self) -> bool:
+        """Dev/mock tokens are strictly forbidden in production under all circumstances."""
+        if self.ENVIRONMENT == "production":
+            return False
+        return bool(self.DEV_MODE or self.ALLOW_DEV_TOKENS)
+
     
     @property
     def AZURE_AUTHORITY(self) -> str:
@@ -113,6 +134,12 @@ class Settings(BaseSettings):
         description="Path to separate SQLite database/index for Historical RAG embeddings",
     )
 
+    # Duplicate Referral Detection Window (6 Months)
+    REFERRAL_DUPLICATE_WINDOW_DAYS: int = Field(
+        default=180,
+        description="Window in days within which a prior referral is considered a duplicate. Referrals submitted older than this window (e.g. 6 months / 180 days) are considered new submissions without duplication warning.",
+    )
+
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
@@ -121,6 +148,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
     CORS_ORIGINS_EXTRA: str = Field(default="", description="Comma-separated extra CORS origins for production (appended to CORS_ORIGINS)")
+    CORS_ORIGIN_REGEX: Optional[str] = Field(default=None, description="Optional regex for allowed CORS origins (disabled in production unless explicitly configured)")
 
     @property
     def all_cors_origins(self) -> List[str]:

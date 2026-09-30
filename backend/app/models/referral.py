@@ -39,7 +39,6 @@ class Referral(Base):
     referred_by_user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     referred_by_name = Column(String(255), nullable=True)
     referred_by_email = Column(String(255), nullable=True)
-    referred_by_phone = Column(String(50), nullable=True)
 
     # Status
     status = Column(String(50), default=ReferralStatus.SUBMITTED.value, nullable=False)

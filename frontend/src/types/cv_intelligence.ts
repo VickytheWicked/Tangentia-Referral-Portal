@@ -1,6 +1,6 @@
 export type ExtractionStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
-export type MatchLevel = 'Strong Match' | 'Good Match' | 'Potential Match';
+export type MatchLevel = 'Strong Match' | 'Good Match' | 'Potential Match' | 'Irrelevant';
 
 export type RequirementStatus =
   | 'SUPPORTED'
@@ -107,6 +107,7 @@ export interface OpeningSuggestions {
   strong_matches: SuggestedCandidateSummary[];
   good_matches: SuggestedCandidateSummary[];
   potential_matches: SuggestedCandidateSummary[];
+  irrelevant_matches?: SuggestedCandidateSummary[];
   pending_extraction: SuggestedCandidateSummary[];
   failed_extraction: SuggestedCandidateSummary[];
   total_candidates: number;

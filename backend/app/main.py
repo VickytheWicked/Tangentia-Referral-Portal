@@ -1,3 +1,8 @@
+import sys
+sys.path = [p for p in sys.path if not ("/agents/python" in p or p.startswith("/agents"))]
+if "typing_extensions" in sys.modules:
+    del sys.modules["typing_extensions"]
+
 import logging
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.responses import JSONResponse
@@ -16,8 +21,9 @@ from app.historical_suggestions.api import router as historical_suggestions_rout
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("referral_portal")
 
-# Create tables if using SQLite or quick dev mode
-Base.metadata.create_all(bind=engine)
+# Create tables automatically for SQLite in-memory dev mode; persistent DBs use Alembic migrations
+if settings.DATABASE_URL.startswith("sqlite") and ":memory:" in settings.DATABASE_URL:
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -30,6 +36,23 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_event():
+    # If running against PostgreSQL in production, ensure Alembic migrations are up to date
+    if settings.DATABASE_URL.startswith("postgresql"):
+        try:
+            import os
+            from alembic.config import Config
+            from alembic import command
+            alembic_ini_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
+            if os.path.exists(alembic_ini_path):
+                migration_url = settings.DATABASE_URL
+                if migration_url.startswith("postgresql://"):
+                    migration_url = migration_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+                cfg.set_main_option("sqlalchemy.url", migration_url)
+                command.upgrade(cfg, "head")
+                logger.info("Alembic database migrations applied successfully.")
+        except Exception as e:
+            logger.warning(f"Alembic auto-migration check note: {e}")
+
     from app.database import SessionLocal
     from app.services.excel import get_excel_service
     from app.services.excel.sync import initialize_and_sync_excel
@@ -43,6 +66,7 @@ async def startup_event():
         logger.error(f"Failed to synchronize with Microsoft Excel workbook on startup: {e}", exc_info=True)
     finally:
         db.close()
+
 
     # Initialize isolated CV Intelligence SQLite database if enabled
     if settings.CV_INTELLIGENCE_ENABLED:
@@ -93,16 +117,21 @@ async def shutdown_event():
     except Exception as e:
         logger.error(f"Failed to persist CV Intelligence DB to Azure Blob on shutdown: {e}")
 
-# CORS Middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.all_cors_origins,
-    allow_origin_regex=r"https://.*\.trycloudflare\.com|https://.*\.azurestaticapps\.net",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
-)
+# CORS Middleware - Restrict origins in production to configured origins (no open wildcard)
+cors_kwargs = {
+    "allow_origins": settings.all_cors_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+    "expose_headers": ["Content-Disposition"],
+}
+if settings.CORS_ORIGIN_REGEX:
+    cors_kwargs["allow_origin_regex"] = settings.CORS_ORIGIN_REGEX
+elif settings.is_dev_token_allowed:
+    cors_kwargs["allow_origin_regex"] = r"https://.*\.trycloudflare\.com"
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
+
 
 
 # Global Exception Handler to sanitize unexpected server errors and prevent credential/stack leakage

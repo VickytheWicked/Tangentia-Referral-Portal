@@ -16,27 +16,22 @@ EMPLOYEES = [
     {
         "name": "Sarah Jenkins",
         "email": "sarah.jenkins@tangentia.com",
-        "phone": "+1 416 555 0123",
     },
     {
         "name": "Arun Kumar",
         "email": "arun.kumar@tangentia.com",
-        "phone": "+91 98201 45678",
     },
     {
         "name": "David Miller",
         "email": "david.miller@tangentia.com",
-        "phone": "+1 647 889 2314",
     },
     {
         "name": "Priya Sharma",
         "email": "priya.sharma@tangentia.com",
-        "phone": "+91 98450 11223",
     },
     {
         "name": "Rohit Verma",
         "email": "rohit.verma@tangentia.com",
-        "phone": "+91 99887 76655",
     },
 ]
 
@@ -509,7 +504,7 @@ def main():
     print(f"Starting submission of {len(CANDIDATES)} referrals to {API_BASE}/referrals...")
     print(f"Common Referring Employees ({len(EMPLOYEES)}):")
     for emp in EMPLOYEES:
-        print(f"  - {emp['name']} <{emp['email']}> ({emp['phone']})")
+        print(f"  - {emp['name']} <{emp['email']}>")
     print("-" * 70)
 
     success_count = 0
@@ -531,8 +526,6 @@ def main():
             "referred_by": emp["name"],
             "referred_by_email": emp["email"],
             "employee_email": emp["email"],
-            "referred_by_phone": emp["phone"],
-            "employee_phone": emp["phone"],
             "position_id": item["position_id"],
             "years_of_experience": str(item["years"]),
             "relationship": item["rel"],

@@ -727,15 +727,29 @@ class GeminiCVExtractor:
             from google import genai
             from google.genai import types
 
-            client = genai.Client(api_key=self.api_key, http_options={"timeout": 35000})
+            client = genai.Client(api_key=self.api_key, http_options={"timeout": 15000})
             prompt = f"{EXTRACTION_SYSTEM_PROMPT}\n\nCandidate CV Text:\n---\n{cv_text}\n---"
 
-            candidate_models = [self.model_name, "gemini-flash-latest", "gemini-3.8-flash"]
+            candidate_models = [
+                # 1. Active Flash-Lite models (highest throughput, instant response, verified active)
+                "gemini-3.5-flash-lite",
+                "gemini-flash-lite-latest",
+                "gemini-3.1-flash-lite",
+                # 2. Configured model (if distinct)
+                self.model_name,
+                # 3. Next-gen standard & pro models recommended by Google
+                "gemini-3.8-flash",
+                "gemini-3.1-pro-preview",
+                "gemini-flash-latest",
+                # 4. Legacy models (kept as lower priority fallbacks)
+                "gemini-2.5-flash",
+                "gemini-1.5-flash",
+                "gemini-2.5-pro",
+            ]
+            candidate_models = list(dict.fromkeys([m for m in candidate_models if m]))
             response = None
             last_err = None
             for m_name in candidate_models:
-                if not m_name:
-                    continue
                 try:
                     response = client.models.generate_content(
                         model=m_name,
@@ -746,10 +760,16 @@ class GeminiCVExtractor:
                         ),
                     )
                     if response and response.text:
+                        logger.info(f"Gemini CV extraction succeeded using model '{m_name}'")
                         break
                 except Exception as model_err:
                     last_err = model_err
-                    logger.warning(f"Gemini model {m_name} failed: {model_err}, trying fallback...")
+                    is_exhausted = "429" in str(model_err) or "RESOURCE_EXHAUSTED" in str(model_err)
+                    log_fn = logger.warning if is_exhausted else logger.info
+                    log_fn(
+                        f"Gemini model '{m_name}' {'exhausted quota (429)' if is_exhausted else 'failed'}: {model_err}. "
+                        "Falling back to next model..."
+                    )
                     continue
 
             if not response or not response.text:

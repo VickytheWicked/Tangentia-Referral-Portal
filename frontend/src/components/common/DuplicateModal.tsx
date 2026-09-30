@@ -64,7 +64,7 @@ export const DuplicateModal: React.FC<DuplicateModalProps> = ({
               Potential Existing Referral Detected ({matches.length} match{matches.length > 1 ? 'es' : ''})
             </h4>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', lineHeight: 1.5, marginBottom: '10px' }}>
-              The system detected that the trimmed details you entered match existing candidate records in the database. Please review the exact duplicate fields below:
+              The system detected that the details you entered match active candidate records submitted within the past 6 months. Submissions older than 6 months are automatically considered new submissions. Please review the matching fields below:
             </p>
             <div
               style={{

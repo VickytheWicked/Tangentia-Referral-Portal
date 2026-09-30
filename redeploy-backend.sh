@@ -57,10 +57,27 @@ az webapp show \
   --output none 2>/dev/null \
   || err "App Service '$BACKEND_APP_NAME' not found in '$RESOURCE_GROUP'. Run deploy-azure.sh first."
 
+# Ensure production security & enterprise infrastructure settings on App Service
+log "Verifying and updating production security and infrastructure settings..."
+az webapp config appsettings set \
+  --name "$BACKEND_APP_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --settings \
+    DEV_MODE="False" \
+    ALLOW_DEV_TOKENS="False" \
+    DATABASE_URL="@Microsoft.KeyVault(SecretUri=https://tangentia-kv-ref.vault.azure.net/secrets/DATABASE-URL/)" \
+    JWT_SECRET_KEY="@Microsoft.KeyVault(SecretUri=https://tangentia-kv-ref.vault.azure.net/secrets/JWT-SECRET-KEY/)" \
+    AZURE_STORAGE_CONNECTION_STRING="@Microsoft.KeyVault(SecretUri=https://tangentia-kv-ref.vault.azure.net/secrets/AZURE-STORAGE-CONNECTION-STRING/)" \
+    GEMINI_API_KEY="@Microsoft.KeyVault(SecretUri=https://tangentia-kv-ref.vault.azure.net/secrets/GEMINI-API-KEY/)" \
+  --output none 2>/dev/null
+ok "Production enterprise infrastructure active (PostgreSQL Flexible Server, Key Vault, Application Insights)."
+
+
 # ==============================================================================
 # Step 1: Package backend (exclude dev artifacts)
 # ==============================================================================
 log "Packaging backend (excluding .venv, tests, cache, .env)..."
+
 rm -f "$DEPLOY_ZIP"
 
 cd "$BACKEND_DIR"
@@ -88,7 +105,10 @@ az webapp deploy \
   --name "$BACKEND_APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
   --src-path "$DEPLOY_ZIP" \
-  --clean true
+  --type zip \
+  --clean true \
+  --restart true
+
 
 rm -f "$DEPLOY_ZIP"
 ok "Zip deployed. Azure is now running pip install + starting the app..."
@@ -120,6 +140,9 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}  NOTE: In-memory SQLite is used (DATABASE_URL=sqlite:///:memory:).${NC}"
-echo -e "${YELLOW}  All data is reset on every deployment.${NC}"
+echo -e "${GREEN}  PERSISTENCE: Azure Database for PostgreSQL Flexible Server (tangentia-pg-server)${NC}"
+echo -e "${GREEN}  SECRETS:     Managed Identity + Azure Key Vault (tangentia-kv-ref)${NC}"
+echo -e "${GREEN}  MONITORING:  Azure Application Insights (tangentia-referral-insights)${NC}"
+echo -e "${GREEN}  All data is now permanently persisted across restarts and redeployments.${NC}"
 echo ""
+

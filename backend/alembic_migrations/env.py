@@ -14,13 +14,16 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+import os
 from app.database import Base
 from app.models import User, JobPosition, Referral, ReferralStatusHistory, HRNote
 from app.config import settings
 
 # add your model's MetaData object here
 target_metadata = Base.metadata
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+db_url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
+config.set_main_option("sqlalchemy.url", db_url)
+
 
 
 def run_migrations_offline() -> None:
@@ -48,17 +51,16 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
+    """Run migrations in 'online' mode."""
+    alembic_config_section = config.get_section(config.config_ini_section, {}).copy()
+    alembic_config_section["sqlalchemy.url"] = config.get_main_option("sqlalchemy.url")
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        alembic_config_section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+
 
     with connectable.connect() as connection:
         context.configure(

@@ -88,7 +88,7 @@ az webapp create \
 az webapp config set \
   --name "$BACKEND_APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
-  --startup-file "uvicorn app.main:app --host 0.0.0.0 --port 8000" \
+  --startup-file "python -m uvicorn app.main:app --host 0.0.0.0 --port 8000" \
   --always-on true \
   --output none 2>/dev/null
 
@@ -117,6 +117,7 @@ ok "Frontend Static Web App ready: $FRONTEND_URL"
 # Step 4: Configure Backend Environment Variables
 # ==============================================================================
 log "Setting backend environment variables (dev/mock mode)..."
+JWT_SECRET_KEY=$(openssl rand -hex 32)
 az webapp config appsettings set \
   --name "$BACKEND_APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
@@ -124,7 +125,9 @@ az webapp config appsettings set \
     PROJECT_NAME="Tangentia Employee Referral Portal" \
     ENVIRONMENT="production" \
     DEBUG="False" \
-    DEV_MODE="True" \
+    DEV_MODE="False" \
+    ALLOW_DEV_TOKENS="False" \
+    JWT_SECRET_KEY="$JWT_SECRET_KEY" \
     DATABASE_URL="sqlite:///:memory:" \
     EXCEL_STORAGE_TYPE="mock" \
     SHAREPOINT_STORAGE_TYPE="mock" \
@@ -136,6 +139,7 @@ az webapp config appsettings set \
     SCM_DO_BUILD_DURING_DEPLOYMENT="true" \
   --output none 2>/dev/null
 ok "Backend environment configured."
+
 
 # ==============================================================================
 # Step 5: Deploy Backend (Zip Deploy)

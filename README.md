@@ -5,11 +5,12 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg?style=flat&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-3178C6.svg?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.2+-646CFF.svg?style=flat&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![AI Engine](https://img.shields.io/badge/AI%20Engine-Gemini%20%7C%20OpenAI-8E44AD.svg?style=flat&logo=google&logoColor=white)](https://ai.google.dev/)
 [![Microsoft Graph](https://img.shields.io/badge/Microsoft%20Graph-API-0078D4.svg?style=flat&logo=microsoft&logoColor=white)](https://learn.microsoft.com/en-us/graph/)
 [![openpyxl](https://img.shields.io/badge/Excel-openpyxl-217346.svg?style=flat&logo=microsoftexcel&logoColor=white)](https://openpyxl.readthedocs.io/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
 
-A production-ready internal **Employee Referral Portal** engineered for enterprise security, seamless corporate Microsoft Entra ID (Azure AD) authentication, automated candidate CV document archival into **Microsoft SharePoint Online**, and dual-engine persistent record management via **Microsoft Excel Online** & in-memory caching.
+A production-ready internal **Employee Referral Portal** engineered for enterprise security, seamless corporate Microsoft Entra ID (Azure AD) authentication, automated candidate CV document archival into **Microsoft SharePoint Online**, dual-engine persistent record management via **Microsoft Excel Online**, **AI-powered CV Intelligence & Resume Matcher**, **Historical Candidate RAG Recommendations**, and automated 6-hour cron synchronization with **Tangentia CATS Careers ATS**.
 
 ---
 
@@ -21,11 +22,15 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 - [Repository Structure](#-repository-structure)
 - [Quick Start (Local Development)](#-quick-start-local-development)
 - [Configuration Guide (`.env`)](#-configuration-guide-env)
+- [AI-Powered CV Intelligence Engine](#-ai-powered-cv-intelligence-engine)
+- [Historical Candidate RAG Recommendations](#-historical-candidate-rag-recommendations)
+- [Automated CATS ATS Scraper & Cron Scheduler](#-automated-cats-ats-scraper--cron-scheduler)
 - [Microsoft Entra ID, SharePoint & Excel Setup](#-microsoft-entra-id-sharepoint--excel-setup)
 - [API Reference](#-api-reference)
 - [Production Deployment (Docker)](#-production-deployment-docker)
 - [Security & Compliance Highlights](#-security--compliance-highlights)
-- [Contributing & Maintainers](#-maintainer)
+- [Running Automated Tests](#-running-automated-tests)
+- [Maintainer](#-maintainer)
 
 ---
 
@@ -36,7 +41,8 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
                            │      Frontend (React 19 + TypeScript)   │
                            │   - Vite SPA + Enterprise Dark UI       │
                            │   - MSAL Microsoft Entra ID SSO         │
-                           │   - Live Excel Export & Audit Timeline  │
+                           │   - Live CV Auto-Fill & AI Fit Radar    │
+                           │   - Candidate Intelligence & RAG UI     │
                            └────────────────────┬────────────────────┘
                                                 │ HTTPS / Bearer JWT
                                                 ▼
@@ -44,28 +50,31 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
                            │      Backend API (FastAPI + Python)     │
                            │   - Entra ID JWKS Token Verifier        │
                            │   - Role-Based Access Control (RBAC)    │
-                           │   - Duplicate Candidate Engine          │
-                           │   - Atomic SharePoint Rollback Manager  │
-                           └──────┬──────────────────────┬───────────┘
-                                  │                      │
-             Microsoft Graph API  │                      │ openpyxl / Graph API
-            (OAuth2 Client Creds) │                      │ Write-Through Sync
-                                  ▼                      ▼
-                ┌───────────────────────────┐  ┌───────────────────────────┐
-                │  SharePoint Online Drive  │  │   Microsoft Excel Online  │
-                │  - Referral-CVs/{YEAR}/   │  │   - Tangentia_Referrals   │
-                │  - Zero DB BLOB Storage   │  │   - Referrals & Jobs      │
-                │  - Secure CV Proxy Stream │  │   - Status History Logs   │
-                │                           │  │   - Confidential HR Notes │
-                └───────────────────────────┘  └─────────────┬─────────────┘
-                                                             │
-                                       Startup Memory Cache  │ Fast Query Index
-                                                             ▼
-                                               ┌───────────────────────────┐
-                                               │ In-Memory SQLite Engine   │
-                                               │ - Sub-millisecond queries │
-                                               │ - Dynamic DB Filter Engine│
-                                               └───────────────────────────┘
+                           │   - Pre-Submission Duplicate Engine     │
+                           │   - CV Intelligence Queue Worker        │
+                           │   - CATS ATS Background Cron Scheduler  │
+                           └──────┬──────────────────┬───────────────┘
+                                  │                  │
+            Microsoft Graph API   │                  │ openpyxl / Graph API
+           (OAuth2 Client Creds)  │                  │ Write-Through Sync
+                                  ▼                  ▼
+               ┌───────────────────────────┐ ┌───────────────────────────┐
+               │  SharePoint Online Drive  │ │   Microsoft Excel Online  │
+               │  - Referral-CVs/{YEAR}/   │ │   - Tangentia_Referrals   │
+               │  - Zero DB BLOB Storage   │ │   - Referrals & Jobs      │
+               │  - Secure CV Proxy Stream │ │   - Status History Logs   │
+               └───────────────────────────┘ │   - Confidential HR Notes │
+                                             └─────────────┬─────────────┘
+                                                           │
+                                                           ▼
+               ┌─────────────────────────────────────────────────────────┐
+               │            AI Intelligence & Data Engine               │
+               │  - LLM Requirement Analyzer (Gemini / Azure OpenAI)     │
+               │  - JEV Candidate-Job Relevance Scoring Engine           │
+               │  - Isolated CV Intelligence SQLite (`cv_intelligence.db`) │
+               │  - Historical Candidate RAG Database (`historical_rag.db`)│
+               │  - Optional Azure Blob Storage Persist & Sync           │
+               └─────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -73,19 +82,38 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 ## ✨ Key Features
 
 ### 👤 Employee Experience
-- **Instant Dashboard Landing**: Direct zero-friction access to metrics (Total, In Review, Interviewing, Hired) and recent submissions.
-- **Submit Candidate Referrals**: Multi-field submission including target requisition, experience, candidate contact, relationship, and recommendation note.
-- **Drag-and-Drop CV Uploader**: Validates `.pdf` and `.docx` files with client-side & server-side magic-byte inspection and 10MB size capping.
-- **Real-Time Duplicate Warning Modal**: Instant pre-submission alerts matching candidate email, normalized phone, or candidate name + target position.
-- **Referral Portfolio (`My Referrals`)**: Filterable data table with candidate status badges, secure CV streaming download, and themed **Referral Withdrawal Modal** (with optional withdrawal rationale).
+- **Instant Dashboard Landing**: Direct zero-friction access to candidate referral statistics (*Total*, *In Review*, *Interviewing*, *Hired*) and recent referral updates.
+- **AI-Powered CV Auto-Fill**: Uploading a CV (`.pdf` / `.docx`) automatically extracts candidate name, email, phone, experience, summary, and skills to populate the submission form in seconds.
+- **Submit Candidate Referrals**: Comprehensive submission workflow including target requisition, experience, candidate contact, relationship, and custom recommendation note.
+- **Drag-and-Drop CV Uploader**: Validates `.pdf` and `.docx` files with client-side & server-side magic-byte inspection, text extraction, and 10MB size capping.
+- **Real-Time Duplicate Warning Modal**: Instant pre-submission alerts matching candidate email, normalized phone, or candidate name + target position within a configurable 6-month (180-day) window.
+- **Referral Portfolio (`My Referrals`)**: Filterable data table with live status badges, secure CV streaming download, and themed **Referral Withdrawal Modal** (with optional withdrawal rationale).
 
 ### 🛡️ HR Administrator Hub
-- **Executive Hiring Pipeline Overview**: Real-time conversion funnel metrics and status breakdowns.
+- **Executive Hiring Pipeline Overview**: Real-time conversion funnel metrics, departmental statistics, and top referrer leaderboards.
 - **Enterprise Candidate Database**: Multi-dimensional filtering by status, department, position, search query, and submission date.
-- **Candidate Profile Reviewer**: Full candidate dossier, direct SharePoint CV download, status progression manager (`Submitted` → `Under Review` → `Shortlisted` → `Interview` → `Selected` → `Hired` / `Rejected`), and complete status transition audit timeline.
-- **Confidential Internal HR Notes**: Private candidate evaluation and recruiter notes thread, completely isolated and hidden from regular employees.
-- **Requisition Manager**: Create, toggle, and manage active and archived corporate job positions.
-- **Permanent Candidate Deletion**: Complete candidate purge with cascade deletion from active database, internal notes, and Microsoft Excel storage.
+- **Candidate Intelligence Dossier**: Deep AI candidate analysis modal showing job-fit match scores (0–100%), skill breakdown matrix, experience alignment, candidate key strengths, potential gaps, and suggested interview questions.
+- **Candidate Profile Reviewer**: Full candidate history, direct SharePoint CV stream, status progression manager (`Submitted` → `Under Review` → `Shortlisted` → `Interview` → `Selected` → `Hired` / `Rejected`), and complete status audit timeline.
+- **Confidential Internal HR Notes**: Private recruiter evaluations thread, completely isolated and hidden from regular employees.
+- **Historical Candidate AI Suggestions (RAG)**: AI-driven matching engine that analyzes past archived/referred candidates to surface passive talent for new job requisitions.
+- **Requisition Manager & AI Requirement Analyzer**: Create and manage job postings with automated LLM requirement extraction that breaks job descriptions down into key technical skills, experience criteria, and domain qualifications.
+- **Permanent Candidate Deletion**: Complete candidate purge with cascade deletion from active database, internal notes, CV intelligence cache, and Microsoft Excel storage.
+- **Hired History Excel Export**: Dedicated export functionality to download styled Microsoft Excel spreadsheets of all hired candidate referrals.
+
+### 🤖 AI CV Intelligence & JEV Relevance Engine
+- **Automated Resume Extraction**: Multi-stage parsing pipeline supporting `pdfplumber`, `PyMuPDF (fitz)`, `docx2txt`, and fallback regex parsers.
+- **Structured Requirement Extraction**: LLM-driven analyzer distills raw job descriptions into structured JSON requirements (*Core Skills*, *Experience Range*, *Domain Knowledge*, *Education Requirements*, *Nice-to-haves*).
+- **Job-Candidate Fit (JEV) Relevance Scoring**: Calculates multi-vector fit scores incorporating skill overlap, years of experience, role alignment, strengths, gaps, and custom technical interview questions.
+- **Asynchronous Queue Worker**: Background process (`cv_intelligence/queue.py`) automatically ingests, extracts, and scores newly uploaded CVs without slowing down UI request threads.
+- **Azure Blob Persistence**: Optional synchronization adapter (`blob_sync.py`) to backup and restore `cv_intelligence.db` to Azure Blob Storage on application startup and shutdown.
+
+### 🔄 Automated CATS ATS Web Scraper & Background Cron Scheduler
+- **Live Requisition Ingestion**: Connects directly to the live [Tangentia CATS Careers Portal](https://tangentia.catsone.com/careers/9463-General) to scrape all active corporate postings across India, the US, and Canada.
+- **Automated Background Scheduler**: Built-in cron scheduler (`cats_scheduler.py`) that runs every 6 hours to keep the internal job catalog synchronized with CATS ATS automatically.
+- **Intelligent 1–2 Liner Summarizer**: Cleans raw HTML, strips boilerplate headers, styles, and scripts, distilling comprehensive job descriptions into crisp 1–2 sentence summaries.
+- **Automated Taxonomy Categorization**: Accurately maps postings into corporate departments (*Intelligent Automation*, *Cloud & Integration*, *Data & Analytics*, *Finance & Enterprise*, *Global Sales*, *Project & Product Management*, *Engineering*) and employment types (*Full-time*, *Contract*, *Internship*).
+- **Idempotent Dual-Storage Persistence**: Scraped positions use deterministic IDs (`cats-{id}`) preventing duplicate entries. Every sync immediately writes through to `Tangentia_Referrals.xlsx` and the runtime database.
+- **One-Click HR ATS Sync Button & ATS Badges**: HR Admins can manually click **"Sync CATS ATS"** from the Job Openings page; synced roles carry a distinct **`CATS ATS`** badge.
 
 ### 📊 Microsoft Excel Online Dual-Storage Engine
 - **Permanent Audit-Ready Ledger**: Every referral submission, status transition, and confidential HR note is automatically written through to `Tangentia_Referrals.xlsx`.
@@ -97,20 +125,11 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 - **Instant One-Click Export**: HR Admins can download the full, styled Microsoft Excel Online workbook directly from the dashboard at any time.
 - **Flexible Deployment Modes**: Seamlessly toggles between local `.xlsx` cache via `openpyxl` (`EXCEL_STORAGE_TYPE=mock`) and live cloud sync via Microsoft Graph API (`EXCEL_STORAGE_TYPE=graph`).
 
-### 🔄 Automated CATS ATS Careers Web Scraper & Sync
-- **Live Requisition Ingestion**: Connects directly to the live [Tangentia CATS Careers Portal](https://tangentia.catsone.com/careers/9463-General) to scrape all active corporate postings across India, the US, and Canada.
-- **Intelligent 1–2 Liner Summarizer**: Cleans raw HTML, strips boilerplate headers, styles, and scripts, distilling comprehensive job descriptions into crisp, informative 1–2 sentence summaries suitable for rapid card scanning.
-- **Automated Taxonomy Categorization**: Accurately maps postings into corporate departments (*Intelligent Automation*, *Cloud & Integration*, *Data & Analytics*, *Finance & Enterprise*, *Global Sales*, *Project & Product Management*, *Engineering*) and detects employment types (*Full-time*, *Contract*, *Internship*).
-- **Idempotent Dual-Storage Persistence**: Scraped positions use deterministic IDs (`cats-{id}`) preventing duplicate entries. Every sync immediately writes through to `Tangentia_Referrals.xlsx` and the runtime database.
-- **One-Click HR ATS Sync Button**: HR Admins can click **"Sync CATS ATS"** directly from the Job Openings page to instantly refresh the corporate referral catalog.
-- **Visual ATS Tagging**: Synced positions display a distinct **`CATS ATS`** badge, clearly separating corporate ATS requisitions from manually posted roles.
-
-### ☁️ Cloud & Enterprise Integrations
+### ☁️ Cloud & Enterprise Security
 - **Microsoft Entra ID (Azure AD)**: Server-side cryptographic token verification using Entra ID public keys (`/discovery/v2.0/keys`), client audience, and issuer validation.
 - **Microsoft SharePoint Online**: Resumes are uploaded directly to your corporate document library via Microsoft Graph API with year partitioning (`Referral-CVs/{YEAR}/{filename}`).
 - **Zero-Orphan Transaction Rollback**: If a database commit fails after a CV upload, the uploaded file in SharePoint is automatically removed via `delete_cv` to eliminate orphaned files.
 - **Zero-Trust Proxied Streaming**: Microsoft Graph access tokens and SharePoint URLs are never exposed to client browsers; CV downloads are securely proxied through authenticated backend streams.
-- **AI-Ready Abstraction**: Pre-built `AIServiceInterface` prepared for zero-downtime integration with Azure OpenAI or Anthropic for resume parsing and candidate-job matching.
 
 ---
 
@@ -118,9 +137,10 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Backend** | Python 3.11+, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2, MSAL Python, PyJWT, HTTPX |
-| **Frontend** | React 19, TypeScript, Vite 8, Lucide Icons, Vanilla CSS Design System, MSAL React |
-| **Storage & Ledger** | In-Memory SQLite (Query Engine) / PostgreSQL 16, Microsoft Excel Online (`openpyxl` / Microsoft Graph API), Microsoft SharePoint Online Document Libraries |
+| **Backend** | Python 3.11+, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2, PyJWT, MSAL Python, HTTPX, APScheduler |
+| **AI & NLP** | Google Gemini API / Azure OpenAI, `pdfplumber`, `fitz (PyMuPDF)`, `docx2txt`, Scikit-Learn |
+| **Frontend** | React 19, TypeScript 5, Vite 8, Lucide Icons, Vanilla CSS Enterprise Theme, MSAL React |
+| **Storage & Ledger** | SQLite / PostgreSQL 16, Microsoft Excel Online (`openpyxl` / Graph API), Microsoft SharePoint Online, Azure Blob Storage |
 | **Infrastructure** | Docker, Docker Compose, Nginx |
 
 ---
@@ -132,44 +152,57 @@ Tangentia-Referral-Portal/
 ├── backend/
 │   ├── alembic_migrations/         # Database migration revisions
 │   ├── app/
-│   │   ├── api/                    # FastAPI routes (auth, jobs, referrals, hr, analytics)
-│   │   ├── models/                 # SQLAlchemy 2.0 ORM database models
-│   │   ├── schemas/                # Pydantic v2 request/response schemas
+│   │   ├── api/                    # FastAPI routers (auth, jobs, referrals, hr, analytics, cv_intelligence, historical_suggestions)
+│   │   ├── cv_intelligence/        # AI CV Intelligence & JEV Relevance engine
+│   │   │   ├── blob_sync.py        # Azure Blob persistence for CV database
+│   │   │   ├── database.py         # SQLite database schema for CV intelligence
+│   │   │   ├── extractor.py        # Multi-stage CV text & metadata extraction
+│   │   │   ├── jev_relevance.py    # Job-candidate relevance scoring engine
+│   │   │   ├── matcher.py          # LLM skill & fit evaluation matcher
+│   │   │   ├── queue.py            # Async background CV processing worker queue
+│   │   │   ├── requirement_analyzer.py # Job requisition LLM requirement parser
+│   │   │   └── service.py          # CV Intelligence orchestration service
+│   │   ├── historical_suggestions/ # Historical candidate RAG recommendation service
+│   │   │   ├── api.py              # Historical suggestions API endpoints
+│   │   │   ├── matcher.py          # Vector/keyword match engine for candidate pool
+│   │   │   └── rag_service.py      # RAG index and similarity query service
+│   │   ├── models/                 # SQLAlchemy ORM database models
+│   │   ├── schemas/                # Pydantic request/response schemas
 │   │   ├── services/
 │   │   │   ├── excel/              # Microsoft Excel Online storage & sync services
-│   │   │   │   ├── base.py                 # Abstract ExcelServiceInterface
-│   │   │   │   ├── local_excel_service.py  # openpyxl local .xlsx manager
-│   │   │   │   ├── graph_excel_service.py  # Microsoft Graph Excel Online integration
-│   │   │   │   └── sync.py                 # Startup bootstrap & data synchronization
 │   │   │   ├── sharepoint/         # Graph API client & local mock storage adapter
-│   │   │   ├── cats_scraper.py     # Tangentia CATS Careers ATS web scraper & 1-2 liner engine
+│   │   │   ├── cats_scraper.py     # CATS Careers ATS web scraper & 1-2 liner engine
+│   │   │   ├── cats_scheduler.py   # 6-hour background cron scheduler for ATS sync
 │   │   │   ├── auth_service.py     # Microsoft Entra ID JWT verification engine
-│   │   │   ├── referral_service.py # Business logic & duplicate detection engine
-│   │   │   └── ai_service.py       # Extensible LLM / AI resume parsing interface
-│   │   ├── utils/                  # CV file validation & filename sanitization
-│   │   ├── config.py               # Pydantic settings management
-│   │   ├── database.py             # Database engine & session maker
-│   │   └── main.py                 # FastAPI application entry point
-│   ├── data/                       # Local Microsoft Excel storage (Tangentia_Referrals.xlsx)
-│   ├── storage/mock_sharepoint/    # Local offline SharePoint mock document library
+│   │   │   └── referral_service.py # Core business logic & duplicate detection engine
+│   │   ├── utils/                  # Document validation & security sanitization
+│   │   ├── config.py               # Pydantic settings & environment management
+│   │   ├── database.py             # Main SQLAlchemy engine & session factory
+│   │   └── main.py                 # FastAPI application entry point & lifecycle hooks
+│   ├── data/                       # Local Excel workbook (`Tangentia_Referrals.xlsx`) & SQLite DBs
+│   ├── storage/mock_sharepoint/    # Local offline SharePoint document library mock
 │   ├── tests/                      # Pytest integration & role authorization test suite
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   └── seed.py                     # Database seeder with sample jobs & candidates
+│   └── seed.py                     # Database seeder with sample positions & candidates
 ├── frontend/
 │   ├── src/
-│   │   ├── auth/                   # MSAL config & React AuthContext
-│   │   ├── components/             # Reusable UI components (Modal, StatusBadge, WithdrawModal, Timeline)
+│   │   ├── auth/                   # MSAL authentication config & React AuthContext
+│   │   ├── components/
+│   │   │   ├── common/             # UI elements (Modals, Badges, Tabs, Search)
+│   │   │   ├── employee/           # Referral Form, CV Extractor Auto-Fill, My Referrals Table
+│   │   │   ├── hr/                 # CandidateIntelligenceModal, AIRequirementAnalysisSection, HistoricalCandidateDetailModal
+│   │   │   └── layout/             # Top Navigation, Sidebar, Role Switcher
 │   │   ├── pages/
 │   │   │   ├── employee/           # Dashboard, Submit Referral, My Referrals
-│   │   │   └── hr/                 # HR Dashboard, Candidate Database, Job Openings, Analytics
-│   │   ├── services/api.ts         # Centralized API service & dev token injector
-│   │   ├── types/                  # TypeScript data interfaces
+│   │   │   └── hr/                 # HR Dashboard, Candidate Database, Job Openings, HR Suggestions, Analytics
+│   │   ├── services/api.ts         # Centralized REST API client & dev token injector
+│   │   ├── types/                  # TypeScript data interfaces & AI types
 │   │   └── index.css               # Curated enterprise dark theme design system
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   └── package.json
-├── docker-compose.yml              # Production multi-container composition
+├── docker-compose.yml              # Multi-container production compose file
 └── README.md
 ```
 
@@ -177,7 +210,7 @@ Tangentia-Referral-Portal/
 
 ## 🚀 Quick Start (Local Development)
 
-The repository features an isolated **Development Mode** (`DEV_MODE=True`, `EXCEL_STORAGE_TYPE=mock`, and `SHAREPOINT_STORAGE_TYPE=mock`) allowing instantaneous local execution without needing live Azure tenant credentials or cloud infrastructure.
+The repository includes an isolated **Development Mode** (`DEV_MODE=True`, `EXCEL_STORAGE_TYPE=mock`, `SHAREPOINT_STORAGE_TYPE=mock`) allowing instant local execution without needing live Azure tenant credentials or cloud infrastructure.
 
 ### Prerequisites
 - **Python 3.11+**
@@ -205,10 +238,10 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # Run the backend API server (automatically seeds Excel & database on first launch)
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000
 ```
 - **Backend API**: [http://localhost:8000](http://localhost:8000)
-- **Interactive Swagger Docs**: [http://localhost:8000/api/docs](http://localhost:8000/api/docs)
+- **Interactive OpenAPI Docs**: [http://localhost:8000/api/docs](http://localhost:8000/api/docs)
 
 ### 3. Start the Frontend Web Portal
 Open a **new terminal tab**:
@@ -233,9 +266,9 @@ npm run dev
 PROJECT_NAME="Tangentia Employee Referral Portal"
 ENVIRONMENT=development
 DEBUG=True
-DEV_MODE=True  # Set to False to enforce live Microsoft Entra ID JWT verification
+DEV_MODE=True  # Set to False in production to enforce live Microsoft Entra ID JWT verification
 
-# Database (In-Memory query engine; persistent records stored in Microsoft Excel)
+# Database Settings
 DATABASE_URL=sqlite:///:memory:
 # DATABASE_URL=postgresql://postgres:password@localhost:5432/referral_portal
 
@@ -252,6 +285,7 @@ AZURE_TENANT_ID=your-azure-tenant-id-or-common
 AZURE_CLIENT_ID=your-azure-client-id
 AZURE_CLIENT_SECRET=your-azure-client-secret
 AZURE_HR_GROUP_ID=your-entra-security-group-id-for-hr-admins
+JWT_SECRET_KEY=your-secure-jwt-signing-secret
 
 # Microsoft SharePoint Online (via Graph API)
 # Set to 'graph' for real SharePoint; 'mock' for local offline storage
@@ -259,6 +293,26 @@ SHAREPOINT_STORAGE_TYPE=mock
 SHAREPOINT_SITE_ID=yourtenant.sharepoint.com,site-guid,web-guid
 SHAREPOINT_DRIVE_ID=b!your-drive-id-from-graph
 SHAREPOINT_ROOT_FOLDER=Referral-CVs
+
+# AI CV Intelligence & HR Suggestions Engine
+CV_INTELLIGENCE_ENABLED=True
+CV_LLM_PROVIDER=gemini  # gemini | azure | openai | anthropic
+CV_LLM_MODEL=gemini-3.5-flash-lite
+GEMINI_API_KEY=your-gemini-api-key
+CV_STORAGE_TYPE=local  # local | blob
+BLOB_CV_INTELLIGENCE_NAME=cv_intelligence.db
+
+# JEV Relevance Check (Optional pre-screen)
+CV_RELEVANCE_CHECK_ENABLED=False
+CV_RELEVANCE_BLOCK_ENABLED=False
+CV_RELEVANCE_BLOCK_THRESHOLD=0.30
+
+# Historical Candidate RAG Recommendations
+HISTORICAL_REFERRAL_SEARCH_ENABLED=True
+HISTORICAL_MATCH_THRESHOLD=0.45
+
+# Duplicate Detection Window (6 Months / 180 Days)
+REFERRAL_DUPLICATE_WINDOW_DAYS=180
 ```
 
 ### `frontend/.env`
@@ -268,50 +322,113 @@ VITE_AZURE_CLIENT_ID=your-azure-client-id
 VITE_AZURE_TENANT_ID=your-azure-tenant-id
 ```
 
-> [!TIP]
-> **Can I use real SharePoint and Excel Online in Dev Mode?**
-> **Yes!** You can set `SHAREPOINT_STORAGE_TYPE=graph` and `EXCEL_STORAGE_TYPE=graph` while keeping `DEV_MODE=True`. This allows you to test real cloud synchronization without requiring users to log in via Microsoft Entra ID SSO. Furthermore, **no paid Azure compute subscription** is required—storage uses your organization's existing Microsoft 365 licensing.
+---
+
+## 🤖 AI-Powered CV Intelligence Engine
+
+The CV Intelligence Engine provides automated resume extraction, job requirement analysis, candidate-to-job matching, and intelligent scoring.
+
+```text
+ Candidate CV (.pdf / .docx)
+             │
+             ▼
+  ┌──────────────────────┐
+  │ CV Text Extractor    │ ── (pdfplumber / PyMuPDF / docx2txt)
+  └──────────┬───────────┘
+             ▼
+  ┌──────────────────────┐
+  │ LLM Matcher & JEV    │ ◄── Job Requisition Requirements
+  │ Scoring Engine       │     (Parsed by Requirement Analyzer)
+  └──────────┬───────────┘
+             ▼
+  ┌──────────────────────┐
+  │ Candidate Dossier    │ ── Fit Score %, Skill Match, Strengths,
+  │ & HR Dashboard       │    Gaps, & Custom Interview Questions
+  └──────────────────────┘
+```
+
+1. **Auto-Fill Resume Ingestion**: When submitting a referral, employees can click **"Auto-fill from CV"**. The API (`POST /api/referrals/extract-cv`) extracts key candidate fields in real time to pre-fill the form.
+2. **Requisition Requirement Analysis**: When a job requisition is created or updated, the requirement analyzer parses the description into structured criteria (*Skills*, *Experience Range*, *Domain Alignment*, *Certifications*).
+3. **Async Queue Worker**: Newly uploaded CVs enter the background worker queue (`cv_intelligence/queue.py`) for automated background extraction and scoring without blocking user operations.
+4. **Candidate Dossier Modal**: HR Admins can view complete candidate fit breakdowns directly from the candidate table by clicking **"AI Fit Profile"**.
+
+---
+
+## 🔍 Historical Candidate RAG Recommendations
+
+The Historical Candidate Suggestions feature surfaces passive talent from prior referral submissions when a new job requisition opens.
+
+- **Vector & Keyword Matching**: Scans historical candidate profiles and past CV extractions stored in `historical_rag.db`.
+- **Match Threshold Filter**: Filters candidates based on configurable similarity thresholds (`HISTORICAL_MATCH_THRESHOLD=0.45`).
+- **HR Tab**: HR Admins can access the **"HR Suggestions"** page in the portal to review recommended passive candidates for active job openings.
+
+---
+
+## 🔄 Automated CATS ATS Scraper & Cron Scheduler
+
+The portal synchronizes corporate job openings with Tangentia's official public ATS portal ([`https://tangentia.catsone.com/careers/9463-General`](https://tangentia.catsone.com/careers/9463-General)).
+
+### Background Cron Scheduler
+- Runs automatically in the background every **6 hours** (`cats_scheduler.py`).
+- Crawls active postings, generates 1–2 sentence job summaries, categorizes departments/types, and updates the database & Excel workbook.
+
+### Manual Synchronization Options
+1. **HR Portal Button**: Click **"Sync CATS ATS"** in the **Job Openings** tab.
+2. **REST API Endpoint**:
+   ```bash
+   curl -X POST http://localhost:8000/api/jobs/sync-cats \
+     -H "Authorization: Bearer dev-hr-token"
+   ```
+3. **Python CLI Command**:
+   ```bash
+   PYTHONPATH=. .venv/bin/python -c "
+   from app.database import SessionLocal, Base, engine
+   from app.services.cats_scraper import sync_cats_jobs_with_db
+   Base.metadata.create_all(bind=engine)
+   db = SessionLocal()
+   print(sync_cats_jobs_with_db(db)['message'])
+   db.close()
+   "
+   ```
 
 ---
 
 ## 🔐 Microsoft Entra ID, SharePoint & Excel Setup
 
 ### 1. Register Entra ID Application
-1. Navigate to the **[Microsoft Entra Admin Center](https://entra.microsoft.com)** > **App registrations** > **New registration**.
-2. Name: `Tangentia Employee Referral Portal`.
-3. Supported account types: `Accounts in this organizational directory only (Single tenant)`.
-4. Redirect URI: Platform `Single-page application (SPA)`, URI: `http://localhost:5173` (and your production domain).
-5. Under **Certificates & secrets**, create a new **Client secret** and copy its value to `AZURE_CLIENT_SECRET`.
+1. Open the **[Microsoft Entra Admin Center](https://entra.microsoft.com)** > **App registrations** > **New registration**.
+2. Set Name: `Tangentia Employee Referral Portal`.
+3. Select `Accounts in this organizational directory only (Single tenant)`.
+4. Add Redirect URI: Platform `Single-page application (SPA)`, URI: `http://localhost:5173` (and production domain).
+5. Generate a **Client secret** under **Certificates & secrets** and set `AZURE_CLIENT_SECRET`.
 
 ### 2. Configure Microsoft Graph API Permissions
-1. Go to **API permissions** > **Add a permission** > **Microsoft Graph** > **Application permissions**.
-2. Add:
-   - `Files.ReadWrite.All` (for SharePoint document uploads and Excel Online workbook operations).
-   - `Sites.ReadWrite.All` (for SharePoint site document libraries and metadata).
-   - `User.Read.All` (optional, for directory sync).
+1. Under **API permissions**, select **Microsoft Graph** > **Application permissions**.
+2. Add permissions:
+   - `Files.ReadWrite.All`
+   - `Sites.ReadWrite.All`
 3. Click **"Grant admin consent for [Your Organization]"**.
 
 ### 3. Retrieve SharePoint Site ID & CV Drive ID
-1. Create a Document Library named `Referral-CVs` in your target SharePoint site.
-2. In [Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer), run:
+1. Create a Document Library named `Referral-CVs` in SharePoint.
+2. In [Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer), execute:
    ```http
    GET https://graph.microsoft.com/v1.0/sites/{yourtenant}.sharepoint.com:/sites/{site-name}
    ```
-   The returned `id` is your `SHAREPOINT_SITE_ID` (and `EXCEL_SITE_ID`).
-3. Query drives for that site:
+   Copy the `id` to `SHAREPOINT_SITE_ID` and `EXCEL_SITE_ID`.
+3. Query site drives:
    ```http
    GET https://graph.microsoft.com/v1.0/sites/{site_id}/drives
    ```
    Locate `Referral-CVs` and copy its `id` to `SHAREPOINT_DRIVE_ID`.
 
 ### 4. Configure Microsoft Excel Online Storage
-1. Upload or create `Tangentia_Referrals.xlsx` in your designated SharePoint document library or OneDrive.
-2. Obtain the workbook's `item_id`:
+1. Upload `Tangentia_Referrals.xlsx` to your SharePoint document library.
+2. Fetch the file's `item_id`:
    ```http
    GET https://graph.microsoft.com/v1.0/drives/{drive_id}/root/children
    ```
-   Copy the `id` of `Tangentia_Referrals.xlsx` to `EXCEL_FILE_ITEM_ID`.
-3. Set `EXCEL_STORAGE_TYPE=graph` in `backend/.env`.
+   Set the resulting `id` in `EXCEL_FILE_ITEM_ID` and set `EXCEL_STORAGE_TYPE=graph`.
 
 ---
 
@@ -319,77 +436,43 @@ VITE_AZURE_TENANT_ID=your-azure-tenant-id
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/auth/config` | Public | Returns Entra ID public client parameters |
-| `GET` | `/api/auth/me` | Authenticated | Current user profile and role permissions |
-| `GET` | `/api/jobs` | Authenticated | List corporate job openings (`?include_inactive=bool`) |
+| `GET` | `/api/auth/config` | Public | Returns Entra ID public configuration & dev status |
+| `GET` | `/api/auth/me` | Authenticated | Current user profile and security roles |
+| `GET` | `/api/jobs` | Authenticated | List active/inactive job requisitions |
 | `POST`| `/api/jobs` | HR Admin | Create a new job requisition |
-| `PUT` | `/api/jobs/{id}` | HR Admin | Update job requisition details or toggle active status |
-| `POST`| `/api/jobs/sync-cats` | HR Admin | Scrape and sync open positions from Tangentia CATS Careers ATS |
-| `GET` | `/api/jobs/sync-cats/preview` | HR Admin | Preview scraped job openings from Tangentia CATS Careers ATS |
+| `PUT` | `/api/jobs/{id}` | HR Admin | Update requisition details or active status |
+| `POST`| `/api/jobs/sync-cats` | HR Admin | Manually trigger CATS ATS web scraper sync |
+| `GET` | `/api/jobs/sync-cats/preview` | HR Admin | Preview live open jobs from CATS ATS |
 | `POST`| `/api/referrals/check-duplicate` | Employee | Pre-submission duplicate candidate detection |
-| `POST`| `/api/referrals` | Employee | Submit candidate referral with multipart CV document |
+| `POST`| `/api/referrals/extract-cv` | Employee | Auto-fill extraction from candidate CV file |
+| `POST`| `/api/referrals` | Employee | Submit candidate referral with CV document |
 | `GET` | `/api/referrals` | Employee | List current employee's submitted referrals |
+| `GET` | `/api/referrals/hired-history` | Employee / HR | List hired candidate referral history |
+| `GET` | `/api/referrals/hired-history/excel-export` | Employee / HR | Download Hired Referral History Excel sheet |
 | `GET` | `/api/referrals/{id}` | Employee / HR | Retrieve candidate referral details |
 | `GET` | `/api/referrals/{id}/cv` | Employee / HR | Authenticated proxy download of candidate CV |
-| `PUT` | `/api/referrals/{id}/withdraw` | Referrer | Withdraw candidate referral from active review |
+| `PUT` | `/api/referrals/{id}/withdraw` | Referrer | Withdraw candidate referral from review |
 | `GET` | `/api/hr/referrals` | HR Admin | Full candidate referral database with filters |
-| `PUT` | `/api/hr/referrals/{id}/status` | HR Admin | Update candidate referral pipeline status & log audit |
+| `PUT` | `/api/hr/referrals/{id}/status` | HR Admin | Update candidate referral status & write audit log |
 | `DELETE`| `/api/hr/referrals/{id}` | HR Admin | Permanently delete referral from DB and Excel |
 | `GET` | `/api/hr/referrals/{id}/notes` | HR Admin | Retrieve confidential internal HR notes |
-| `POST`| `/api/hr/referrals/{id}/notes` | HR Admin | Add confidential internal HR evaluation note |
-| `GET` | `/api/hr/referrals/excel-export` | HR Admin | Download live Microsoft Excel workbook (`.xlsx`) |
+| `POST`| `/api/hr/referrals/{id}/notes` | HR Admin | Add confidential internal HR note |
+| `GET` | `/api/hr/referrals/excel-export` | HR Admin | Download full Microsoft Excel workbook (`.xlsx`) |
 | `GET` | `/api/hr/analytics` | HR Admin | Conversion funnel, department metrics, top referrers |
-
----
-
-## 🔄 Tangentia CATS Careers ATS Scraper & Sync
-
-The portal includes an automated web scraper engine located at [`backend/app/services/cats_scraper.py`](file:///home/vansh2004/Work/Tangentia-Referral-Portal/backend/app/services/cats_scraper.py) designed to keep internal employee referral opportunities synchronized with Tangentia's official public ATS portal ([`https://tangentia.catsone.com/careers/9463-General`](https://tangentia.catsone.com/careers/9463-General)).
-
-### Core Capabilities
-* **Live Scraping**: Crawls the general portal and individual requisition pages to extract role titles, geographical locations, and detailed job specifications.
-* **1–2 Liner Summarization**: Eliminates boilerplate styling, embedded `<style>`/`<script>` tags, and generic headers (*Key Responsibilities*, *Job Summary*, *Role Overview*), distilling multi-paragraph postings into clean, readable 1–2 sentence descriptions (~180–200 characters).
-* **Automated Taxonomy Categorization**: Intelligently classifies roles into corporate departments (*Intelligent Automation*, *Cloud & Integration*, *Data & Analytics*, *Finance & Enterprise*, *Global Sales*, *Project & Product Management*, *Engineering*) and detects employment terms (*Full-time*, *Contract*, *Internship*).
-* **Dual-Store Persistence**: Upserts positions into the in-memory SQLite query engine and immediately writes through to `Tangentia_Referrals.xlsx` via `openpyxl` / Microsoft Graph.
-* **Idempotent Sync**: Positions use deterministic IDs (`cats-{cats_job_id}`), ensuring re-syncing updates existing postings without creating duplicates or breaking existing candidate referrals.
-
-### How to Trigger Synchronization
-
-#### 1. Via HR Web UI (Recommended)
-1. Switch to the **HR / Admin** role using the top-right profile selector.
-2. Navigate to **Job Openings** in the sidebar.
-3. Click the **"Sync CATS ATS"** button. The portal will scrape live listings, update the database and Excel workbook, and refresh the UI grid immediately.
-
-#### 2. Via REST API
-Send an authenticated `POST` request (HR Admin permissions required):
-```bash
-curl -X POST http://localhost:8000/api/jobs/sync-cats \
-  -H "Authorization: Bearer dev-hr-token"
-```
-
-#### 3. Via Python CLI
-```bash
-cd backend
-PYTHONPATH=. .venv/bin/python -c "
-from app.database import SessionLocal, Base, engine
-from app.services.cats_scraper import sync_cats_jobs_with_db
-
-Base.metadata.create_all(bind=engine)
-db = SessionLocal()
-res = sync_cats_jobs_with_db(db)
-print(res['message'])
-db.close()
-"
-```
+| `GET` | `/api/cv-intelligence/status` | HR Admin | Returns CV Intelligence system & queue status |
+| `GET` | `/api/cv-intelligence/suggestions` | HR Admin | Get AI suggestions across active job requisitions |
+| `GET` | `/api/cv-intelligence/candidates/{id}`| HR Admin | Get deep AI Candidate Intelligence dossier |
+| `POST`| `/api/cv-intelligence/process/{id}` | HR Admin | Manually trigger AI extraction/scoring for a CV |
+| `GET` | `/api/historical-suggestions/positions/{id}`| HR Admin | Get passive historical candidate suggestions for job |
 
 ---
 
 ## 🐳 Production Deployment (Docker)
 
-To deploy the entire production stack (FastAPI backend + PostgreSQL 16 database + Nginx frontend SPA) using Docker Compose:
+Deploy the full production stack (FastAPI backend + PostgreSQL 16 + Nginx frontend SPA) using Docker Compose:
 
 ```bash
-# 1. Start all containers
+# 1. Start containers in detached mode
 docker-compose up -d --build
 
 # 2. Apply database migrations
@@ -404,17 +487,17 @@ docker-compose exec backend alembic upgrade head
 
 ## 🛡️ Security & Compliance Highlights
 
-- **Server-Side Signature Verification**: Tokens are cryptographically validated against Microsoft JWKS public keys. Client-supplied identity headers are never trusted in production.
-- **Strict Role Boundaries**: HR routes (`/api/hr/*`) enforce `require_hr_admin`. Employees are strictly restricted to their own submitted referrals (`referred_by_user_id == current_user.id`).
-- **Zero CV Data Leaks**: Internal SharePoint URLs and Graph access tokens are never exposed to client browsers. All downloads are proxied through authenticated backend streams.
-- **File Validation & Anti-Traversal**: Resumes are checked for valid PDF/DOCX magic bytes (`%PDF-`, `PK\x03\x04`), 10MB limits, and strict filename sanitization to eliminate path-traversal attacks.
-- **Consent Tracking**: Mandatory explicit candidate consent confirmation stored on every referral record for GDPR/compliance.
+- **Server-Side Token Verification**: Tokens are cryptographically validated against Microsoft Entra ID JWKS public keys.
+- **Strict Role-Based Access Control (RBAC)**: HR endpoints (`/api/hr/*`, `/api/cv-intelligence/*`) enforce strict admin authorization. Regular employees can only view their own referrals.
+- **Zero Raw Document Exposure**: SharePoint document URLs and storage credentials are never exposed to browsers; all file downloads stream securely through authenticated backend proxies.
+- **Magic-Byte & Anti-Traversal Validation**: Uploaded resumes undergo magic-byte signature checking (`%PDF-`, `PK\x03\x04`), 10MB file caps, and path sanitization.
+- **Explicit GDPR Candidate Consent**: Mandatory candidate consent tracking recorded on every referral submission.
 
 ---
 
 ## 🧪 Running Automated Tests
 
-Run the comprehensive pytest test suite (100% passing):
+Run the backend test suite:
 
 ```bash
 cd backend
@@ -425,4 +508,4 @@ PYTHONPATH=. .venv/bin/pytest tests/ -v
 
 ## 👨‍💻 Maintainer
 
-Created and maintained by **[VickytheWicked](https://github.com/VickytheWicked)** (`rupeshvansh84@gmail.com`).
+Engineered and maintained by **[VickytheWicked](https://github.com/VickytheWicked)** (`rupeshvansh84@gmail.com`).

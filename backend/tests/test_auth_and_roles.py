@@ -92,3 +92,40 @@ def test_hr_admin_can_access_analytics(client):
     data = res.json()
     assert "total_referrals" in data
     assert "funnel" in data
+
+
+def test_password_hashing_and_verification():
+    from app.services.auth_service import hash_password, verify_password
+    plain = "TangentiaHR@2026"
+    hashed = hash_password(plain)
+
+    assert hashed.startswith("pbkdf2_sha256$")
+    assert verify_password(plain, hashed) is True
+    assert verify_password("WrongPassword", hashed) is False
+    # Legacy plaintext backward compatibility
+    assert verify_password(plain, plain) is True
+    assert verify_password("WrongPassword", plain) is False
+
+
+def test_production_environment_blocks_dev_backdoor_tokens(client, monkeypatch):
+    from app.config import settings
+
+    # Simulate production environment with proper JWT_SECRET_KEY configured
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "DEV_MODE", False)
+    monkeypatch.setattr(settings, "JWT_SECRET_KEY", "production-test-secure-random-key-64-bytes")
+
+
+    # Dev token should now be strictly rejected with 401
+    headers = {"Authorization": "Bearer dev-hr-token"}
+    res = client.get("/api/hr/referrals", headers=headers)
+    assert res.status_code == 401
+
+    headers_emp = {"Authorization": "Bearer dev-employee-token"}
+    res_emp = client.get("/api/hr/referrals", headers=headers_emp)
+    assert res_emp.status_code == 401
+
+    # X-Dev-Role header bypass should also be strictly rejected
+    res_header = client.get("/api/hr/referrals", headers={"X-Dev-Role": "hr_admin"})
+    assert res_header.status_code == 401
+

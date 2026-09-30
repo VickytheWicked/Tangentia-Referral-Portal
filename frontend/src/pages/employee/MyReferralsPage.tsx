@@ -15,14 +15,17 @@ import {
   AlertCircle,
   RotateCcw,
 } from 'lucide-react';
+import { onReferralUpdated } from '../../services/referralEvents';
 
 interface MyReferralsPageProps {
   onNavigate: (tab: string) => void;
 }
 
+let cachedMyReferrals: ReferralSummary[] = [];
+
 export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) => {
-  const [referrals, setReferrals] = useState<ReferralSummary[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [referrals, setReferrals] = useState<ReferralSummary[]>(() => cachedMyReferrals);
+  const [isLoading, setIsLoading] = useState<boolean>(() => cachedMyReferrals.length === 0);
   const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedReferral, setSelectedReferral] = useState<ReferralDetail | null>(null);
@@ -32,20 +35,40 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
     referralNumber?: string;
   } | null>(null);
 
-  const fetchReferrals = async () => {
-    setIsLoading(true);
+  const fetchReferrals = async (silent = false) => {
+    if (!silent && referrals.length === 0 && cachedMyReferrals.length === 0) {
+      setIsLoading(true);
+    }
     try {
       const data = await api.getMyReferrals();
-      setReferrals(data);
+      if (Array.isArray(data) && (data.length > 0 || !silent || cachedMyReferrals.length === 0)) {
+        cachedMyReferrals = data;
+        setReferrals(data);
+      }
     } catch (err) {
       console.error('Failed to load referrals:', err);
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchReferrals();
+
+    const unsubscribe = onReferralUpdated(() => {
+      fetchReferrals(true);
+    });
+
+    const timer = setInterval(() => {
+      fetchReferrals(true);
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
   }, []);
 
   const openDetail = async (id: string) => {
@@ -142,7 +165,7 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
         </div>
 
         {/* Table */}
-        {isLoading ? (
+        {isLoading && referrals.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
             Loading referrals...
           </div>

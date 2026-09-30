@@ -14,34 +14,63 @@ import {
   Search,
   Filter,
 } from 'lucide-react';
+import { onReferralUpdated } from '../../services/referralEvents';
 
 interface HRDashboardProps {
   onNavigate: (tab: string) => void;
   onOpenCandidate: (id: string) => void;
 }
 
-export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCandidate }) => {
-  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
-  const [recentReferrals, setRecentReferrals] = useState<ReferralSummary[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+let cachedAnalytics: AnalyticsResponse | null = null;
+let cachedRecentReferrals: ReferralSummary[] = [];
 
-  useEffect(() => {
-    const loadData = async () => {
+export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCandidate }) => {
+  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(() => cachedAnalytics);
+  const [recentReferrals, setRecentReferrals] = useState<ReferralSummary[]>(() => cachedRecentReferrals);
+  const [isLoading, setIsLoading] = useState<boolean>(() => !cachedAnalytics);
+
+  const loadData = async (silent = false) => {
+    if (!silent && !analytics && !cachedAnalytics) {
       setIsLoading(true);
-      try {
-        const [anData, refData] = await Promise.all([
-          api.getAnalytics(),
-          api.getAllReferrals(),
-        ]);
+    }
+    try {
+      const [anData, refData] = await Promise.all([
+        api.getAnalytics(),
+        api.getAllReferrals(),
+      ]);
+      // Guard metrics from dropping to zero during background processing or transient reloads
+      if (anData && (anData.total_referrals > 0 || !cachedAnalytics || cachedAnalytics.total_referrals === 0)) {
+        cachedAnalytics = anData;
         setAnalytics(anData);
-        setRecentReferrals(refData.slice(0, 8));
-      } catch (err) {
-        console.error('Failed to load HR dashboard data:', err);
-      } finally {
+      }
+      if (Array.isArray(refData) && (refData.length > 0 || !silent || cachedRecentReferrals.length === 0)) {
+        cachedRecentReferrals = refData.slice(0, 8);
+        setRecentReferrals(cachedRecentReferrals);
+      }
+    } catch (err) {
+      console.error('Failed to load HR dashboard data:', err);
+    } finally {
+      if (!silent) {
         setIsLoading(false);
       }
-    };
+    }
+  };
+
+  useEffect(() => {
     loadData();
+
+    const unsubscribe = onReferralUpdated(() => {
+      loadData(true);
+    });
+
+    const timer = setInterval(() => {
+      loadData(true);
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
   }, []);
 
   const handleDownloadCV = async (refId: string, filename: string) => {
@@ -193,7 +222,7 @@ export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCand
           </button>
         </div>
 
-        {isLoading ? (
+        {isLoading && recentReferrals.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
             Loading submissions...
           </div>

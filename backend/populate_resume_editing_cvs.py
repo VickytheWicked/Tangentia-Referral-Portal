@@ -400,7 +400,6 @@ async def populate_cvs_and_test():
             candidate_phone=item["candidate_phone"],
             referred_by_name="Vansh Rupesh (Employee)",
             referred_by_email="employee@tangentia.com",
-            referred_by_phone="+91 98200 12345",
             years_of_experience=item["years"],
             relationship=item["relationship"],
             position_id=item["position_id"],

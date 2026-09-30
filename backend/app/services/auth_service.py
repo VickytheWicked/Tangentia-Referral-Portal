@@ -1,4 +1,7 @@
 import logging
+import hashlib
+import hmac
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple
 from jose import jwt, JWTError, ExpiredSignatureError
@@ -11,9 +14,47 @@ from app.services.excel import get_excel_service
 
 logger = logging.getLogger(__name__)
 
-JWT_SECRET_KEY = getattr(settings, "JWT_SECRET_KEY", "tangentia-portal-super-secret-jwt-key-2026")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_DAYS = 7
+
+
+def hash_password(password: str) -> str:
+    """Hash password using PBKDF2-HMAC-SHA256 with a unique random 16-byte salt."""
+    salt = secrets.token_hex(16)
+    iterations = 100_000
+    hash_bytes = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations)
+    return f"pbkdf2_sha256${iterations}${salt}${hash_bytes.hex()}"
+
+
+def verify_password(plain_password: str, stored_password_or_hash: str) -> bool:
+    """
+    Verify a plain password against a stored PBKDF2 hash or legacy plaintext.
+    Uses constant-time comparison to prevent timing attacks.
+    """
+    if not stored_password_or_hash or not plain_password:
+        return False
+    stored = stored_password_or_hash.strip()
+    plain = plain_password.strip()
+
+    if stored.startswith("pbkdf2_sha256$"):
+        parts = stored.split("$")
+        if len(parts) == 4:
+            try:
+                iterations = int(parts[1])
+                salt = parts[2]
+                expected_hash_hex = parts[3]
+                computed = hashlib.pbkdf2_hmac(
+                    "sha256",
+                    plain.encode("utf-8"),
+                    salt.encode("utf-8"),
+                    iterations,
+                ).hex()
+                return hmac.compare_digest(computed, expected_hash_hex)
+            except Exception:
+                return False
+
+    # Fallback constant-time comparison for legacy unhashed entries
+    return hmac.compare_digest(plain.encode("utf-8"), stored.encode("utf-8"))
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
@@ -21,13 +62,13 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=JWT_EXPIRATION_DAYS))
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> Dict[str, Any]:
     """Decode and validate a JWT access token"""
-    # Development / test tokens bypass
-    if settings.DEV_MODE:
+    # Development / test tokens bypass — strictly disallowed in production
+    if settings.is_dev_token_allowed:
         if token == "dev-hr-token" or token.startswith("dev-hr"):
             return {
                 "sub": "user-hr-001",
@@ -44,7 +85,7 @@ def decode_access_token(token: str) -> Dict[str, Any]:
             }
 
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[JWT_ALGORITHM])
         return payload
     except ExpiredSignatureError:
         raise HTTPException(
@@ -119,12 +160,15 @@ def authenticate_hr_user(db: Session, email: str, password: str) -> Tuple[User, 
             detail="Access restricted to HR administrators only. Employees do not require a login.",
         )
 
-    # 4. Verify password
-    if not target_password or target_password.strip() != password.strip():
+    # 4. Verify password securely using constant-time hash comparison
+    if not verify_password(password, target_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Password incorrect. Please check your password and try again.",
         )
+
+    # Compute secure hash for database storage (never store plaintext)
+    secure_db_password = target_password if (target_password and target_password.startswith("pbkdf2_sha256$")) else hash_password(password)
 
     # 5. Sync to database
     if not db_user:
@@ -132,7 +176,7 @@ def authenticate_hr_user(db: Session, email: str, password: str) -> Tuple[User, 
             id=target_id or f"user-hr-{clean_email.split('@')[0]}",
             name=target_name,
             email=clean_email,
-            password=target_password,
+            password=secure_db_password,
             role=UserRole.HR_ADMIN.value,
             department=target_dept,
         )
@@ -144,12 +188,13 @@ def authenticate_hr_user(db: Session, email: str, password: str) -> Tuple[User, 
         if db_user.role != UserRole.HR_ADMIN.value:
             db_user.role = UserRole.HR_ADMIN.value
             updated = True
-        if target_password and db_user.password != target_password:
-            db_user.password = target_password
+        if not db_user.password or not db_user.password.startswith("pbkdf2_sha256$") or not verify_password(password, db_user.password):
+            db_user.password = secure_db_password
             updated = True
         if updated:
             db.commit()
             db.refresh(db_user)
+
 
     # 6. Issue access token
     token = create_access_token({

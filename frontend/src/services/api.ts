@@ -22,10 +22,10 @@ import { HistoricalSuggestionsResponse } from '../types/historical_suggestions';
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
 
 // Clear any legacy persistent tokens from localStorage to prevent accidental auto-login
-try {
-  localStorage.removeItem('tangentia_auth_token');
-  localStorage.removeItem('dev_role');
-} catch {}
+// try {
+//   localStorage.removeItem('tangentia_auth_token');
+//   localStorage.removeItem('dev_role');
+// } catch {}
 
 // Auth token stored in sessionStorage for the active HR Administrator tab session
 let currentAuthToken: string | null = sessionStorage.getItem('tangentia_auth_token');
@@ -46,7 +46,7 @@ export const setAuthToken = (token: string | null) => {
     sessionStorage.removeItem('tangentia_auth_token');
     try {
       localStorage.removeItem('tangentia_auth_token');
-    } catch {}
+    } catch { }
   }
 };
 
@@ -66,10 +66,15 @@ const getHeaders = (isMultipart: boolean = false): HeadersInit => {
   return headers;
 };
 
-// Resilient fetch wrapper with 25s timeout to prevent UI hangs during network stalls
-const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+// Resilient fetch wrapper with customizable timeout (default 25s, extended for AI extraction & uploads)
+interface CustomRequestInit extends RequestInit {
+  timeoutMs?: number;
+}
+
+const fetchWithTimeout = async (input: RequestInfo | URL, init?: CustomRequestInit): Promise<Response> => {
+  const timeoutMs = init?.timeoutMs || 25000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await window.fetch(input, {
       ...init,
@@ -77,7 +82,7 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit): P
     });
   } catch (err: any) {
     if (err.name === 'AbortError') {
-      throw new Error('Network request timed out. Please check your connection and try again.');
+      throw new Error(`Network request timed out (${Math.round(timeoutMs / 1000)}s). Please check your connection and try again.`);
     }
     throw err;
   } finally {
@@ -187,7 +192,7 @@ export const api = {
     return handleResponse<DuplicateCheckResponse>(res);
   },
 
-  // Extract CV Details for Autofill
+  // Extract CV Details for Autofill (allows up to 60s for AI processing and model fallbacks)
   async extractCV(file: File): Promise<CVExtractionPreview> {
     const formData = new FormData();
     formData.append('file', file);
@@ -195,16 +200,18 @@ export const api = {
       method: 'POST',
       headers: getHeaders(true),
       body: formData,
+      timeoutMs: 60000,
     });
     return handleResponse<CVExtractionPreview>(res);
   },
 
-  // Submit Referral
+  // Submit Referral (allows up to 60s for SharePoint upload, Excel sync, and validation)
   async submitReferral(formData: FormData): Promise<ReferralSummary> {
     const res = await fetch(`${API_BASE}/referrals`, {
       method: 'POST',
       headers: getHeaders(true),
       body: formData,
+      timeoutMs: 60000,
     });
     return handleResponse<ReferralSummary>(res);
   },

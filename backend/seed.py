@@ -8,6 +8,8 @@ from app.models.status_history import ReferralStatusHistory
 from app.models.hr_note import HRNote
 from app.config import settings
 
+from app.services.auth_service import hash_password
+
 # PDF header signature
 SAMPLE_PDF_BYTES = b"%PDF-1.4\n1 0 obj\n<<\n/Title (Sample Candidate Resume)\n/Author (Tangentia)\n>>\nendobj\ntrailer\n<<\n/Root 1 0 R\n>>\n%%EOF"
 
@@ -24,7 +26,7 @@ def seed_database():
                 entra_user_id="user-dev-hr-001",
                 name="Marcus Vance",
                 email="hr.lead@tangentia.com",
-                password="TangentiaHR@2026",
+                password=hash_password("TangentiaHR@2026"),
                 role=UserRole.HR_ADMIN.value,
                 department="Human Resources",
             )

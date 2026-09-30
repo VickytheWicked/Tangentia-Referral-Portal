@@ -1,6 +1,7 @@
 import re
 import json
 import logging
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
@@ -136,7 +137,7 @@ class CVIntelligenceService:
             gemini_available = False
             try:
                 extractor = get_cv_extractor()
-                gemini_data = extractor.extract(cv_text)
+                gemini_data = await asyncio.to_thread(extractor.extract, cv_text)
                 gemini_available = True
             except Exception as ex:
                 logger.warning(f"Live Gemini extraction unavailable for referral {referral_id} ({ex}).")
@@ -311,7 +312,8 @@ class CVIntelligenceService:
             # 6. Compute job matching against referral's target position
             position = db.query(JobPosition).filter(JobPosition.id == referral.position_id).first()
             if position:
-                match_level, matched_skills, missing_skills, exp_match, explanation, fit_summary = llm_match_candidate_to_job(
+                match_res = await asyncio.to_thread(
+                    llm_match_candidate_to_job,
                     candidate_skills=profile.skills,
                     candidate_years_exp=profile.years_of_experience,
                     candidate_projects=profile.projects,
@@ -320,6 +322,7 @@ class CVIntelligenceService:
                     job_department=position.department,
                     job_description=position.description,
                 )
+                match_level, matched_skills, missing_skills, exp_match, explanation, fit_summary = match_res
 
                 # If Gemini was unavailable and we had prior match details in cv_db, preserve rich fit_summary:
                 if not gemini_available and prior_match:
@@ -354,7 +357,8 @@ class CVIntelligenceService:
                 # Generate evidence-based requirement analysis (new — additive)
                 try:
                     from app.cv_intelligence.requirement_analyzer import generate_requirement_analysis
-                    req_analysis = generate_requirement_analysis(
+                    req_analysis = await asyncio.to_thread(
+                        generate_requirement_analysis,
                         position_id=position.id,
                         job_title=position.title,
                         department=position.department,
@@ -442,6 +446,7 @@ class CVIntelligenceService:
             strong_matches = []
             good_matches = []
             potential_matches = []
+            irrelevant_matches = []
             pending_extraction = []
             failed_extraction = []
 
@@ -466,6 +471,10 @@ class CVIntelligenceService:
                         priority_score += 300
                     elif match.match_level == MatchLevel.GOOD_MATCH.value:
                         priority_score += 200
+                    elif match.match_level == MatchLevel.POTENTIAL_MATCH.value:
+                        priority_score += 100
+                    elif match.match_level == MatchLevel.IRRELEVANT.value:
+                        priority_score += 0
                     else:
                         priority_score += 100
                     priority_score += len(match.matched_skills) * 15
@@ -488,7 +497,7 @@ class CVIntelligenceService:
                     priority_score=priority_score,
                 )
 
-                if not profile or profile.extraction_status == ExtractionStatus.PENDING.value:
+                if not profile or profile.extraction_status in (ExtractionStatus.PENDING.value, ExtractionStatus.PROCESSING.value):
                     pending_extraction.append(summary)
                 elif profile.extraction_status == ExtractionStatus.FAILED.value:
                     failed_extraction.append(summary)
@@ -497,6 +506,8 @@ class CVIntelligenceService:
                         strong_matches.append(summary)
                     elif match.match_level == MatchLevel.GOOD_MATCH.value:
                         good_matches.append(summary)
+                    elif match.match_level == MatchLevel.IRRELEVANT.value:
+                        irrelevant_matches.append(summary)
                     else:
                         potential_matches.append(summary)
                 else:
@@ -506,20 +517,10 @@ class CVIntelligenceService:
             strong_matches.sort(key=lambda s: s.priority_score, reverse=True)
             good_matches.sort(key=lambda s: s.priority_score, reverse=True)
             potential_matches.sort(key=lambda s: s.priority_score, reverse=True)
-
-            from app.cv_intelligence.guidance import get_hr_decision_guidance
+            irrelevant_matches.sort(key=lambda s: s.priority_score, reverse=True)
 
             expected_skills_raw, min_exp = extract_keywords_from_job(pos.title, pos.department, pos.description or "")
             formatted_skills = sorted([s.capitalize() if len(s) > 3 else s.upper() for s in expected_skills_raw])[:6]
-
-            guidance = get_hr_decision_guidance(
-                position_id=pos.id,
-                job_title=pos.title,
-                department=pos.department,
-                description=pos.description or "",
-                min_exp_years=min_exp,
-                expected_skills=formatted_skills,
-            )
 
             results.append(
                 OpeningSuggestionsResponse(
@@ -531,12 +532,10 @@ class CVIntelligenceService:
                     description=pos.description,
                     expected_skills=formatted_skills,
                     min_experience_years=min_exp,
-                    selection_criteria=guidance.get("selection_criteria", []),
-                    key_qualities=guidance.get("key_qualities", []),
-                    hiring_guidance=guidance.get("hiring_guidance"),
                     strong_matches=strong_matches,
                     good_matches=good_matches,
                     potential_matches=potential_matches,
+                    irrelevant_matches=irrelevant_matches,
                     pending_extraction=pending_extraction,
                     failed_extraction=failed_extraction,
                     total_candidates=len(referrals),

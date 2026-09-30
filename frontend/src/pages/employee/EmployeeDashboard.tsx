@@ -22,18 +22,22 @@ import {
   MapPin,
   ArrowRight,
 } from 'lucide-react';
+import { onReferralUpdated } from '../../services/referralEvents';
 
 interface EmployeeDashboardProps {
   onNavigate: (tab: string) => void;
 }
 
+let cachedEmployeeReferrals: ReferralSummary[] = [];
+let cachedEmployeeOpenings: JobPosition[] = [];
+
 export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [referrals, setReferrals] = useState<ReferralSummary[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [openings, setOpenings] = useState<JobPosition[]>([]);
-  const [isOpeningsLoading, setIsOpeningsLoading] = useState<boolean>(true);
+  const [referrals, setReferrals] = useState<ReferralSummary[]>(() => cachedEmployeeReferrals);
+  const [isLoading, setIsLoading] = useState<boolean>(() => cachedEmployeeReferrals.length === 0);
+  const [openings, setOpenings] = useState<JobPosition[]>(() => cachedEmployeeOpenings);
+  const [isOpeningsLoading, setIsOpeningsLoading] = useState<boolean>(() => cachedEmployeeOpenings.length === 0);
   const [search, setSearch] = useState<string>('');
   const [selectedReferral, setSelectedReferral] = useState<ReferralDetail | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState<boolean>(false);
@@ -43,33 +47,60 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
     referralNumber?: string;
   } | null>(null);
 
-  const fetchReferrals = async () => {
-    setIsLoading(true);
+  const fetchReferrals = async (silent = false) => {
+    if (!silent && referrals.length === 0 && cachedEmployeeReferrals.length === 0) {
+      setIsLoading(true);
+    }
     try {
       const data = await api.getMyReferrals();
-      setReferrals(data);
+      if (Array.isArray(data) && (data.length > 0 || !silent || cachedEmployeeReferrals.length === 0)) {
+        cachedEmployeeReferrals = data;
+        setReferrals(data);
+      }
     } catch (err) {
       console.error('Failed to load referrals:', err);
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const fetchOpenings = async () => {
-    setIsOpeningsLoading(true);
+  const fetchOpenings = async (silent = false) => {
+    if (!silent && openings.length === 0 && cachedEmployeeOpenings.length === 0) {
+      setIsOpeningsLoading(true);
+    }
     try {
       const data = await api.getJobs(false);
-      setOpenings(data);
+      if (Array.isArray(data) && (data.length > 0 || !silent || cachedEmployeeOpenings.length === 0)) {
+        cachedEmployeeOpenings = data;
+        setOpenings(data);
+      }
     } catch (err) {
       console.error('Failed to load openings:', err);
     } finally {
-      setIsOpeningsLoading(false);
+      if (!silent) {
+        setIsOpeningsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchReferrals();
     fetchOpenings();
+
+    const unsubscribe = onReferralUpdated(() => {
+      fetchReferrals(true);
+    });
+
+    const timer = setInterval(() => {
+      fetchReferrals(true);
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
   }, []);
 
   const openDetail = async (refSummary: ReferralSummary) => {
@@ -420,7 +451,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
           </div>
         </div>
 
-        {isLoading ? (
+        {isLoading && referrals.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
             Loading referrals...
           </div>

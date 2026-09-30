@@ -1,6 +1,6 @@
 import re
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Tuple, Optional
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
@@ -65,12 +65,27 @@ def check_duplicate_candidate(
     trimmed_name = candidate_name.strip()
     norm_name = trimmed_name.lower()
 
-    # Query all active referrals
+    # Calculate duplicate window cutoff (default: 180 days / ~6 months).
+    # If a referral was submitted more than 6 months ago, it is treated as a new
+    # submission and will not trigger a duplicate warning.
+    window_days = getattr(settings, "REFERRAL_DUPLICATE_WINDOW_DAYS", 180)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=window_days)
+
+    # Query active referrals submitted within the last 6 months
     candidates = db.query(Referral).filter(
-        Referral.status != ReferralStatus.WITHDRAWN.value
+        Referral.status != ReferralStatus.WITHDRAWN.value,
+        Referral.created_at >= cutoff_date,
     ).all()
 
     for ref in candidates:
+        # Extra safeguard for timezone-naive timestamps or SQLite conversions
+        if ref.created_at:
+            ref_created = ref.created_at
+            if ref_created.tzinfo is None:
+                ref_created = ref_created.replace(tzinfo=timezone.utc)
+            if ref_created < cutoff_date:
+                continue
+
         reasons = []
         ref_trimmed_email = (ref.candidate_email or "").strip()
         ref_norm_email = ref_trimmed_email.lower()
@@ -111,6 +126,53 @@ def check_duplicate_candidate(
     )
 
 
+def find_candidate_older_than_window(
+    db: Session,
+    candidate_email: str,
+    candidate_phone: str,
+    candidate_name: str,
+    position_id: str,
+) -> Optional[Referral]:
+    """
+    Check if a candidate with matching email, phone, or name was previously referred
+    more than 6 months (180 days) ago. If found, returns the existing record so it
+    can be updated/overridden in place rather than creating a duplicate row.
+    """
+    window_days = getattr(settings, "REFERRAL_DUPLICATE_WINDOW_DAYS", 180)
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=window_days)
+
+    norm_email = candidate_email.strip().lower()
+    norm_phone = normalize_phone(candidate_phone.strip())
+    norm_name = candidate_name.strip().lower()
+
+    candidates = db.query(Referral).filter(
+        Referral.status != ReferralStatus.WITHDRAWN.value,
+        Referral.created_at < cutoff_date,
+    ).order_by(Referral.created_at.desc()).all()
+
+    for ref in candidates:
+        if ref.created_at:
+            ref_created = ref.created_at
+            if ref_created.tzinfo is None:
+                ref_created = ref_created.replace(tzinfo=timezone.utc)
+            if ref_created >= cutoff_date:
+                continue
+
+        ref_email = (ref.candidate_email or "").strip().lower()
+        if norm_email and ref_email == norm_email:
+            return ref
+
+        ref_phone = normalize_phone((ref.candidate_phone or "").strip())
+        if norm_phone and ref_phone and ref_phone == norm_phone:
+            return ref
+
+        ref_name = (ref.candidate_name or "").strip().lower()
+        if norm_name and ref_name == norm_name and ref.position_id == position_id:
+            return ref
+
+    return None
+
+
 async def create_referral_with_cv(
     db: Session,
     form_data: ReferralCreateForm,
@@ -119,12 +181,13 @@ async def create_referral_with_cv(
     sharepoint_service: SharePointServiceInterface,
 ) -> Referral:
     """
-    Atomic referral creation:
+    Atomic referral creation or update:
     1. Validate file format & magic bytes.
     2. Check position validity.
-    3. Generate standardized filename.
+    3. If candidate was submitted > 6 months ago, override/update the existing database row.
+       Otherwise, generate a new referral number and create a new row.
     4. Upload CV to SharePoint document library.
-    5. Save Referral and ReferralStatusHistory to PostgreSQL.
+    5. Save/update Referral and append ReferralStatusHistory audit record to PostgreSQL.
     6. Rollback SharePoint file if DB transaction fails.
     """
     if not form_data.candidate_consent:
@@ -202,8 +265,27 @@ async def create_referral_with_cv(
             logger.warning(f"Jev relevance gate skipped (non-blocking): {jev_err}")
     # ─── End Jev Pre-Screen ────────────────────────────────────────────────────
 
-    # Generate atomic referral number & standardized SharePoint filename
-    ref_number = generate_referral_number(db)
+    # Check if a prior referral exists for this candidate older than the 6-month cutoff window.
+    # If so, we override the existing row rather than inserting a brand-new row.
+    existing_old_ref = find_candidate_older_than_window(
+        db=db,
+        candidate_email=form_data.candidate_email,
+        candidate_phone=form_data.candidate_phone,
+        candidate_name=form_data.candidate_name,
+        position_id=position.id,
+    )
+
+    if existing_old_ref:
+        ref_number = existing_old_ref.referral_number
+        is_override = True
+        logger.info(
+            f"Candidate re-submitted after 6+ months. Overriding existing referral row: "
+            f"id={existing_old_ref.id}, referral_number={ref_number}"
+        )
+    else:
+        ref_number = generate_referral_number(db)
+        is_override = False
+
     stored_filename = generate_sharepoint_filename(
         referral_number=ref_number,
         candidate_name=form_data.candidate_name,
@@ -226,47 +308,102 @@ async def create_referral_with_cv(
             detail="Referral submission could not be completed. The CV could not be uploaded to SharePoint. Please try again.",
         )
 
-    # Step 2: Save to Database
+    # Step 2: Save or Update in Database
     try:
         referral_referrer = (form_data.referred_by_name.strip() if form_data.referred_by_name else None) or (current_user.name if current_user else "Employee")
         referral_referrer_email = (str(form_data.referred_by_email).strip().lower() if form_data.referred_by_email else None) or (current_user.email if current_user else None)
-        referral_referrer_phone = (str(form_data.referred_by_phone).strip() if form_data.referred_by_phone else None)
-        referral = Referral(
-            referral_number=ref_number,
-            candidate_name=form_data.candidate_name.strip(),
-            candidate_email=form_data.candidate_email.lower().strip(),
-            candidate_phone=form_data.candidate_phone.strip(),
-            linkedin_url=form_data.linkedin_url.strip() if form_data.linkedin_url else None,
-            github_url=form_data.github_url.strip() if form_data.github_url else None,
-            years_of_experience=form_data.years_of_experience,
-            relationship=form_data.relationship.strip(),
-            referral_note=form_data.referral_note.strip(),
-            position_id=position.id,
-            referred_by_user_id=current_user.id,
-            referred_by_name=referral_referrer,
-            referred_by_email=referral_referrer_email,
-            referred_by_phone=referral_referrer_phone,
-            status=ReferralStatus.SUBMITTED.value,
-            sharepoint_drive_id=upload_result.drive_id,
-            sharepoint_item_id=upload_result.item_id,
-            sharepoint_file_id=upload_result.file_id,
-            sharepoint_file_url=upload_result.web_url,
-            original_filename=file.filename,
-            stored_filename=stored_filename,
-            candidate_consent=True,
-        )
-        db.add(referral)
-        db.flush()  # assign referral.id
+        now = datetime.now(timezone.utc)
 
-        # Add initial audit history record
-        history_entry = ReferralStatusHistory(
-            referral_id=referral.id,
-            old_status=None,
-            new_status=ReferralStatus.SUBMITTED.value,
-            changed_by_user_id=current_user.id,
-            comment=f"Referral submitted by {referral_referrer}.",
-        )
-        db.add(history_entry)
+        if is_override and existing_old_ref:
+            referral = existing_old_ref
+            old_status = referral.status
+            referral.candidate_name = form_data.candidate_name.strip()
+            referral.candidate_email = form_data.candidate_email.lower().strip()
+            referral.candidate_phone = form_data.candidate_phone.strip()
+            referral.linkedin_url = form_data.linkedin_url.strip() if form_data.linkedin_url else None
+            referral.github_url = form_data.github_url.strip() if form_data.github_url else None
+            referral.years_of_experience = form_data.years_of_experience
+            referral.relationship = form_data.relationship.strip()
+            referral.referral_note = form_data.referral_note.strip()
+            referral.position_id = position.id
+            referral.referred_by_user_id = current_user.id
+            referral.referred_by_name = referral_referrer
+            referral.referred_by_email = referral_referrer_email
+            referral.status = ReferralStatus.SUBMITTED.value
+            referral.sharepoint_drive_id = upload_result.drive_id
+            referral.sharepoint_item_id = upload_result.item_id
+            referral.sharepoint_file_id = upload_result.file_id
+            referral.sharepoint_file_url = upload_result.web_url
+            referral.original_filename = file.filename
+            referral.stored_filename = stored_filename
+            referral.candidate_consent = True
+            referral.created_at = now  # Reset creation timestamp for the fresh 6-month lifecycle
+            referral.updated_at = now
+
+            # Audit history entry recording the override / re-submission
+            history_entry = ReferralStatusHistory(
+                referral_id=referral.id,
+                old_status=old_status,
+                new_status=ReferralStatus.SUBMITTED.value,
+                changed_by_user_id=current_user.id,
+                comment=f"Referral re-submitted after 6+ months by {referral_referrer} (overrode existing record).",
+            )
+            db.add(history_entry)
+
+            # Reset CV Intelligence candidate profile status to trigger re-extraction
+            if getattr(settings, "CV_INTELLIGENCE_ENABLED", False):
+                try:
+                    from app.cv_intelligence.database import CVSessionLocal
+                    from app.cv_intelligence.models import CandidateProfile, ExtractionStatus
+                    cv_db = CVSessionLocal()
+                    try:
+                        profile = cv_db.query(CandidateProfile).filter(CandidateProfile.referral_id == referral.id).first()
+                        if profile:
+                            profile.extraction_status = ExtractionStatus.PENDING.value
+                            profile.extraction_error = None
+                            cv_db.commit()
+                    finally:
+                        cv_db.close()
+                except Exception as cv_reset_err:
+                    logger.warning(f"Could not reset profile extraction status on override: {cv_reset_err}")
+
+        else:
+            referral = Referral(
+                referral_number=ref_number,
+                candidate_name=form_data.candidate_name.strip(),
+                candidate_email=form_data.candidate_email.lower().strip(),
+                candidate_phone=form_data.candidate_phone.strip(),
+                linkedin_url=form_data.linkedin_url.strip() if form_data.linkedin_url else None,
+                github_url=form_data.github_url.strip() if form_data.github_url else None,
+                years_of_experience=form_data.years_of_experience,
+                relationship=form_data.relationship.strip(),
+                referral_note=form_data.referral_note.strip(),
+                position_id=position.id,
+                referred_by_user_id=current_user.id,
+                referred_by_name=referral_referrer,
+                referred_by_email=referral_referrer_email,
+                status=ReferralStatus.SUBMITTED.value,
+                sharepoint_drive_id=upload_result.drive_id,
+                sharepoint_item_id=upload_result.item_id,
+                sharepoint_file_id=upload_result.file_id,
+                sharepoint_file_url=upload_result.web_url,
+                original_filename=file.filename,
+                stored_filename=stored_filename,
+                candidate_consent=True,
+            )
+            db.add(referral)
+            db.flush()  # assign referral.id
+
+            # Add initial audit history record
+            history_entry = ReferralStatusHistory(
+                referral_id=referral.id,
+                old_status=None,
+                new_status=ReferralStatus.SUBMITTED.value,
+                changed_by_user_id=current_user.id,
+                comment=f"Referral submitted by {referral_referrer}.",
+            )
+            db.add(history_entry)
+
         db.commit()
         db.refresh(referral)
 

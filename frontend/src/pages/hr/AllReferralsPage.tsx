@@ -22,19 +22,23 @@ import {
   Archive,
   Trash2,
 } from 'lucide-react';
+import { onReferralUpdated } from '../../services/referralEvents';
 
 interface AllReferralsPageProps {
   initialSelectedId?: string | null;
   onClearInitialId?: () => void;
 }
 
+let cachedAllReferrals: ReferralSummary[] = [];
+let cachedPositions: JobPosition[] = [];
+
 export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
   initialSelectedId,
   onClearInitialId,
 }) => {
-  const [referrals, setReferrals] = useState<ReferralSummary[]>([]);
-  const [positions, setPositions] = useState<JobPosition[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [referrals, setReferrals] = useState<ReferralSummary[]>(() => cachedAllReferrals);
+  const [positions, setPositions] = useState<JobPosition[]>(() => cachedPositions);
+  const [isLoading, setIsLoading] = useState<boolean>(() => cachedAllReferrals.length === 0);
 
   // Filters
   const [search, setSearch] = useState<string>('');
@@ -77,24 +81,47 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
     }
   };
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (silent = false) => {
+    if (!silent && referrals.length === 0 && cachedAllReferrals.length === 0) {
+      setIsLoading(true);
+    }
     try {
       const [refData, jobsData] = await Promise.all([
         api.getAllReferrals(),
         api.getJobs(true),
       ]);
-      setReferrals(refData);
-      setPositions(jobsData);
+      if (Array.isArray(refData) && (refData.length > 0 || !silent || cachedAllReferrals.length === 0)) {
+        cachedAllReferrals = refData;
+        setReferrals(refData);
+      }
+      if (Array.isArray(jobsData) && (jobsData.length > 0 || !silent || cachedPositions.length === 0)) {
+        cachedPositions = jobsData;
+        setPositions(jobsData);
+      }
     } catch (err) {
       console.error('Failed to load referrals:', err);
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     loadData();
+
+    const unsubscribe = onReferralUpdated(() => {
+      loadData(true);
+    });
+
+    const timer = setInterval(() => {
+      loadData(true);
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
   }, []);
 
   const openCandidateDetail = async (id: string) => {
@@ -280,7 +307,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
         </div>
 
         {/* Data Grid */}
-        {isLoading ? (
+        {isLoading && referrals.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
             Loading candidate database...
           </div>

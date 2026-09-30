@@ -11,23 +11,48 @@ import {
   Calendar,
 } from 'lucide-react';
 
-export const AnalyticsPage: React.FC = () => {
-  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+import { onReferralUpdated } from '../../services/referralEvents';
 
-  useEffect(() => {
-    const loadAnalytics = async () => {
+let cachedFullAnalytics: AnalyticsResponse | null = null;
+
+export const AnalyticsPage: React.FC = () => {
+  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(() => cachedFullAnalytics);
+  const [isLoading, setIsLoading] = useState<boolean>(() => !cachedFullAnalytics);
+
+  const loadAnalytics = async (silent = false) => {
+    if (!silent && !analytics && !cachedFullAnalytics) {
       setIsLoading(true);
-      try {
-        const data = await api.getAnalytics();
+    }
+    try {
+      const data = await api.getAnalytics();
+      if (data && (data.total_referrals > 0 || !cachedFullAnalytics || cachedFullAnalytics.total_referrals === 0)) {
+        cachedFullAnalytics = data;
         setAnalytics(data);
-      } catch (err) {
-        console.error('Failed to load analytics:', err);
-      } finally {
+      }
+    } catch (err) {
+      console.error('Failed to load analytics:', err);
+    } finally {
+      if (!silent) {
         setIsLoading(false);
       }
-    };
+    }
+  };
+
+  useEffect(() => {
     loadAnalytics();
+
+    const unsubscribe = onReferralUpdated(() => {
+      loadAnalytics(true);
+    });
+
+    const timer = setInterval(() => {
+      loadAnalytics(true);
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
   }, []);
 
   if (isLoading) {

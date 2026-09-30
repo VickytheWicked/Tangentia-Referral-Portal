@@ -231,7 +231,7 @@ def _ensure_core_baseline_requirements(
     edu_idx = -1
     for i, r in enumerate(requirements[1:], start=1):
         req_name = r.get("requirement", "").lower()
-        if any(kw in req_name for kw in ["education", "degree", "academic", "diploma", "qualification", "bachelor", "master"]):
+        if any(kw in req_name for kw in ["education", "degree", "academic", "diploma", "qualification", "bachelor", "master", "mba"]):
             edu_idx = i
             break
 
@@ -239,10 +239,14 @@ def _ensure_core_baseline_requirements(
         edu_item = requirements.pop(edu_idx)
         requirements.insert(1, edu_item)
     else:
+        if "mba" in combined:
+            edu_val = "MBA or equivalent advanced degree preferred; Bachelor's degree in Business, Computer Science, Engineering, or related discipline"
+        else:
+            edu_val = "Degree or Diploma in Computer Engineering, Computer Science, IT, Business, or related discipline"
         requirements.insert(1, {
             "requirement": "Education & Academic Qualifications",
             "category": "MANDATORY",
-            "required_value": "Degree or Diploma in Computer Engineering, Computer Science, IT, Business, or related discipline",
+            "required_value": edu_val,
         })
 
     return requirements
@@ -398,9 +402,23 @@ def _gemini_extract_job_requirements(
             description=desc_truncated or "No description provided.",
         )
 
-        candidate_models = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.8-flash-lite"]
-        if getattr(settings, "CV_LLM_MODEL", None) and settings.CV_LLM_MODEL not in candidate_models:
-            candidate_models.insert(0, settings.CV_LLM_MODEL)
+        candidate_models = [
+            # 1. Active Flash-Lite models (highest throughput, instant response, verified active)
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-3.1-flash-lite",
+            # 2. Configured model (if distinct)
+            getattr(settings, "CV_LLM_MODEL", None),
+            # 3. Next-gen standard & pro models recommended by Google
+            "gemini-3.8-flash",
+            "gemini-3.1-pro-preview",
+            "gemini-flash-latest",
+            # 4. Legacy models (kept as lower priority fallbacks)
+            "gemini-2.5-flash",
+            "gemini-1.5-flash",
+            "gemini-2.5-pro",
+        ]
+        candidate_models = list(dict.fromkeys([m for m in candidate_models if m]))
 
         for model_name in candidate_models:
             try:
@@ -420,7 +438,13 @@ def _gemini_extract_job_requirements(
                         )
                         return [r for r in raw if isinstance(r, dict) and r.get("requirement")]
             except Exception as e:
-                logger.debug(f"Gemini job requirement extraction failed with {model_name}: {e}")
+                is_exhausted = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+                log_fn = logger.warning if is_exhausted else logger.debug
+                log_fn(
+                    f"Gemini job requirement extraction with '{model_name}' "
+                    f"{'exhausted quota (429)' if is_exhausted else 'failed'}: {e}. "
+                    "Falling back to next model..."
+                )
                 continue
 
     except Exception as e:
@@ -433,8 +457,9 @@ def _heuristic_extract_job_requirements(
     job_title: str, department: str, description: str
 ) -> List[Dict[str, Any]]:
     """
-    Minimal heuristic extraction when Gemini is unavailable.
-    Extracts experience requirements from common patterns.
+    Heuristic extraction fallback when Gemini is unavailable.
+    Extracts experience requirements and domain-specific competencies across
+    technical, architectural, sales, commercial, and executive disciplines.
     """
     requirements = []
     combined = f"{job_title} {department} {description}".lower()
@@ -443,6 +468,8 @@ def _heuristic_extract_job_requirements(
     exp_patterns = [
         (r"(\d+)\+?\s*years?\s+(?:of\s+)?(?:total\s+)?it\s+experience", "Total IT Experience", "REQUIRED_EXPERIENCE"),
         (r"(\d+)\+?\s*years?\s+(?:of\s+)?(?:total\s+)?(?:relevant\s+|work\s+|professional\s+)?experience", "Total Experience", "REQUIRED_EXPERIENCE"),
+        (r"(\d+)\+?\s*years?\s+(?:of\s+)?(?:experience\s+in\s+)?b2b\s+sales", "B2B Sales Experience", "REQUIRED_EXPERIENCE"),
+        (r"(\d+)\+?\s*years?\s+(?:of\s+)?(?:experience\s+in\s+)?(?:a\s+)?(?:global\s+)?leadership", "Global Sales Leadership Experience", "REQUIRED_EXPERIENCE"),
         (r"(\d+)\+?\s*years?\s+(?:of\s+)?business\s+arch", "Business Architecture Experience", "REQUIRED_ARCHITECTURE"),
         (r"(\d+)\+?\s*years?\s+(?:of\s+)?business\s+anal", "Business Analysis Experience", "REQUIRED_EXPERIENCE"),
     ]
@@ -454,6 +481,24 @@ def _heuristic_extract_job_requirements(
                 "requirement": req_name,
                 "category": category,
                 "required_value": f"{m.group(1)}+ years",
+            })
+            seen_requirements.add(req_name)
+
+    # Sales, revenue & executive commercial competencies
+    sales_patterns = [
+        (r"\b(b2b sales|enterprise sales|commercial services)\b", "B2B Enterprise & Commercial Sales", "MANDATORY", "15+ years of experience in B2B enterprise technology, SaaS, or services solutions"),
+        (r"\b(global sales leadership|scale.*?sales organization|lead.*?sales strategy)\b", "Global Sales Leadership", "MANDATORY", "5+ years in a global sales leadership role scaling cross-regional sales teams"),
+        (r"\b(multi-million|revenue targets?|revenue growth|quota)\b", "Revenue Targets & Deal Closing", "REQUIRED_SKILLS", "Consistent achievement and overachievement of multi-million-dollar revenue targets"),
+        (r"\b(tia agentic platform|agentic ai|ai-led solutions?)\b", "TiA Agentic Platform & AI Offerings", "REQUIRED_DOMAIN", "Driving adoption and revenue growth for the TiA Agentic Platform and AI-led solutions"),
+        (r"\b(sales operations|crm|sales processes|forecasting)\b", "Sales Operations, CRM & Forecasting", "REQUIRED_SKILLS", "Scalable sales processes, CRM best practices, and data-driven forecasting"),
+        (r"\b(c-level|deal cycles|negotiations?|tailored value propositions?)\b", "Enterprise Deal Cycles & C-Level Relationships", "REQUIRED_SKILLS", "Building relationships with C-level executives and leading high-value deal negotiations"),
+    ]
+    for pattern, req_name, category, req_val in sales_patterns:
+        if re.search(pattern, combined) and req_name not in seen_requirements:
+            requirements.append({
+                "requirement": req_name,
+                "category": category,
+                "required_value": req_val,
             })
             seen_requirements.add(req_name)
 
@@ -778,9 +823,23 @@ def run_semantic_analysis(
             api_key=settings.GEMINI_API_KEY, http_options={"timeout": 20000}
         )
 
-        candidate_models = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.8-flash-lite"]
-        if getattr(settings, "CV_LLM_MODEL", None) and settings.CV_LLM_MODEL not in candidate_models:
-            candidate_models.insert(0, settings.CV_LLM_MODEL)
+        candidate_models = [
+            # 1. Active Flash-Lite models (highest throughput, instant response, verified active)
+            "gemini-3.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-3.1-flash-lite",
+            # 2. Configured model (if distinct)
+            getattr(settings, "CV_LLM_MODEL", None),
+            # 3. Next-gen standard & pro models recommended by Google
+            "gemini-3.8-flash",
+            "gemini-3.1-pro-preview",
+            "gemini-flash-latest",
+            # 4. Legacy models (kept as lower priority fallbacks)
+            "gemini-2.5-flash",
+            "gemini-1.5-flash",
+            "gemini-2.5-pro",
+        ]
+        candidate_models = list(dict.fromkeys([m for m in candidate_models if m]))
 
         for model_name in candidate_models:
             try:
@@ -808,7 +867,13 @@ def run_semantic_analysis(
                 logger.warning(f"Gemini semantic analysis returned invalid JSON ({model_name}): {e}")
                 continue
             except Exception as e:
-                logger.debug(f"Gemini semantic analysis failed with {model_name}: {e}")
+                is_exhausted = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+                log_fn = logger.warning if is_exhausted else logger.debug
+                log_fn(
+                    f"Gemini semantic analysis with '{model_name}' "
+                    f"{'exhausted quota (429)' if is_exhausted else 'failed'}: {e}. "
+                    "Falling back to next model..."
+                )
                 continue
 
     except Exception as e:

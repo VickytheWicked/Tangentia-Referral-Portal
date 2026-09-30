@@ -348,7 +348,6 @@ def test_submission_and_extraction_pipeline():
             "candidate_phone": final_candidate_phone,
             "referred_by_name": "Vansh Rupesh (Employee)",
             "referred_by_email": "vansh.rupesh@tangentia.com",
-            "referred_by_phone": "+91 98200 12345",
             "years_of_experience": str(final_exp),
             "relationship": item["relationship"],
             "referral_note": item["note"],
