@@ -216,7 +216,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
               Candidate Referrals Database
             </h3>
             <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-              Enterprise repository of all candidate submissions with SharePoint CV storage
+              Enterprise repository of all candidate submissions with cloud CV storage
             </p>
           </div>
 
@@ -362,7 +362,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
                       <button
                         className="btn btn-outline btn-sm"
                         onClick={() => handleDownloadCV(r.id, r.original_filename)}
-                        title="Download CV from SharePoint"
+                        title="Download candidate CV"
                       >
                         <Download size={14} /> CV
                       </button>
@@ -539,7 +539,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
               </div>
               <div><strong>Referrer Email:</strong> {selectedReferral.referred_by_email}</div>
               <div>
-                <strong>CV Storage:</strong> SharePoint Online ({selectedReferral.original_filename})
+                <strong>CV Storage:</strong> Cloud Storage ({selectedReferral.original_filename})
               </div>
               {selectedReferral.linkedin_url && (
                 <div>

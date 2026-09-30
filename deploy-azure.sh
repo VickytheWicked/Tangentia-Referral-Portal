@@ -3,7 +3,7 @@
 # Tangentia Referral Portal — Azure Deployment Script
 # ==============================================================================
 # Deploys the backend to Azure App Service and the frontend to Azure Static Web Apps.
-# No M365, no SharePoint, no Entra ID — runs in dev/mock mode on Azure.
+# Runs in dev/mock mode on Azure without live cloud credentials.
 #
 # Prerequisites:
 #   1. Azure CLI installed:  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
@@ -130,7 +130,7 @@ az webapp config appsettings set \
     JWT_SECRET_KEY="$JWT_SECRET_KEY" \
     DATABASE_URL="sqlite:///:memory:" \
     EXCEL_STORAGE_TYPE="mock" \
-    SHAREPOINT_STORAGE_TYPE="mock" \
+    STORAGE_TYPE="mock" \
     CV_STORAGE_TYPE="local" \
     BLOB_DATA_CONTAINER="referral-data" \
     BLOB_CV_INTELLIGENCE_NAME="cv_intelligence.db" \
@@ -157,7 +157,7 @@ zip -r "$DEPLOY_ZIP" . \
   -x "tests/*" \
   -x ".env" \
   -x ".env.example" \
-  -x "storage/mock_sharepoint/*" \
+  -x "storage/mock_storage/*" \
   -x "data/*.db" \
   -x "data/*.xlsx" \
   -x "data/*.json" \

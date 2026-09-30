@@ -416,7 +416,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
         setShowUnavailableModal(true);
       } else {
         setErrorMessage(
-          err.message || 'Referral submission could not be completed. The CV could not be uploaded to SharePoint.'
+          err.message || 'Referral submission could not be completed. The CV could not be uploaded to storage.'
         );
       }
     } finally {
@@ -455,7 +455,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               Submit a Referral
             </h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Provide your employee information and the referral's details. Resumes are stored directly in SharePoint and synced to Excel.
+              Provide your employee information and the referral's details. Resumes are securely stored in cloud storage and synced to Excel.
             </p>
           </div>
           <div className="brand-logo-badge-sm" title="Tangentia Referral Portal">
@@ -630,7 +630,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                         {selectedFile.name}
                       </div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Ready for SharePoint sync
+                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Ready for cloud upload
                       </div>
                     </div>
                   </div>

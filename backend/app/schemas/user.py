@@ -10,10 +10,6 @@ class UserBase(BaseModel):
     department: Optional[str] = None
 
 
-class UserCreate(UserBase):
-    entra_user_id: Optional[str] = None
-
-
 class UserResponse(UserBase):
     id: str
     entra_user_id: Optional[str] = None

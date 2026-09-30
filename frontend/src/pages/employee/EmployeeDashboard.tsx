@@ -161,7 +161,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
             Welcome back! 👋
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '640px', lineHeight: 1.5 }}>
-            Help shape Tangentia's future by referring exceptional talent. Submit your candidate's CV directly to our SharePoint document repository and track their progress live.
+            Help shape Tangentia's future by referring exceptional talent. Submit your candidate's CV directly to our secure cloud repository and track their progress live.
           </p>
         </div>
         <button

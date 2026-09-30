@@ -43,11 +43,11 @@ class Referral(Base):
     # Status
     status = Column(String(50), default=ReferralStatus.SUBMITTED.value, nullable=False)
 
-    # SharePoint Metadata
-    sharepoint_drive_id = Column(String(255), nullable=True)
-    sharepoint_item_id = Column(String(255), nullable=True)
-    sharepoint_file_id = Column(String(255), nullable=True)
-    sharepoint_file_url = Column(String(1000), nullable=True)
+    # Storage Metadata (Azure Blob Storage / Local Storage)
+    storage_drive_id = Column(String(255), nullable=True)
+    storage_item_id = Column(String(255), nullable=True)
+    storage_file_id = Column(String(255), nullable=True)
+    storage_file_url = Column(String(1000), nullable=True)
     original_filename = Column(String(255), nullable=False)
     stored_filename = Column(String(255), nullable=False)
 

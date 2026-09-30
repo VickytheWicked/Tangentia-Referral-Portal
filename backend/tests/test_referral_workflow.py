@@ -260,8 +260,8 @@ def test_download_cv_fallback_when_item_id_none(client, db_session, seeded_job):
         status="Submitted",
         original_filename="devin_torres_cv.pdf",
         stored_filename="devin_torres_cv.pdf",
-        sharepoint_drive_id=None,
-        sharepoint_item_id=None,
+        storage_drive_id=None,
+        storage_item_id=None,
         candidate_consent=True,
     )
     db_session.add(ref)

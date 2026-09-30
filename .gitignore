@@ -40,9 +40,9 @@ yarn-error.log*
 referrals.db
 backend/data/cv_intelligence.db
 cv_intelligence.db
-storage/mock_sharepoint/
-backend/storage/mock_sharepoint/*
-!backend/storage/mock_sharepoint/.gitkeep
+storage/mock_storage/
+backend/storage/mock_storage/*
+!backend/storage/mock_storage/.gitkeep
 backend/data/*.xlsx
 backend/data/*.json
 !backend/data/.gitkeep

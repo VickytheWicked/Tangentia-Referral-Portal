@@ -5,13 +5,13 @@ from datetime import datetime, timezone
 from typing import Tuple, Optional
 from fastapi import HTTPException, status
 from app.config import settings
-from app.services.sharepoint.base import SharePointServiceInterface, SharePointUploadResult
+from app.services.storage.base import StorageServiceInterface, StorageUploadResult
 
 
-class MockSharePointService(SharePointServiceInterface):
+class LocalStorageService(StorageServiceInterface):
     """
-    Isolated local mock SharePoint storage service for development and offline testing.
-    Maintains the exact same folder hierarchy ({root_folder}/{year}/{filename}) and API contract.
+    Isolated local disk storage service for development and offline testing.
+    Maintains folder hierarchy ({root_folder}/{year}/{filename}) and standard API contract.
     """
 
     def __init__(self, storage_dir: str = None):
@@ -42,7 +42,7 @@ class MockSharePointService(SharePointServiceInterface):
         file_bytes: bytes,
         filename: str,
         referral_number: str,
-    ) -> SharePointUploadResult:
+    ) -> StorageUploadResult:
         year = str(datetime.now(timezone.utc).year)
         target_dir = os.path.join(self.base_dir, year)
         os.makedirs(target_dir, exist_ok=True)
@@ -51,18 +51,18 @@ class MockSharePointService(SharePointServiceInterface):
         with open(file_path, "wb") as f:
             f.write(file_bytes)
 
-        mock_item_id = f"mock-item-{uuid.uuid4()}"
-        mock_drive_id = "mock-drive-tangentia-cvs"
+        mock_item_id = f"local-item-{uuid.uuid4()}"
+        mock_drive_id = "local-drive-cvs"
 
         index = self._load_index()
         index[mock_item_id] = file_path
         self._save_index(index)
 
-        return SharePointUploadResult(
+        return StorageUploadResult(
             drive_id=mock_drive_id,
             item_id=mock_item_id,
             file_id=mock_item_id,
-            web_url=f"https://tangentia.sharepoint.com/sites/hr/Referral-CVs/{year}/{filename}",
+            web_url=f"/storage/cvs/{year}/{filename}",
             stored_filename=filename,
         )
 
@@ -107,7 +107,7 @@ class MockSharePointService(SharePointServiceInterface):
                     with open(file_path, "rb") as fp:
                         return fp.read(), f, content_type
 
-        # Fallback to any file in mock storage
+        # Fallback to any file in local storage
         for root, _, files in os.walk(self.base_dir):
             for f in files:
                 if f.startswith("_") or f.startswith("."):
@@ -121,7 +121,7 @@ class MockSharePointService(SharePointServiceInterface):
                 with open(file_path, "rb") as fp:
                     return fp.read(), f, content_type
 
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="CV document not found in mock SharePoint storage.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="CV document not found in local storage.")
 
     async def delete_cv(
         self,

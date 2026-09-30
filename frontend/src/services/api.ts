@@ -205,7 +205,7 @@ export const api = {
     return handleResponse<CVExtractionPreview>(res);
   },
 
-  // Submit Referral (allows up to 60s for SharePoint upload, Excel sync, and validation)
+  // Submit Referral (allows up to 60s for cloud storage upload, Excel sync, and validation)
   async submitReferral(formData: FormData): Promise<ReferralSummary> {
     const res = await fetch(`${API_BASE}/referrals`, {
       method: 'POST',

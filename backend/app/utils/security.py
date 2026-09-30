@@ -19,9 +19,9 @@ def sanitize_filename_component(text: str) -> str:
     return text[:40]  # limit component length
 
 
-def generate_sharepoint_filename(referral_number: str, candidate_name: str, position_title: str, original_filename: str) -> str:
+def generate_storage_filename(referral_number: str, candidate_name: str, position_title: str, original_filename: str) -> str:
     """
-    Generate predictable, standardized SharePoint filename:
+    Generate predictable, standardized storage filename:
     e.g. REF-2026-000123_Rahul-Sharma_Backend-Developer.pdf
     """
     _, ext = os.path.splitext(original_filename.lower())
@@ -32,6 +32,9 @@ def generate_sharepoint_filename(referral_number: str, candidate_name: str, posi
     pos_slug = sanitize_filename_component(position_title) or "Position"
 
     return f"{referral_number}_{cand_slug}_{pos_slug}{ext}"
+
+
+generate_cv_filename = generate_storage_filename
 
 
 def validate_cv_file(filename: str, content: bytes) -> Tuple[str, str]:

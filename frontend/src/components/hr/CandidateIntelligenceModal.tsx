@@ -250,7 +250,7 @@ export const CandidateIntelligenceModal: React.FC<CandidateIntelligenceModalProp
             <div><strong>Referrer Email:</strong> {profile.referred_by_email}</div>
           )}
           <div>
-            <strong>CV Storage:</strong> SharePoint Online ({profile.original_filename})
+            <strong>CV Storage:</strong> Cloud Storage ({profile.original_filename})
           </div>
           {profile.linkedin_url && (
             <div>

@@ -89,7 +89,7 @@ zip -r "$DEPLOY_ZIP" . \
   -x "tests/*" \
   -x ".env" \
   -x ".env.example" \
-  -x "storage/mock_sharepoint/*" \
+  -x "storage/mock_storage/*" \
   -x "data/*.db" \
   -x "data/*.xlsx" \
   > /dev/null

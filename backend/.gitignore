@@ -7,5 +7,6 @@ data/*.db
 data/*.sqlite*
 data/cv_intelligence.db
 data/job_requirements_cache.json
-storage/
+/storage/mock_storage/*
+!/storage/mock_storage/.gitkeep
 .watchfiles.ignore

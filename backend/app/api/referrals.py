@@ -24,7 +24,7 @@ from app.schemas.referral import (
 from app.schemas.duplicate import DuplicateCheckRequest, DuplicateCheckResponse
 from app.schemas.status_history import StatusHistoryResponse
 from app.api.deps import get_current_user, get_current_user_optional
-from app.services.sharepoint import get_sharepoint_service
+from app.services.storage import get_storage_service
 from app.services.referral_service import (
     check_duplicate_candidate,
     create_referral_with_cv,
@@ -294,13 +294,13 @@ async def submit_referral(
         referred_by_name=ref_by_name,
         referred_by_email=effective_emp_email,
     )
-    sharepoint_svc = get_sharepoint_service()
+    storage_svc = get_storage_service()
     referral = await create_referral_with_cv(
         db=db,
         form_data=form_data,
         file=file,
         current_user=effective_user,
-        sharepoint_service=sharepoint_svc,
+        storage_service=storage_svc,
     )
 
     return format_referral_summary(referral)
@@ -477,12 +477,12 @@ async def download_cv_file(
     Securely stream candidate CV.
     """
     effective_user = current_user or get_or_create_default_employee(db)
-    sharepoint_svc = get_sharepoint_service()
+    storage_svc = get_storage_service()
     content_bytes, filename, content_type = await get_referral_cv_bytes(
         db=db,
         referral_id=referral_id,
         current_user=effective_user,
-        sharepoint_service=sharepoint_svc,
+        storage_service=storage_svc,
     )
 
     return StreamingResponse(

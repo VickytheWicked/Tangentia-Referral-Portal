@@ -9,7 +9,7 @@
    - Referring employee email: **Must be corporate `@tangentia.com`**.
 4. Creation of referrals via `POST /api/referrals` (multipart form + CV file upload).
 5. CV Intelligence profile parsing and match evaluation across active positions.
-6. Persistence verification across SQLite, Excel, and Mock SharePoint storage.
+6. Persistence verification across SQLite, Excel, and Mock Storage.
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|---|---|
 | **Live FastAPI / SQLite** | `referrals`, `referral_status_history`, `hr_notes` | **0** | `GET /api/referrals` &rarr; `[]` (0 records) |
 | **Microsoft Excel** | `tangentia_referrals.xlsx` (Referrals & StatusHistory) | **0** | Worksheet inspected (header preserved) |
-| **Mock SharePoint** | `/storage/mock_sharepoint/2026` & `_index.json` | **0** | Folder cleaned, index reset to `{}` |
+| **Mock Storage** | `/storage/mock_storage/2026` & `_index.json` | **0** | Folder cleaned, index reset to `{}` |
 | **CV Intelligence DB** | `candidate_profiles`, `job_matches` | **0** | SQLite query confirmed 0 records |
 
 ---
@@ -67,6 +67,6 @@
 |---|---|---|---|
 | **Live API (`GET /api/referrals`)** | 18 | **18** | **PASS** |
 | **Excel Workbook (`tangentia_referrals.xlsx`)** | 18 | **18** | **PASS** |
-| **Mock SharePoint Storage (`storage/mock_sharepoint/2026`)** | 18 | **18** | **PASS** |
+| **Mock Storage (`storage/mock_storage/2026`)** | 18 | **18** | **PASS** |
 | **Active Openings with Ranked Candidates** | 10 | **10** | **PASS** |
 | **Total Candidates Evaluated by CV Intelligence** | 18 | **18** | **PASS** |

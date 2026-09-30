@@ -148,7 +148,7 @@ def seed_database():
             if not existing_ref and ref_info["job_title"] in created_jobs:
                 job = created_jobs[ref_info["job_title"]]
                 
-                # Write sample PDF to mock sharepoint storage
+                # Write sample PDF to mock storage
                 file_path = os.path.join(mock_dir, ref_info["cv_filename"])
                 with open(file_path, "wb") as fp:
                     fp.write(SAMPLE_PDF_BYTES)
@@ -165,10 +165,10 @@ def seed_database():
                     referred_by_user_id=employee_user.id,
                     referred_by_name=employee_user.name,
                     status=ref_info["status"],
-                    sharepoint_drive_id="mock-drive-tangentia-cvs",
-                    sharepoint_item_id=f"item-{ref_info['number']}",
-                    sharepoint_file_id=f"file-{ref_info['number']}",
-                    sharepoint_file_url=f"https://tangentia.sharepoint.com/sites/hr/Referral-CVs/{year}/{ref_info['cv_filename']}",
+                    storage_drive_id="mock-drive-tangentia-cvs",
+                    storage_item_id=f"item-{ref_info['number']}",
+                    storage_file_id=f"file-{ref_info['number']}",
+                    storage_file_url=f"/storage/cvs/{year}/{ref_info['cv_filename']}",
                     original_filename=f"{ref_info['cand_name'].replace(' ', '_')}_CV.pdf",
                     stored_filename=ref_info["cv_filename"],
                     candidate_consent=True,

@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Tangentia Employee Referral Portal"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    DEV_MODE: bool = True  # Allows local dev testing with simulated Entra user and local mock SharePoint storage
+    DEV_MODE: bool = True  # Allows local dev testing with simulated Entra user and local mock storage
     
     # API Prefix
     API_V1_STR: str = "/api"
@@ -20,7 +20,6 @@ class Settings(BaseSettings):
     # Microsoft Excel Online Storage
     EXCEL_STORAGE_TYPE: str = Field(default="mock", description="'graph' for real Microsoft Graph Excel Online, 'mock' for local development Excel file")
     EXCEL_FILE_PATH: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "Tangentia_Referrals.xlsx")
-    EXCEL_SITE_ID: str = Field(default="", description="SharePoint Site ID for Excel workbook")
     EXCEL_DRIVE_ID: str = Field(default="", description="Drive ID where the Excel workbook is stored")
     EXCEL_FILE_ITEM_ID: str = Field(default="", description="Microsoft Graph item ID for the Excel workbook")
     EXCEL_WORKBOOK_NAME: str = Field(default="Tangentia_Referrals.xlsx", description="Name of the Excel workbook file")
@@ -60,19 +59,16 @@ class Settings(BaseSettings):
     def AZURE_JWKS_URL(self) -> str:
         return f"https://login.microsoftonline.com/{self.AZURE_TENANT_ID}/discovery/v2.0/keys"
 
-    # Microsoft SharePoint Online
-    SHAREPOINT_STORAGE_TYPE: str = Field(default="mock", description="'graph' for real Microsoft Graph, 'mock' for local development")
-    SHAREPOINT_SITE_ID: str = Field(default="", description="SharePoint Site ID (tenant.sharepoint.com,site-id,web-id)")
-    SHAREPOINT_DRIVE_ID: str = Field(default="", description="SharePoint Document Library Drive ID")
-    SHAREPOINT_ROOT_FOLDER: str = Field(default="Referral-CVs", description="Root folder in document library for CVs")
+    # Document & CV Storage (Azure Blob Storage / Local Mock)
+    STORAGE_TYPE: str = Field(default="mock", description="'blob' for Azure Blob Storage, 'mock' for local development")
     
-    # Azure Blob Storage (used when SHAREPOINT_STORAGE_TYPE == 'blob' or EXCEL_STORAGE_TYPE == 'blob')
+    # Azure Blob Storage (used when STORAGE_TYPE == 'blob' or EXCEL_STORAGE_TYPE == 'blob')
     AZURE_STORAGE_CONNECTION_STRING: str = Field(default="", description="Azure Storage Account connection string")
     BLOB_CV_CONTAINER: str = Field(default="referral-cvs", description="Blob container for CV uploads")
     BLOB_DATA_CONTAINER: str = Field(default="referral-data", description="Blob container for Excel workbook")
 
-    # Storage Mock Directory (used when SHAREPOINT_STORAGE_TYPE == 'mock')
-    LOCAL_STORAGE_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "mock_sharepoint")
+    # Storage Mock Directory (used when STORAGE_TYPE == 'mock')
+    LOCAL_STORAGE_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "mock_storage")
 
     # Security & Upload Validation
     MAX_UPLOAD_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MB limit

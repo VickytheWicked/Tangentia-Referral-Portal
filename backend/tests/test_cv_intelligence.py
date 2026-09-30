@@ -635,7 +635,7 @@ async def test_reextract_cv_uses_prior_stored_details_when_gemini_unavailable():
         mock_sp = MagicMock()
         mock_sp.download_cv = AsyncMock(return_value=(pdf_bytes, "karan_cv.pdf", "application/pdf"))
 
-        with patch("app.cv_intelligence.service.get_sharepoint_service", return_value=mock_sp), \
+        with patch("app.cv_intelligence.service.get_storage_service", return_value=mock_sp), \
              patch("app.cv_intelligence.extractor.GeminiCVExtractor.extract", side_effect=ExtractionServiceError("Gemini API Rate Limit 429")), \
              patch("app.cv_intelligence.service.llm_match_candidate_to_job", return_value=(
                  MatchLevel.STRONG_MATCH,

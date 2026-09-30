@@ -27,7 +27,7 @@ if settings.DATABASE_URL.startswith("sqlite") and ":memory:" in settings.DATABAS
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="Internal Employee Referral Portal for submitting candidates and uploading CVs to Microsoft SharePoint via Microsoft Graph API.",
+    description="Internal Employee Referral Portal for submitting candidates, tracking referrals, and archiving CVs in secure cloud storage.",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -159,7 +159,7 @@ async def health_check():
         "status": "healthy",
         "service": settings.PROJECT_NAME,
         "environment": settings.ENVIRONMENT,
-        "sharepoint_storage": settings.SHAREPOINT_STORAGE_TYPE,
+        "storage_type": settings.STORAGE_TYPE,
         "dev_mode": settings.DEV_MODE,
     }
 

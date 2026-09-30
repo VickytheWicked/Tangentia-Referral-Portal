@@ -14,8 +14,8 @@ from app.models.hr_note import HRNote
 from app.models.user import User, UserRole
 from app.schemas.referral import ReferralCreateForm
 from app.schemas.duplicate import DuplicateCheckResponse, DuplicateMatch
-from app.services.sharepoint.base import SharePointServiceInterface
-from app.utils.security import validate_cv_file, generate_sharepoint_filename
+from app.services.storage.base import StorageServiceInterface
+from app.utils.security import validate_cv_file, generate_storage_filename
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,7 @@ async def create_referral_with_cv(
     form_data: ReferralCreateForm,
     file: UploadFile,
     current_user: User,
-    sharepoint_service: SharePointServiceInterface,
+    storage_service: Optional[StorageServiceInterface] = None,
 ) -> Referral:
     """
     Atomic referral creation or update:
@@ -186,10 +186,14 @@ async def create_referral_with_cv(
     2. Check position validity.
     3. If candidate was submitted > 6 months ago, override/update the existing database row.
        Otherwise, generate a new referral number and create a new row.
-    4. Upload CV to SharePoint document library.
+    4. Upload CV to secure document storage repository.
     5. Save/update Referral and append ReferralStatusHistory audit record to PostgreSQL.
-    6. Rollback SharePoint file if DB transaction fails.
+    6. Rollback storage file if DB transaction fails.
     """
+    storage_svc = storage_service
+    if not storage_svc:
+        from app.services.storage import get_storage_service
+        storage_svc = get_storage_service()
     if not form_data.candidate_consent:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -286,26 +290,26 @@ async def create_referral_with_cv(
         ref_number = generate_referral_number(db)
         is_override = False
 
-    stored_filename = generate_sharepoint_filename(
+    stored_filename = generate_storage_filename(
         referral_number=ref_number,
         candidate_name=form_data.candidate_name,
         position_title=position.title,
         original_filename=file.filename,
     )
 
-    # Step 1: Upload to SharePoint
+    # Step 1: Upload to storage
     upload_result = None
     try:
-        upload_result = await sharepoint_service.upload_cv(
+        upload_result = await storage_svc.upload_cv(
             file_bytes=file_bytes,
             filename=stored_filename,
             referral_number=ref_number,
         )
     except Exception as e:
-        logger.error(f"SharePoint upload failed during referral creation: {e}")
+        logger.error(f"Storage upload failed during referral creation: {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Referral submission could not be completed. The CV could not be uploaded to SharePoint. Please try again.",
+            detail="Referral submission could not be completed. The CV could not be uploaded to storage. Please try again.",
         )
 
     # Step 2: Save or Update in Database
@@ -330,10 +334,10 @@ async def create_referral_with_cv(
             referral.referred_by_name = referral_referrer
             referral.referred_by_email = referral_referrer_email
             referral.status = ReferralStatus.SUBMITTED.value
-            referral.sharepoint_drive_id = upload_result.drive_id
-            referral.sharepoint_item_id = upload_result.item_id
-            referral.sharepoint_file_id = upload_result.file_id
-            referral.sharepoint_file_url = upload_result.web_url
+            referral.storage_drive_id = upload_result.drive_id
+            referral.storage_item_id = upload_result.item_id
+            referral.storage_file_id = upload_result.file_id
+            referral.storage_file_url = upload_result.web_url
             referral.original_filename = file.filename
             referral.stored_filename = stored_filename
             referral.candidate_consent = True
@@ -383,10 +387,10 @@ async def create_referral_with_cv(
                 referred_by_name=referral_referrer,
                 referred_by_email=referral_referrer_email,
                 status=ReferralStatus.SUBMITTED.value,
-                sharepoint_drive_id=upload_result.drive_id,
-                sharepoint_item_id=upload_result.item_id,
-                sharepoint_file_id=upload_result.file_id,
-                sharepoint_file_url=upload_result.web_url,
+                storage_drive_id=upload_result.drive_id,
+                storage_item_id=upload_result.item_id,
+                storage_file_id=upload_result.file_id,
+                storage_file_url=upload_result.web_url,
                 original_filename=file.filename,
                 stored_filename=stored_filename,
                 candidate_consent=True,
@@ -428,7 +432,7 @@ async def create_referral_with_cv(
                 "linkedin_url": referral.linkedin_url,
                 "github_url": referral.github_url,
                 "original_filename": referral.original_filename,
-                "sharepoint_file_url": referral.sharepoint_file_url,
+                "storage_file_url": referral.storage_file_url,
                 "referral_note": referral.referral_note,
                 "created_at": referral.created_at.strftime("%Y-%m-%d %H:%M:%S") if referral.created_at else "",
                 "updated_at": referral.updated_at.strftime("%Y-%m-%d %H:%M:%S") if referral.updated_at else "",
@@ -449,10 +453,10 @@ async def create_referral_with_cv(
 
     except Exception as db_err:
         db.rollback()
-        logger.error(f"Database commit failed, executing SharePoint rollback: {db_err}")
-        # Clean up the file uploaded to SharePoint
+        logger.error(f"Database commit failed, executing storage rollback: {db_err}")
+        # Clean up the file uploaded to storage
         if upload_result and upload_result.item_id:
-            await sharepoint_service.delete_cv(
+            await storage_svc.delete_cv(
                 drive_id=upload_result.drive_id,
                 item_id=upload_result.item_id,
             )
@@ -678,12 +682,17 @@ async def get_referral_cv_bytes(
     db: Session,
     referral_id: str,
     current_user: User,
-    sharepoint_service: SharePointServiceInterface,
+    storage_service: Optional[StorageServiceInterface] = None,
 ) -> Tuple[bytes, str, str]:
     """
-    Retrieve CV bytes from SharePoint.
+    Retrieve CV bytes from storage.
     Enforces authorization: Must be HR Admin or the referring employee.
     """
+    storage_svc = storage_service
+    if not storage_svc:
+        from app.services.storage import get_storage_service
+        storage_svc = get_storage_service()
+
     referral = db.query(Referral).filter(Referral.id == referral_id).first()
     if not referral:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Referral not found.")
@@ -694,9 +703,9 @@ async def get_referral_cv_bytes(
             detail="You are not authorized to access this candidate's CV.",
         )
 
-    file_bytes, filename, content_type = await sharepoint_service.download_cv(
-        drive_id=referral.sharepoint_drive_id,
-        item_id=referral.sharepoint_item_id,
+    file_bytes, filename, content_type = await storage_svc.download_cv(
+        drive_id=referral.storage_drive_id,
+        item_id=referral.storage_item_id,
         referral_number=referral.referral_number,
         stored_filename=referral.stored_filename,
         original_filename=referral.original_filename,

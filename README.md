@@ -10,7 +10,7 @@
 [![openpyxl](https://img.shields.io/badge/Excel-openpyxl-217346.svg?style=flat&logo=microsoftexcel&logoColor=white)](https://openpyxl.readthedocs.io/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
 
-A production-ready internal **Employee Referral Portal** engineered for enterprise security, seamless corporate Microsoft Entra ID (Azure AD) authentication, automated candidate CV document archival into **Microsoft SharePoint Online**, dual-engine persistent record management via **Microsoft Excel Online**, **AI-powered CV Intelligence & Resume Matcher**, **Historical Candidate RAG Recommendations**, and automated 6-hour cron synchronization with **Tangentia CATS Careers ATS**.
+A production-ready internal **Employee Referral Portal** engineered for enterprise security, seamless corporate Microsoft Entra ID (Azure AD) authentication, automated candidate CV document archival into **Azure Blob Storage / Secure Document Storage**, dual-engine persistent record management via **Microsoft Excel Online**, **AI-powered CV Intelligence & Resume Matcher**, **Historical Candidate RAG Recommendations**, and automated 6-hour cron synchronization with **Tangentia CATS Careers ATS**.
 
 ---
 
@@ -25,7 +25,7 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 - [AI-Powered CV Intelligence Engine](#-ai-powered-cv-intelligence-engine)
 - [Historical Candidate RAG Recommendations](#-historical-candidate-rag-recommendations)
 - [Automated CATS ATS Scraper & Cron Scheduler](#-automated-cats-ats-scraper--cron-scheduler)
-- [Microsoft Entra ID, SharePoint & Excel Setup](#-microsoft-entra-id-sharepoint--excel-setup)
+- [Microsoft Entra ID & Storage Setup](#-microsoft-entra-id--storage-setup)
 - [API Reference](#-api-reference)
 - [Production Deployment (Docker)](#-production-deployment-docker)
 - [Security & Compliance Highlights](#-security--compliance-highlights)
@@ -55,12 +55,12 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
                            │   - CATS ATS Background Cron Scheduler  │
                            └──────┬──────────────────┬───────────────┘
                                   │                  │
-            Microsoft Graph API   │                  │ openpyxl / Graph API
-           (OAuth2 Client Creds)  │                  │ Write-Through Sync
+            Azure Blob Storage SDK│                  │ openpyxl / Graph API
+            (or Local Mock Disk)  │                  │ Write-Through Sync
                                   ▼                  ▼
                ┌───────────────────────────┐ ┌───────────────────────────┐
-               │  SharePoint Online Drive  │ │   Microsoft Excel Online  │
-               │  - Referral-CVs/{YEAR}/   │ │   - Tangentia_Referrals   │
+               │  Azure Blob / Doc Storage │ │   Microsoft Excel Online  │
+               │  - referral-cvs/{YEAR}/   │ │   - Tangentia_Referrals   │
                │  - Zero DB BLOB Storage   │ │   - Referrals & Jobs      │
                │  - Secure CV Proxy Stream │ │   - Status History Logs   │
                └───────────────────────────┘ │   - Confidential HR Notes │
@@ -93,7 +93,7 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 - **Executive Hiring Pipeline Overview**: Real-time conversion funnel metrics, departmental statistics, and top referrer leaderboards.
 - **Enterprise Candidate Database**: Multi-dimensional filtering by status, department, position, search query, and submission date.
 - **Candidate Intelligence Dossier**: Deep AI candidate analysis modal showing job-fit match scores (0–100%), skill breakdown matrix, experience alignment, candidate key strengths, potential gaps, and suggested interview questions.
-- **Candidate Profile Reviewer**: Full candidate history, direct SharePoint CV stream, status progression manager (`Submitted` → `Under Review` → `Shortlisted` → `Interview` → `Selected` → `Hired` / `Rejected`), and complete status audit timeline.
+- **Candidate Profile Reviewer**: Full candidate history, direct secure CV stream, status progression manager (`Submitted` → `Under Review` → `Shortlisted` → `Interview` → `Selected` → `Hired` / `Rejected`), and complete status audit timeline.
 - **Confidential Internal HR Notes**: Private recruiter evaluations thread, completely isolated and hidden from regular employees.
 - **Historical Candidate AI Suggestions (RAG)**: AI-driven matching engine that analyzes past archived/referred candidates to surface passive talent for new job requisitions.
 - **Requisition Manager & AI Requirement Analyzer**: Create and manage job postings with automated LLM requirement extraction that breaks job descriptions down into key technical skills, experience criteria, and domain qualifications.
@@ -118,7 +118,7 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 ### 📊 Microsoft Excel Online Dual-Storage Engine
 - **Permanent Audit-Ready Ledger**: Every referral submission, status transition, and confidential HR note is automatically written through to `Tangentia_Referrals.xlsx`.
 - **Multi-Sheet Structured Worksheets**:
-  - `Referrals`: Comprehensive candidate information, submission timestamps, contact details, and SharePoint CV URLs.
+  - `Referrals`: Comprehensive candidate information, submission timestamps, contact details, and CV storage URLs.
   - `JobPositions`: Requisitions, departments, locations, employment types, and active statuses.
   - `StatusHistory`: Full audit trail recording who changed what status, when, and rationale notes.
   - `HRNotes`: Internal evaluations tagged with author and timestamps.
@@ -127,9 +127,9 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 
 ### ☁️ Cloud & Enterprise Security
 - **Microsoft Entra ID (Azure AD)**: Server-side cryptographic token verification using Entra ID public keys (`/discovery/v2.0/keys`), client audience, and issuer validation.
-- **Microsoft SharePoint Online**: Resumes are uploaded directly to your corporate document library via Microsoft Graph API with year partitioning (`Referral-CVs/{YEAR}/{filename}`).
-- **Zero-Orphan Transaction Rollback**: If a database commit fails after a CV upload, the uploaded file in SharePoint is automatically removed via `delete_cv` to eliminate orphaned files.
-- **Zero-Trust Proxied Streaming**: Microsoft Graph access tokens and SharePoint URLs are never exposed to client browsers; CV downloads are securely proxied through authenticated backend streams.
+- **Azure Blob Storage / Secure Document Repository**: Resumes are archived directly into cloud blob storage (or local offline mock storage in dev mode) with year partitioning (`referral-cvs/{YEAR}/{filename}`).
+- **Zero-Orphan Transaction Rollback**: If a database commit fails after a CV upload, the uploaded file in blob storage is automatically removed via `delete_cv` to eliminate orphaned files.
+- **Zero-Trust Proxied Streaming**: Cloud storage connection strings and raw blob URLs are never exposed to client browsers; CV downloads are securely proxied through authenticated backend streams.
 
 ---
 
@@ -140,7 +140,7 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 | **Backend** | Python 3.11+, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2, PyJWT, MSAL Python, HTTPX, APScheduler |
 | **AI & NLP** | Google Gemini API / Azure OpenAI, `pdfplumber`, `fitz (PyMuPDF)`, `docx2txt`, Scikit-Learn |
 | **Frontend** | React 19, TypeScript 5, Vite 8, Lucide Icons, Vanilla CSS Enterprise Theme, MSAL React |
-| **Storage & Ledger** | SQLite / PostgreSQL 16, Microsoft Excel Online (`openpyxl` / Graph API), Microsoft SharePoint Online, Azure Blob Storage |
+| **Storage & Ledger** | SQLite / PostgreSQL 16, Microsoft Excel Online (`openpyxl` / Graph API), Azure Blob Storage (Cloud / Local Storage Service) |
 | **Infrastructure** | Docker, Docker Compose, Nginx |
 
 ---
@@ -170,7 +170,7 @@ Tangentia-Referral-Portal/
 │   │   ├── schemas/                # Pydantic request/response schemas
 │   │   ├── services/
 │   │   │   ├── excel/              # Microsoft Excel Online storage & sync services
-│   │   │   ├── sharepoint/         # Graph API client & local mock storage adapter
+│   │   │   ├── storage/            # Cloud Azure Blob & Local mock document storage adapters
 │   │   │   ├── cats_scraper.py     # CATS Careers ATS web scraper & 1-2 liner engine
 │   │   │   ├── cats_scheduler.py   # 6-hour background cron scheduler for ATS sync
 │   │   │   ├── auth_service.py     # Microsoft Entra ID JWT verification engine
@@ -180,7 +180,7 @@ Tangentia-Referral-Portal/
 │   │   ├── database.py             # Main SQLAlchemy engine & session factory
 │   │   └── main.py                 # FastAPI application entry point & lifecycle hooks
 │   ├── data/                       # Local Excel workbook (`Tangentia_Referrals.xlsx`) & SQLite DBs
-│   ├── storage/mock_sharepoint/    # Local offline SharePoint document library mock
+│   ├── storage/mock_storage/       # Local offline document library mock
 │   ├── tests/                      # Pytest integration & role authorization test suite
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -210,7 +210,7 @@ Tangentia-Referral-Portal/
 
 ## 🚀 Quick Start (Local Development)
 
-The repository includes an isolated **Development Mode** (`DEV_MODE=True`, `EXCEL_STORAGE_TYPE=mock`, `SHAREPOINT_STORAGE_TYPE=mock`) allowing instant local execution without needing live Azure tenant credentials or cloud infrastructure.
+The repository includes an isolated **Development Mode** (`DEV_MODE=True`, `EXCEL_STORAGE_TYPE=mock`, `STORAGE_TYPE=mock`) allowing instant local execution without needing live Azure tenant credentials or cloud infrastructure.
 
 ### Prerequisites
 - **Python 3.11+**
@@ -275,7 +275,6 @@ DATABASE_URL=sqlite:///:memory:
 # Microsoft Excel Online Storage
 # Set to 'graph' for live Microsoft Graph Excel Online; 'mock' for local .xlsx file
 EXCEL_STORAGE_TYPE=mock
-EXCEL_SITE_ID=yourtenant.sharepoint.com,site-guid,web-guid
 EXCEL_DRIVE_ID=b!your-drive-id-for-excel
 EXCEL_FILE_ITEM_ID=your-excel-file-item-id
 EXCEL_WORKBOOK_NAME=Tangentia_Referrals.xlsx
@@ -287,12 +286,12 @@ AZURE_CLIENT_SECRET=your-azure-client-secret
 AZURE_HR_GROUP_ID=your-entra-security-group-id-for-hr-admins
 JWT_SECRET_KEY=your-secure-jwt-signing-secret
 
-# Microsoft SharePoint Online (via Graph API)
-# Set to 'graph' for real SharePoint; 'mock' for local offline storage
-SHAREPOINT_STORAGE_TYPE=mock
-SHAREPOINT_SITE_ID=yourtenant.sharepoint.com,site-guid,web-guid
-SHAREPOINT_DRIVE_ID=b!your-drive-id-from-graph
-SHAREPOINT_ROOT_FOLDER=Referral-CVs
+# Document & CV Storage (Azure Blob Storage / Local Mock)
+# Set to 'blob' for Azure Blob Storage; 'mock' for local offline development
+STORAGE_TYPE=mock
+AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...
+BLOB_CV_CONTAINER=referral-cvs
+BLOB_DATA_CONTAINER=referral-data
 
 # AI CV Intelligence & HR Suggestions Engine
 CV_INTELLIGENCE_ENABLED=True
@@ -393,7 +392,7 @@ The portal synchronizes corporate job openings with Tangentia's official public 
 
 ---
 
-## 🔐 Microsoft Entra ID, SharePoint & Excel Setup
+## 🔐 Microsoft Entra ID & Storage Setup
 
 ### 1. Register Entra ID Application
 1. Open the **[Microsoft Entra Admin Center](https://entra.microsoft.com)** > **App registrations** > **New registration**.
@@ -402,33 +401,26 @@ The portal synchronizes corporate job openings with Tangentia's official public 
 4. Add Redirect URI: Platform `Single-page application (SPA)`, URI: `http://localhost:5173` (and production domain).
 5. Generate a **Client secret** under **Certificates & secrets** and set `AZURE_CLIENT_SECRET`.
 
-### 2. Configure Microsoft Graph API Permissions
+### 2. Configure Microsoft Graph API Permissions (for Excel Online)
 1. Under **API permissions**, select **Microsoft Graph** > **Application permissions**.
 2. Add permissions:
    - `Files.ReadWrite.All`
-   - `Sites.ReadWrite.All`
 3. Click **"Grant admin consent for [Your Organization]"**.
 
-### 3. Retrieve SharePoint Site ID & CV Drive ID
-1. Create a Document Library named `Referral-CVs` in SharePoint.
-2. In [Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer), execute:
-   ```http
-   GET https://graph.microsoft.com/v1.0/sites/{yourtenant}.sharepoint.com:/sites/{site-name}
-   ```
-   Copy the `id` to `SHAREPOINT_SITE_ID` and `EXCEL_SITE_ID`.
-3. Query site drives:
-   ```http
-   GET https://graph.microsoft.com/v1.0/sites/{site_id}/drives
-   ```
-   Locate `Referral-CVs` and copy its `id` to `SHAREPOINT_DRIVE_ID`.
+### 3. Configure Azure Blob Storage for CV Archival
+1. In the **[Azure Portal](https://portal.azure.com)**, navigate to your Azure Storage Account.
+2. Under **Data storage** > **Containers**, create a container named `referral-cvs` (and optionally `referral-data`).
+3. Under **Security + networking** > **Access keys**, copy the **Connection string** and set `AZURE_STORAGE_CONNECTION_STRING`.
+4. Set `STORAGE_TYPE=blob` for production (or `STORAGE_TYPE=mock` for local offline storage).
 
-### 4. Configure Microsoft Excel Online Storage
-1. Upload `Tangentia_Referrals.xlsx` to your SharePoint document library.
-2. Fetch the file's `item_id`:
+### 4. Configure Microsoft Excel Online Storage (Optional Cloud Sync)
+1. In local development, `EXCEL_STORAGE_TYPE=mock` uses the included local `Tangentia_Referrals.xlsx` via `openpyxl`.
+2. For live cloud Excel synchronization (`EXCEL_STORAGE_TYPE=graph`), upload `Tangentia_Referrals.xlsx` to your corporate drive.
+3. Fetch the file's `item_id` and drive ID via Microsoft Graph Explorer:
    ```http
    GET https://graph.microsoft.com/v1.0/drives/{drive_id}/root/children
    ```
-   Set the resulting `id` in `EXCEL_FILE_ITEM_ID` and set `EXCEL_STORAGE_TYPE=graph`.
+   Set `EXCEL_DRIVE_ID` and `EXCEL_FILE_ITEM_ID` accordingly.
 
 ---
 
@@ -489,7 +481,7 @@ docker-compose exec backend alembic upgrade head
 
 - **Server-Side Token Verification**: Tokens are cryptographically validated against Microsoft Entra ID JWKS public keys.
 - **Strict Role-Based Access Control (RBAC)**: HR endpoints (`/api/hr/*`, `/api/cv-intelligence/*`) enforce strict admin authorization. Regular employees can only view their own referrals.
-- **Zero Raw Document Exposure**: SharePoint document URLs and storage credentials are never exposed to browsers; all file downloads stream securely through authenticated backend proxies.
+- **Zero Raw Document Exposure**: Cloud storage credentials and raw blob URLs are never exposed to browsers; all file downloads stream securely through authenticated backend proxies.
 - **Magic-Byte & Anti-Traversal Validation**: Uploaded resumes undergo magic-byte signature checking (`%PDF-`, `PK\x03\x04`), 10MB file caps, and path sanitization.
 - **Explicit GDPR Candidate Consent**: Mandatory candidate consent tracking recorded on every referral submission.
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 Test the end-to-end referral submission pipeline where CV data is extracted and submitted:
-1. Purges all existing referrals from SQLite, Excel, Mock SharePoint, and CV DB.
+1. Purges all existing referrals from SQLite, Excel, Mock Storage, and CV DB.
 2. For each of the 18 CVs in Resume_Editing_/:
    - POST /api/referrals/extract-cv (tests CV extraction preview)
    - Inspects found vs not_found fields
    - Simulates user filling any missing fields manually
    - POST /api/referrals (submits the referral form with CV file attached)
    - Evaluates CV Intelligence processing & job matching
-3. Audits persistence across SQLite, Excel, Mock SharePoint, and HR suggestions.
+3. Audits persistence across SQLite, Excel, Mock Storage, and HR suggestions.
 4. Generates a comprehensive testing report.
 """
 
@@ -204,7 +204,7 @@ CV_PIPELINE_DATA = [
 
 
 def purge_all_data():
-    """Purge all referral records from SQLite, Excel, mock SharePoint, and CV DB."""
+    """Purge all referral records from SQLite, Excel, mock storage, and CV DB."""
     print("\n" + "=" * 70)
     print("STEP 1: PURGING ALL EXISTING REFERRAL DATA")
     print("=" * 70)
@@ -238,18 +238,18 @@ def purge_all_data():
         wb.save(excel_path)
         wb.close()
 
-    # 3. Mock SharePoint
-    sp_dir = settings.LOCAL_STORAGE_DIR
+    # 3. Mock Storage
+    storage_dir = settings.LOCAL_STORAGE_DIR
     current_year = str(datetime.now(timezone.utc).year)
-    year_dir = os.path.join(sp_dir, current_year)
+    year_dir = os.path.join(storage_dir, current_year)
     if os.path.exists(year_dir):
         shutil.rmtree(year_dir)
         os.makedirs(year_dir, exist_ok=True)
-        print(f"  [Mock SharePoint] Cleaned directory: {year_dir}")
-    index_file = os.path.join(sp_dir, "_index.json")
+        print(f"  [Mock Storage] Cleaned directory: {year_dir}")
+    index_file = os.path.join(storage_dir, "_index.json")
     with open(index_file, "w") as f:
         f.write("{}")
-    print(f"  [Mock SharePoint] Reset index: {index_file}")
+    print(f"  [Mock Storage] Reset index: {index_file}")
 
     # 4. CV Intelligence DB
     cv_db = CVSessionLocal()
@@ -416,11 +416,11 @@ def test_submission_and_extraction_pipeline():
     wb.close()
     print(f"  [Excel Verification] Referrals worksheet contains {excel_rows} rows.")
 
-    # 3. Query Mock SharePoint
+    # 3. Query Mock Storage
     current_year = str(datetime.now(timezone.utc).year)
     year_dir = os.path.join(settings.LOCAL_STORAGE_DIR, current_year)
-    sp_files = os.listdir(year_dir) if os.path.exists(year_dir) else []
-    print(f"  [SharePoint Verification] Mock storage contains {len(sp_files)} CV files.")
+    storage_files = os.listdir(year_dir) if os.path.exists(year_dir) else []
+    print(f"  [Storage Verification] Mock storage contains {len(storage_files)} CV files.")
 
     # 4. Query GET /api/cv-intelligence/suggestions
     sug_res = client.get("/api/cv-intelligence/suggestions", headers=hr_headers)
@@ -441,7 +441,7 @@ def test_submission_and_extraction_pipeline():
     print(f"  CVs Triggering Manual Fill:      {sum(1 for r in submission_results if r['manual_filled'])} / 18")
     print(f"  SQLite Referrals Count:          {len(all_refs)}")
     print(f"  Excel Referrals Rows:            {excel_rows}")
-    print(f"  Mock SharePoint Stored Files:    {len(sp_files)}")
+    print(f"  Mock Storage Stored Files:       {len(storage_files)}")
     print(f"  Openings with Ranked Candidates: {len(openings_with_matches)}")
     print("=" * 70 + "\n")
 

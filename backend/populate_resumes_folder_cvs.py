@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Populate and test CV Intelligence & HR Suggestions using ALL CVs from resumes/ folder.
-1. Purges all existing referrals from Main DB, Excel, Mock SharePoint, and CV Intelligence DB.
-2. Ingests all 29 CVs from resumes/ into Mock SharePoint, SQLite, and Excel.
+1. Purges all existing referrals from Main DB, Excel, Mock Storage, and CV Intelligence DB.
+2. Ingests all 29 CVs from resumes/ into Mock Storage, SQLite, and Excel.
 3. Executes CV Intelligence extraction (profile, education, skills, criteria).
 4. Generates match evaluations and HR suggestion rankings.
 5. Persists cv_intelligence.db to Azure Blob Storage if enabled.
@@ -30,7 +30,7 @@ from app.models.hr_note import HRNote
 from app.models.job_position import JobPosition
 from app.models.user import User, UserRole
 from app.services.excel.local_excel_service import LocalExcelService
-from app.services.sharepoint.mock_service import MockSharePointService
+from app.services.storage.local_service import LocalStorageService
 from app.cv_intelligence.database import cv_engine, CVBase, CVSessionLocal
 from app.cv_intelligence.models import CandidateProfile, JobMatch
 from app.cv_intelligence.service import CVIntelligenceService
@@ -359,7 +359,7 @@ REFERRERS = [
 
 
 def purge_all_referrals():
-    """Purge all referrals across DB, Excel, Mock SharePoint, and CV Intelligence."""
+    """Purge all referrals across DB, Excel, Mock Storage, and CV Intelligence."""
     print("\n--- 1. Purging All Existing Referral Data ---")
 
     # A. Clear SQLite Main DB
@@ -393,20 +393,20 @@ def purge_all_referrals():
         wb.close()
         print(f"  [Excel] Saved clean workbook: {excel_path}")
 
-    # C. Clear mock SharePoint storage files
-    sp_dir = settings.LOCAL_STORAGE_DIR
+    # C. Clear mock storage files
+    storage_dir = settings.LOCAL_STORAGE_DIR
     current_year = str(datetime.now(timezone.utc).year)
-    year_dir = os.path.join(sp_dir, current_year)
+    year_dir = os.path.join(storage_dir, current_year)
     if os.path.exists(year_dir):
         shutil.rmtree(year_dir)
         os.makedirs(year_dir, exist_ok=True)
-        print(f"  [SharePoint Mock] Cleared files in {year_dir}")
+        print(f"  [Mock Storage] Cleared files in {year_dir}")
 
     # Reset _index.json
-    index_file = os.path.join(sp_dir, "_index.json")
+    index_file = os.path.join(storage_dir, "_index.json")
     with open(index_file, "w") as f:
         f.write("{}")
-    print("  [SharePoint Mock] Reset _index.json")
+    print("  [Mock Storage] Reset _index.json")
 
     # D. Clear CV Intelligence DB
     cv_db_path = settings.CV_INTELLIGENCE_DB_PATH
@@ -433,7 +433,7 @@ async def ingest_resumes_folder_cvs():
     init_cv_db()
 
     excel_svc = LocalExcelService()
-    sp_svc = MockSharePointService()
+    storage_svc = LocalStorageService()
 
     db = SessionLocal()
     cv_db = CVSessionLocal()
@@ -492,16 +492,16 @@ async def ingest_resumes_folder_cvs():
         referrer = REFERRERS[idx % len(REFERRERS)]
         referral_number = f"REF-{current_year}-{idx:06d}"
 
-        from app.utils.security import generate_sharepoint_filename
-        stored_filename = generate_sharepoint_filename(
+        from app.utils.security import generate_storage_filename
+        stored_filename = generate_storage_filename(
             referral_number=referral_number,
             candidate_name=cand_name,
             position_title=position.title,
             original_filename=filename,
         )
 
-        # Save to mock SharePoint
-        sp_result = await sp_svc.upload_cv(
+        # Save to mock storage
+        storage_result = await storage_svc.upload_cv(
             file_bytes=cv_bytes,
             filename=stored_filename,
             referral_number=referral_number,
@@ -524,10 +524,10 @@ async def ingest_resumes_folder_cvs():
             referred_by_name=referrer["name"],
             referred_by_email=referrer["email"],
             status=ref_status,
-            sharepoint_drive_id=sp_result.drive_id,
-            sharepoint_item_id=sp_result.item_id,
-            sharepoint_file_id=sp_result.file_id,
-            sharepoint_file_url=sp_result.web_url,
+            storage_drive_id=storage_result.drive_id,
+            storage_item_id=storage_result.item_id,
+            storage_file_id=storage_result.file_id,
+            storage_file_url=storage_result.web_url,
             original_filename=filename,
             stored_filename=stored_filename,
             candidate_consent=True,
@@ -573,7 +573,7 @@ async def ingest_resumes_folder_cvs():
             "linkedin_url": "",
             "github_url": "",
             "original_filename": referral.original_filename,
-            "sharepoint_file_url": referral.sharepoint_file_url,
+            "storage_file_url": referral.storage_file_url,
             "referral_note": referral.referral_note,
             "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),

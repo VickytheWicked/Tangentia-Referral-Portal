@@ -1,4 +1,3 @@
-import uuid
 import logging
 import mimetypes
 from datetime import datetime, timezone
@@ -8,22 +7,21 @@ from azure.storage.blob import BlobServiceClient, ContentSettings
 from fastapi import HTTPException, status
 
 from app.config import settings
-from app.services.sharepoint.base import SharePointServiceInterface, SharePointUploadResult
+from app.services.storage.base import StorageServiceInterface, StorageUploadResult
 
 logger = logging.getLogger(__name__)
 
 
-class BlobSharePointService(SharePointServiceInterface):
+class BlobStorageService(StorageServiceInterface):
     """
-    Azure Blob Storage implementation of the SharePoint document interface.
+    Azure Blob Storage implementation of the document storage interface.
     Stores CV files in the configured blob container with year-based folder hierarchy.
-    Drop-in replacement for MockSharePointService — same interface, durable cloud storage.
     """
 
     def __init__(self):
         if not settings.AZURE_STORAGE_CONNECTION_STRING:
             raise RuntimeError(
-                "AZURE_STORAGE_CONNECTION_STRING is required when SHAREPOINT_STORAGE_TYPE='blob'. "
+                "AZURE_STORAGE_CONNECTION_STRING is required when STORAGE_TYPE='blob'. "
                 "Set it in your .env or App Service configuration."
             )
         self._blob_service = BlobServiceClient.from_connection_string(
@@ -46,7 +44,7 @@ class BlobSharePointService(SharePointServiceInterface):
         file_bytes: bytes,
         filename: str,
         referral_number: str,
-    ) -> SharePointUploadResult:
+    ) -> StorageUploadResult:
         year = str(datetime.now(timezone.utc).year)
         blob_name = f"{year}/{filename}"
 
@@ -72,7 +70,7 @@ class BlobSharePointService(SharePointServiceInterface):
         item_id = f"blob:{blob_name}"
         drive_id = f"blob:{self._container_name}"
 
-        return SharePointUploadResult(
+        return StorageUploadResult(
             drive_id=drive_id,
             item_id=item_id,
             file_id=item_id,

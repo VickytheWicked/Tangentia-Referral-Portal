@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Populate and test CV Intelligence & HR Suggestions using CVs from Resume_Editing_.
-1. Clears existing referrals from Main DB, Excel, Mock SharePoint, and CV Intelligence DB.
+1. Clears existing referrals from Main DB, Excel, Mock Storage, and CV Intelligence DB.
 2. Evaluates CV extraction preview (/api/referrals/extract-cv) on all 18 CVs.
-3. Ingests all 18 CVs from Resume_Editing_/ into mock SharePoint, SQLite, and Excel.
+3. Ingests all 18 CVs from Resume_Editing_/ into mock storage, SQLite, and Excel.
 4. Executes CV Intelligence extraction (profile, education, skills, criteria).
 5. Generates match evaluations and HR suggestion rankings.
 6. Exports a detailed testing report.
@@ -30,7 +30,7 @@ from app.models.hr_note import HRNote
 from app.models.job_position import JobPosition
 from app.models.user import User, UserRole
 from app.services.excel.local_excel_service import LocalExcelService, SHEET_SCHEMAS
-from app.services.sharepoint.mock_service import MockSharePointService
+from app.services.storage.local_service import LocalStorageService
 from app.cv_intelligence.database import cv_engine, CVBase, CVSessionLocal
 from app.cv_intelligence.models import CandidateProfile, JobMatch
 from app.cv_intelligence.service import CVIntelligenceService
@@ -226,7 +226,7 @@ CV_METADATA = [
 
 
 def clear_local_storage():
-    """Clear all existing referrals from Main DB, Excel, Mock SharePoint, and CV DB."""
+    """Clear all existing referrals from Main DB, Excel, Mock Storage, and CV DB."""
     print("\n--- 1. Clearing Existing Local Development Referrals ---")
 
     # A. Clear Main SQLite DB
@@ -260,20 +260,20 @@ def clear_local_storage():
         wb.close()
         print(f"  [Excel] Saved clean workbook: {excel_path}")
 
-    # C. Clear mock SharePoint storage files
-    sp_dir = settings.LOCAL_STORAGE_DIR
+    # C. Clear mock storage files
+    storage_dir = settings.LOCAL_STORAGE_DIR
     current_year = str(datetime.now(timezone.utc).year)
-    year_dir = os.path.join(sp_dir, current_year)
+    year_dir = os.path.join(storage_dir, current_year)
     if os.path.exists(year_dir):
         shutil.rmtree(year_dir)
         os.makedirs(year_dir, exist_ok=True)
-        print(f"  [SharePoint Mock] Cleared files in {year_dir}")
+        print(f"  [Mock Storage] Cleared files in {year_dir}")
 
     # Reset _index.json
-    index_file = os.path.join(sp_dir, "_index.json")
+    index_file = os.path.join(storage_dir, "_index.json")
     with open(index_file, "w") as f:
         f.write("{}")
-    print("  [SharePoint Mock] Reset _index.json")
+    print("  [Mock Storage] Reset _index.json")
 
     # D. Clear CV Intelligence DB
     cv_db_path = settings.CV_INTELLIGENCE_DB_PATH
@@ -301,7 +301,7 @@ async def populate_cvs_and_test():
     init_cv_db()
 
     excel_svc = LocalExcelService()
-    sp_svc = MockSharePointService()
+    storage_svc = LocalStorageService()
     
     db = SessionLocal()
     cv_db = CVSessionLocal()
@@ -385,7 +385,7 @@ async def populate_cvs_and_test():
         ext = os.path.splitext(filename)[1]
         stored_filename = f"{ref_num}_{safe_name}{ext}"
 
-        upload_result = await sp_svc.upload_cv(
+        upload_result = await storage_svc.upload_cv(
             file_bytes=cv_bytes,
             filename=stored_filename,
             referral_number=ref_num,
@@ -407,9 +407,9 @@ async def populate_cvs_and_test():
             referred_by_user_id="user-emp-001",
             original_filename=filename,
             stored_filename=stored_filename,
-            sharepoint_file_url=upload_result.web_url,
-            sharepoint_drive_id=upload_result.drive_id,
-            sharepoint_item_id=upload_result.item_id,
+            storage_file_url=upload_result.web_url,
+            storage_drive_id=upload_result.drive_id,
+            storage_item_id=upload_result.item_id,
             referral_note=item["note"],
             candidate_consent=True,
             created_at=now,
@@ -434,7 +434,7 @@ async def populate_cvs_and_test():
             "linkedin_url": "",
             "github_url": "",
             "original_filename": filename,
-            "sharepoint_file_url": upload_result.web_url,
+            "storage_file_url": upload_result.web_url,
             "referral_note": item["note"],
             "created_at": now.strftime("%Y-%m-%d %H:%M:%S"),
             "updated_at": now.strftime("%Y-%m-%d %H:%M:%S"),
@@ -470,14 +470,14 @@ async def populate_cvs_and_test():
     report_lines = []
     report_lines.append("# Tangentia Referral Portal - CV Deletion & Re-upload Testing Report")
     report_lines.append(f"\n**Execution Timestamp**: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
-    report_lines.append(f"**Test Environment**: Local Development (SQLite + Excel Write-through + Mock SharePoint)\n")
+    report_lines.append(f"**Test Environment**: Local Development (SQLite + Excel Write-through + Mock Storage)\n")
 
     report_lines.append("## 1. Storage Cleanup Verification")
     report_lines.append("| Target Data Store | Action Taken | Result Status |")
     report_lines.append("|---|---|---|")
     report_lines.append("| SQLite Database (`tangentia_referrals.db`) | Deleted `referrals`, `referral_status_history`, `hr_notes` | Verified Empty |")
     report_lines.append("| Excel Workbook (`tangentia_referrals.xlsx`) | Cleared `Referrals`, `StatusHistory`, `HRNotes`, `HiredHistory` rows | Verified Empty (Headers Preserved) |")
-    report_lines.append("| Mock SharePoint Storage (`data/sharepoint_mock/`) | Cleared current year directory and reset `_index.json` | Verified Empty |")
+    report_lines.append("| Mock Storage (`storage/mock_storage/`) | Cleared current year directory and reset `_index.json` | Verified Empty |")
     report_lines.append("| CV Intelligence Database (`cv_intelligence.db`) | Deleted `job_matches` and `candidate_profiles` | Verified Empty |")
 
     report_lines.append("\n## 2. CV Upload & Autofill Extraction Test (/api/referrals/extract-cv)")
@@ -538,8 +538,8 @@ async def populate_cvs_and_test():
     excel_ref_count = max(0, ws_check.max_row - 1)
     wb_check.close()
 
-    # Check Mock SharePoint file count
-    sp_count = len(os.listdir(os.path.join(settings.LOCAL_STORAGE_DIR, str(current_year))))
+    # Check Mock storage file count
+    storage_count = len(os.listdir(os.path.join(settings.LOCAL_STORAGE_DIR, str(current_year))))
 
     # Check CV Intelligence Profiles
     cv_prof_count = cv_db.query(CandidateProfile).count()
@@ -549,7 +549,7 @@ async def populate_cvs_and_test():
     report_lines.append("|---|---|---|---|---|")
     report_lines.append(f"| SQLite (`tangentia_referrals.db`) | Referral Records | 18 | {db_ref_count} | {'PASS' if db_ref_count == 18 else 'FAIL'} |")
     report_lines.append(f"| Excel (`tangentia_referrals.xlsx`) | Referrals Rows | 18 | {excel_ref_count} | {'PASS' if excel_ref_count == 18 else 'FAIL'} |")
-    report_lines.append(f"| Mock SharePoint (`/data/sharepoint_mock/{current_year}`) | Stored CV Files | 18 | {sp_count} | {'PASS' if sp_count == 18 else 'FAIL'} |")
+    report_lines.append(f"| Mock Storage (`/storage/mock_storage/{current_year}`) | Stored CV Files | 18 | {storage_count} | {'PASS' if storage_count == 18 else 'FAIL'} |")
     report_lines.append(f"| CV Intelligence DB (`candidate_profiles`) | Extracted Profiles | 18 | {cv_prof_count} | {'PASS' if cv_prof_count == 18 else 'FAIL'} |")
     report_lines.append(f"| CV Intelligence DB (`job_matches`) | Matched Evaluations | > 0 | {cv_match_count} | {'PASS' if cv_match_count > 0 else 'FAIL'} |")
 
@@ -577,7 +577,7 @@ async def populate_cvs_and_test():
     print(f"  - Match Suggestions Across Openings: {total_candidates_matched}")
     print(f"  - SQLite Referrals Count: {db_ref_count}")
     print(f"  - Excel Referrals Rows: {excel_ref_count}")
-    print(f"  - Mock SharePoint Files: {sp_count}")
+    print(f"  - Mock Storage Files: {storage_count}")
     print("=" * 70 + "\n")
 
     db.close()

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class GraphExcelService(LocalExcelService):
     """
     Microsoft Excel Online implementation via Microsoft Graph API.
-    Writes rows directly to cloud-hosted Excel Online workbooks in SharePoint/OneDrive,
+    Writes rows directly to cloud-hosted Excel Online workbooks,
     while maintaining a synchronized local Excel file cache for instant offline reads and export.
     """
 
@@ -72,7 +72,7 @@ class GraphExcelService(LocalExcelService):
             referral_data.get("linkedin_url", "") or "",
             referral_data.get("github_url", "") or "",
             referral_data.get("original_filename", ""),
-            referral_data.get("sharepoint_file_url", "") or "",
+            referral_data.get("storage_file_url", "") or "",
             referral_data.get("referral_note", ""),
             referral_data.get("created_at", ""),
             referral_data.get("updated_at", ""),

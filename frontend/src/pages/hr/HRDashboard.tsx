@@ -277,7 +277,7 @@ export const HRDashboard: React.FC<HRDashboardProps> = ({ onNavigate, onOpenCand
                       <button
                         className="btn btn-outline btn-sm"
                         onClick={() => handleDownloadCV(r.id, r.original_filename)}
-                        title="Download CV from SharePoint"
+                        title="Download candidate CV"
                       >
                         <Download size={14} /> Download
                       </button>

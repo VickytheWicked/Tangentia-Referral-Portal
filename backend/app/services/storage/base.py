@@ -4,7 +4,7 @@ from typing import Tuple, Optional
 
 
 @dataclass
-class SharePointUploadResult:
+class StorageUploadResult:
     drive_id: str
     item_id: str
     file_id: str
@@ -12,10 +12,10 @@ class SharePointUploadResult:
     stored_filename: str
 
 
-class SharePointServiceInterface(ABC):
+class StorageServiceInterface(ABC):
     """
-    Abstract interface for SharePoint document library operations.
-    Decouples business logic from Microsoft Graph API implementation.
+    Abstract interface for document and CV file storage operations.
+    Decouples referral business logic from cloud or local storage providers.
     """
 
     @abstractmethod
@@ -24,9 +24,9 @@ class SharePointServiceInterface(ABC):
         file_bytes: bytes,
         filename: str,
         referral_number: str,
-    ) -> SharePointUploadResult:
+    ) -> StorageUploadResult:
         """
-        Upload a CV document to the configured SharePoint document library.
+        Upload a CV document to the configured storage repository.
         Returns metadata identifiers for database storage.
         """
         pass
@@ -42,7 +42,7 @@ class SharePointServiceInterface(ABC):
         candidate_name: Optional[str] = None,
     ) -> Tuple[bytes, str, str]:
         """
-        Download CV file bytes from SharePoint / storage for authorized proxy streaming.
+        Download CV file bytes from storage for authorized proxy streaming.
         Returns: (file_bytes, filename, content_type)
         """
         pass
@@ -50,10 +50,10 @@ class SharePointServiceInterface(ABC):
     @abstractmethod
     async def delete_cv(
         self,
-        drive_id: str,
-        item_id: str,
+        drive_id: Optional[str] = None,
+        item_id: Optional[str] = None,
     ) -> bool:
         """
-        Delete a file from SharePoint (used for transactional rollback if database commit fails).
+        Delete a file from storage (used for transactional rollback if database commit fails).
         """
         pass

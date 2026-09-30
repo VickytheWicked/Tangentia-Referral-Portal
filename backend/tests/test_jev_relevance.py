@@ -120,7 +120,7 @@ async def test_referral_submission_with_jev_disabled(db_session, seeded_job, see
     """When CV_RELEVANCE_CHECK_ENABLED=False (default), submission runs normally with zero overhead."""
     from app.services.referral_service import create_referral_with_cv
     from app.schemas.referral import ReferralCreateForm
-    from app.services.sharepoint.mock_service import MockSharePointService
+    from app.services.storage.local_service import LocalStorageService
     from unittest.mock import AsyncMock
 
     mock_file = MagicMock()
@@ -139,14 +139,14 @@ async def test_referral_submission_with_jev_disabled(db_session, seeded_job, see
         candidate_consent=True,
     )
 
-    sp_service = MockSharePointService(storage_dir=str(tmp_path / "sp_storage"))
+    storage_service = LocalStorageService(storage_dir=str(tmp_path / "storage"))
 
     referral = await create_referral_with_cv(
         db=db_session,
         form_data=form_data,
         file=mock_file,
         current_user=seeded_users["emp1"],
-        sharepoint_service=sp_service,
+        storage_service=storage_service,
     )
     assert referral.candidate_name == "Alice Smith"
     assert referral.referral_number.startswith("REF-")
@@ -160,7 +160,7 @@ async def test_referral_submission_with_jev_failure_does_not_crash(db_session, s
 
     from app.services.referral_service import create_referral_with_cv
     from app.schemas.referral import ReferralCreateForm
-    from app.services.sharepoint.mock_service import MockSharePointService
+    from app.services.storage.local_service import LocalStorageService
     from unittest.mock import AsyncMock
 
     mock_file = MagicMock()
@@ -179,7 +179,7 @@ async def test_referral_submission_with_jev_failure_does_not_crash(db_session, s
         candidate_consent=True,
     )
 
-    sp_service = MockSharePointService(storage_dir=str(tmp_path / "sp_storage"))
+    storage_service = LocalStorageService(storage_dir=str(tmp_path / "storage"))
 
     # Simulate Jev failing completely
     with patch("app.cv_intelligence.jev_relevance.check_cv_relevance", side_effect=Exception("Jev network timeout")):
@@ -189,7 +189,7 @@ async def test_referral_submission_with_jev_failure_does_not_crash(db_session, s
                 form_data=form_data,
                 file=mock_file,
                 current_user=seeded_users["emp1"],
-                sharepoint_service=sp_service,
+                storage_service=storage_service,
             )
             assert referral.candidate_name == "Bob Jones"
 
@@ -235,9 +235,9 @@ async def test_referral_submission_with_low_relevance_blocking_enabled(db_sessio
                     form_data=form_data,
                     file=mock_file,
                     current_user=seeded_users["emp1"],
-                    sharepoint_service=mock_sp,
+                    storage_service=mock_sp,
                 )
             assert exc_info.value.status_code == 422
             assert "does not appear to match" in exc_info.value.detail
-            # Ensure SharePoint upload was never called since submission was blocked before upload
+            # Ensure storage upload was never called since submission was blocked before upload
             mock_sp.upload_cv.assert_not_called()

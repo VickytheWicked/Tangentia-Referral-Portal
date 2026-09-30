@@ -152,7 +152,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 "status": ReferralStatus.INTERVIEW.value,
                 "referred_by_user_id": "user-emp-001",
                 "original_filename": "Rahul_Sharma_CV.pdf",
-                "sharepoint_file_url": "https://tangentia.sharepoint.com/sites/hr/Referral-CVs/Rahul_Sharma_CV.pdf",
+                "storage_file_url": "https://tangentia.blob.core.windows.net/referral-cvs/2026/Rahul_Sharma_CV.pdf",
                 "referral_note": "Worked with Rahul at FinTech Corp. Brilliant distributed systems knowledge and very proactive team player.",
             },
             {
@@ -169,7 +169,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 "status": ReferralStatus.SHORTLISTED.value,
                 "referred_by_user_id": "user-emp-001",
                 "original_filename": "Ananya_Patel_CV.pdf",
-                "sharepoint_file_url": "https://tangentia.sharepoint.com/sites/hr/Referral-CVs/Ananya_Patel_CV.pdf",
+                "storage_file_url": "https://tangentia.blob.core.windows.net/referral-cvs/2026/Ananya_Patel_CV.pdf",
                 "referral_note": "Ananya has published research papers in NLP and built agentic search engines using LangChain and FastAPI.",
             },
             {
@@ -186,7 +186,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 "status": ReferralStatus.UNDER_REVIEW.value,
                 "referred_by_user_id": "user-emp-001",
                 "original_filename": "David_Chen_CV.pdf",
-                "sharepoint_file_url": "https://tangentia.sharepoint.com/sites/hr/Referral-CVs/David_Chen_CV.pdf",
+                "storage_file_url": "https://tangentia.blob.core.windows.net/referral-cvs/2026/David_Chen_CV.pdf",
                 "referral_note": "David is a seasoned cloud architect who led multi-region Azure migrations at his previous enterprise employer.",
             },
         ]
@@ -206,7 +206,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 status=r_info["status"],
                 original_filename=r_info["original_filename"],
                 stored_filename=r_info["original_filename"],
-                sharepoint_file_url=r_info["sharepoint_file_url"],
+                storage_file_url=r_info.get("storage_file_url"),
                 referral_note=r_info["referral_note"],
                 candidate_consent=True,
             )
@@ -437,7 +437,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 rel = str(row.get("Relationship") or "Former Colleague").strip()
                 note = str(row.get("Referral Note") or "Referred candidate.").strip()
                 orig_file = str(row.get("Original CV Filename") or "resume.pdf").strip()
-                sp_url = str(row.get("SharePoint CV URL") or "").strip()
+                cv_url = str(row.get("CV File URL") or "").strip()
                 li_url = str(row.get("LinkedIn URL") or "").strip() or None
                 gh_url = str(row.get("GitHub URL") or "").strip() or None
 
@@ -452,17 +452,17 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                         except Exception:
                             pass
 
-                sp_drive_id = None
-                sp_item_id = None
+                storage_drive_id = None
+                storage_item_id = None
                 stored_file = orig_file
-                if sp_url:
-                    if "/referral-cvs/" in sp_url:
-                        blob_path = sp_url.split("/referral-cvs/")[-1]
-                        sp_item_id = f"blob:{blob_path}"
-                        sp_drive_id = "blob:referral-cvs"
+                if cv_url:
+                    if "/referral-cvs/" in cv_url:
+                        blob_path = cv_url.split("/referral-cvs/")[-1]
+                        storage_item_id = f"blob:{blob_path}"
+                        storage_drive_id = "blob:referral-cvs"
                         stored_file = blob_path.split("/")[-1]
-                    elif "sharepoint.com" in sp_url:
-                        parts = sp_url.rstrip("/").split("/")
+                    else:
+                        parts = cv_url.rstrip("/").split("/")
                         if parts:
                             stored_file = parts[-1]
 
@@ -480,9 +480,9 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                     status=status_val,
                     original_filename=orig_file,
                     stored_filename=stored_file,
-                    sharepoint_drive_id=sp_drive_id,
-                    sharepoint_item_id=sp_item_id,
-                    sharepoint_file_url=sp_url,
+                    storage_drive_id=storage_drive_id,
+                    storage_item_id=storage_item_id,
+                    storage_file_url=cv_url,
                     linkedin_url=li_url,
                     github_url=gh_url,
                     referral_note=note,

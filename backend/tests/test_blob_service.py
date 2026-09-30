@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
-from app.services.sharepoint.blob_service import BlobSharePointService
+from app.services.storage.blob_service import BlobStorageService
 
 
 @pytest.fixture
@@ -14,7 +14,7 @@ def mock_blob_env(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_blob_download_cv_with_none_item_id_and_fallback(mock_blob_env):
-    with patch("app.services.sharepoint.blob_service.BlobServiceClient") as mock_bsc:
+    with patch("app.services.storage.blob_service.BlobServiceClient") as mock_bsc:
         service_client_instance = MagicMock()
         mock_bsc.from_connection_string.return_value = service_client_instance
         container_client = MagicMock()
@@ -30,7 +30,7 @@ async def test_blob_download_cv_with_none_item_id_and_fallback(mock_blob_env):
         blob_client.download_blob.return_value.readall.return_value = b"%PDF-1.4 Mock Blob Content"
         container_client.get_blob_client.return_value = blob_client
 
-        service = BlobSharePointService()
+        service = BlobStorageService()
 
         # item_id is None, referral_number is REF-2026-000004
         content, filename, content_type = await service.download_cv(
@@ -47,14 +47,14 @@ async def test_blob_download_cv_with_none_item_id_and_fallback(mock_blob_env):
 
 @pytest.mark.asyncio
 async def test_blob_download_cv_not_found(mock_blob_env):
-    with patch("app.services.sharepoint.blob_service.BlobServiceClient") as mock_bsc:
+    with patch("app.services.storage.blob_service.BlobServiceClient") as mock_bsc:
         service_client_instance = MagicMock()
         mock_bsc.from_connection_string.return_value = service_client_instance
         container_client = MagicMock()
         service_client_instance.get_container_client.return_value = container_client
         container_client.list_blobs.return_value = []
 
-        service = BlobSharePointService()
+        service = BlobStorageService()
 
         with pytest.raises(HTTPException) as exc_info:
             await service.download_cv(

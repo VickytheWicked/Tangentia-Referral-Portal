@@ -24,7 +24,7 @@ from app.cv_intelligence.schemas import (
     CandidateProfileDetailResponse,
     JobMatchItem,
 )
-from app.services.sharepoint import get_sharepoint_service
+from app.services.storage import get_storage_service
 
 logger = logging.getLogger("cv_intelligence")
 
@@ -109,10 +109,10 @@ class CVIntelligenceService:
 
         try:
             # 1. Download original CV bytes using existing storage service
-            sharepoint_svc = get_sharepoint_service()
-            cv_bytes, filename, content_type = await sharepoint_svc.download_cv(
-                drive_id=referral.sharepoint_drive_id,
-                item_id=referral.sharepoint_item_id,
+            storage_svc = get_storage_service()
+            cv_bytes, filename, content_type = await storage_svc.download_cv(
+                drive_id=referral.storage_drive_id,
+                item_id=referral.storage_item_id,
                 referral_number=referral.referral_number,
                 stored_filename=referral.stored_filename,
                 original_filename=referral.original_filename,

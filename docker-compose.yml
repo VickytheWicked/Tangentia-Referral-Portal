@@ -39,10 +39,10 @@ services:
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
       - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
       - AZURE_HR_GROUP_ID=${AZURE_HR_GROUP_ID}
-      - SHAREPOINT_STORAGE_TYPE=graph
-      - SHAREPOINT_SITE_ID=${SHAREPOINT_SITE_ID}
-      - SHAREPOINT_DRIVE_ID=${SHAREPOINT_DRIVE_ID}
-      - SHAREPOINT_ROOT_FOLDER=Referral-CVs
+      - STORAGE_TYPE=blob
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
+      - BLOB_CV_CONTAINER=referral-cvs
+      - BLOB_DATA_CONTAINER=referral-data
     depends_on:
       postgres:
         condition: service_healthy

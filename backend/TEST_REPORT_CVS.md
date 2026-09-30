@@ -1,14 +1,14 @@
 # Tangentia Referral Portal - CV Deletion & Re-upload Testing Report
 
 **Execution Timestamp**: 2026-09-22 19:07:36 UTC
-**Test Environment**: Local Development (SQLite + Excel Write-through + Mock SharePoint)
+**Test Environment**: Local Development (SQLite + Excel Write-through + Mock Storage)
 
 ## 1. Storage Cleanup Verification
 | Target Data Store | Action Taken | Result Status |
 |---|---|---|
 | SQLite Database (`tangentia_referrals.db`) | Deleted `referrals`, `referral_status_history`, `hr_notes` | Verified Empty |
 | Excel Workbook (`tangentia_referrals.xlsx`) | Cleared `Referrals`, `StatusHistory`, `HRNotes`, `HiredHistory` rows | Verified Empty (Headers Preserved) |
-| Mock SharePoint Storage (`data/sharepoint_mock/`) | Cleared current year directory and reset `_index.json` | Verified Empty |
+| Mock Storage (`storage/mock_storage/`) | Cleared current year directory and reset `_index.json` | Verified Empty |
 | CV Intelligence Database (`cv_intelligence.db`) | Deleted `job_matches` and `candidate_profiles` | Verified Empty |
 
 ## 2. CV Upload & Autofill Extraction Test (/api/referrals/extract-cv)
@@ -166,6 +166,6 @@ Openings sorted by total number of candidate referrals, displaying AI advisory s
 |---|---|---|---|---|
 | SQLite (`tangentia_referrals.db`) | Referral Records | 18 | 18 | PASS |
 | Excel (`tangentia_referrals.xlsx`) | Referrals Rows | 18 | 18 | PASS |
-| Mock SharePoint (`/data/sharepoint_mock/2026`) | Stored CV Files | 18 | 18 | PASS |
+| Mock Storage (`/storage/mock_storage/2026`) | Stored CV Files | 18 | 18 | PASS |
 | CV Intelligence DB (`candidate_profiles`) | Extracted Profiles | 18 | 18 | PASS |
 | CV Intelligence DB (`job_matches`) | Matched Evaluations | > 0 | 18 | PASS |

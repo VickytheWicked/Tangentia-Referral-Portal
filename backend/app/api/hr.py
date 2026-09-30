@@ -129,8 +129,8 @@ async def api_delete_referral(
 
     ref_num = ref.referral_number
     cand_name = ref.candidate_name
-    sp_drive_id = ref.sharepoint_drive_id
-    sp_item_id = ref.sharepoint_item_id
+    storage_drive_id = ref.storage_drive_id
+    storage_item_id = ref.storage_item_id
 
     # Delete associated CV Intelligence data (candidate profile, job matches, and blob sync)
     try:
@@ -138,17 +138,17 @@ async def api_delete_referral(
     except Exception as cv_err:
         logger.warning(f"Failed to delete CV intelligence data for referral {referral_id}: {cv_err}")
 
-    # Delete CV file from storage (SharePoint / Azure Blob / local) if applicable
+    # Delete CV file from storage (Azure Blob / local) if applicable
     try:
-        if sp_drive_id and sp_item_id:
-            from app.services.sharepoint import get_sharepoint_service
-            sp_service = get_sharepoint_service()
-            await sp_service.delete_cv(
-                drive_id=sp_drive_id,
-                item_id=sp_item_id,
+        if storage_drive_id and storage_item_id:
+            from app.services.storage import get_storage_service
+            storage_service = get_storage_service()
+            await storage_service.delete_cv(
+                drive_id=storage_drive_id,
+                item_id=storage_item_id,
             )
-    except Exception as sp_err:
-        logger.warning(f"Failed to delete CV file for referral {referral_id} from storage: {sp_err}")
+    except Exception as storage_err:
+        logger.warning(f"Failed to delete CV file for referral {referral_id} from storage: {storage_err}")
 
     # Delete from database (cascades to status_history and hr_notes)
     db.delete(ref)

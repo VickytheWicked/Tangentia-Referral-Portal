@@ -11,8 +11,6 @@ from app.main import app
 from app.models.user import User, UserRole
 from app.models.job_position import JobPosition
 from app.models.referral import Referral, ReferralStatus
-from app.services.sharepoint.mock_service import MockSharePointService
-from app.services.sharepoint import get_sharepoint_service
 
 from app.services.excel.local_excel_service import LocalExcelService
 import app.services.excel as excel_module
