@@ -225,7 +225,7 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
               className="btn btn-secondary btn-sm"
               onClick={handleExportExcel}
               disabled={isExporting}
-              title="Download Microsoft Excel Online Workbook (.xlsx)"
+              title="Download Tangentia Referrals Excel Workbook (.xlsx)"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
               <FileSpreadsheet size={15} color="#10b981" />

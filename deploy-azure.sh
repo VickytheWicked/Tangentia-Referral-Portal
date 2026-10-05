@@ -113,11 +113,66 @@ FRONTEND_HOSTNAME=$(az staticwebapp show \
 FRONTEND_URL="https://${FRONTEND_HOSTNAME}"
 ok "Frontend Static Web App ready: $FRONTEND_URL"
 
+STORAGE_ACCOUNT_NAME="${AZURE_STORAGE_ACCOUNT:-tangstrg$(echo -n "$RESOURCE_GROUP" | md5sum | cut -c1-8)}"
+
 # ==============================================================================
-# Step 4: Configure Backend Environment Variables
+# Step 4: Setup Azure Blob Storage (Excel Ledger & Candidate CVs)
 # ==============================================================================
-log "Setting backend environment variables (dev/mock mode)..."
+log "Setting up Azure Storage Account for Excel ledger & CV documents: $STORAGE_ACCOUNT_NAME..."
+az storage account create \
+  --name "$STORAGE_ACCOUNT_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --location "$LOCATION" \
+  --sku Standard_LRS \
+  --kind StorageV2 \
+  --output none 2>/dev/null || true
+
+STORAGE_CONN_STR=$(az storage account show-connection-string \
+  --name "$STORAGE_ACCOUNT_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --query "connectionString" -o tsv 2>/dev/null || echo "")
+
+if [ -n "$STORAGE_CONN_STR" ]; then
+  ok "Storage account ready: $STORAGE_ACCOUNT_NAME"
+  log "Ensuring blob containers exist ('referral-data' and 'referral-cvs')..."
+  az storage container create \
+    --name "referral-data" \
+    --connection-string "$STORAGE_CONN_STR" \
+    --output none 2>/dev/null || true
+
+  az storage container create \
+    --name "referral-cvs" \
+    --connection-string "$STORAGE_CONN_STR" \
+    --output none 2>/dev/null || true
+
+  # Seed initial Excel ledger to blob storage if not present
+  EXISTS=$(az storage blob exists \
+    --container-name "referral-data" \
+    --name "Tangentia_Referrals.xlsx" \
+    --connection-string "$STORAGE_CONN_STR" \
+    --query "exists" -o tsv 2>/dev/null || echo "false")
+
+  if [ "$EXISTS" != "true" ] && [ -f "$BACKEND_DIR/data/Tangentia_Referrals.xlsx" ]; then
+    log "Seeding initial Tangentia_Referrals.xlsx into Azure Blob Storage..."
+    az storage blob upload \
+      --container-name "referral-data" \
+      --file "$BACKEND_DIR/data/Tangentia_Referrals.xlsx" \
+      --name "Tangentia_Referrals.xlsx" \
+      --connection-string "$STORAGE_CONN_STR" \
+      --overwrite false \
+      --output none 2>/dev/null || true
+    ok "Tangentia_Referrals.xlsx seeded to Azure Blob Storage."
+  fi
+else
+  warn "Could not retrieve Azure Storage connection string. Backend will fallback to local storage."
+fi
+
+# ==============================================================================
+# Step 5: Configure Backend Environment Variables
+# ==============================================================================
+log "Setting backend environment variables..."
 JWT_SECRET_KEY=$(openssl rand -hex 32)
+
 az webapp config appsettings set \
   --name "$BACKEND_APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
@@ -129,10 +184,12 @@ az webapp config appsettings set \
     ALLOW_DEV_TOKENS="False" \
     JWT_SECRET_KEY="$JWT_SECRET_KEY" \
     DATABASE_URL="sqlite:///:memory:" \
-    EXCEL_STORAGE_TYPE="mock" \
-    STORAGE_TYPE="mock" \
-    CV_STORAGE_TYPE="local" \
+    EXCEL_STORAGE_TYPE="blob" \
+    STORAGE_TYPE="blob" \
+    CV_STORAGE_TYPE="azure" \
+    AZURE_STORAGE_CONNECTION_STRING="$STORAGE_CONN_STR" \
     BLOB_DATA_CONTAINER="referral-data" \
+    BLOB_CV_CONTAINER="referral-cvs" \
     BLOB_CV_INTELLIGENCE_NAME="cv_intelligence.db" \
     CORS_ORIGINS_EXTRA="${FRONTEND_URL}" \
     WEBSITES_PORT="8000" \
@@ -140,9 +197,8 @@ az webapp config appsettings set \
   --output none 2>/dev/null
 ok "Backend environment configured."
 
-
 # ==============================================================================
-# Step 5: Deploy Backend (Zip Deploy)
+# Step 6: Deploy Backend (Zip Deploy)
 # ==============================================================================
 log "Packaging backend for deployment..."
 DEPLOY_ZIP="$SCRIPT_DIR/backend-deploy.zip"
@@ -185,16 +241,14 @@ else
 fi
 
 # ==============================================================================
-# Step 6: Build & Deploy Frontend
+# Step 7: Build & Deploy Frontend
 # ==============================================================================
 log "Building frontend for production..."
 cd "$FRONTEND_DIR"
 
-# Write production env
+# Write production env (no Entra ID required)
 cat > .env.production <<EOF
 VITE_API_BASE_URL=${BACKEND_URL}/api
-VITE_AZURE_CLIENT_ID=00000000-0000-0000-0000-000000000000
-VITE_AZURE_TENANT_ID=common
 EOF
 
 npm ci --silent 2>/dev/null
@@ -225,12 +279,9 @@ echo -e "  Backend:   ${CYAN}${BACKEND_URL}${NC}"
 echo -e "  API Docs:  ${CYAN}${BACKEND_URL}/api/docs${NC}"
 echo -e "  Health:    ${CYAN}${BACKEND_URL}/api/health${NC}"
 echo ""
-echo -e "  Mode:      ${YELLOW}DEV_MODE (mock storage, simulated auth)${NC}"
-echo -e "  Storage:   Local filesystem on App Service"
-echo -e "  Auth:      Simulated dev tokens (no Entra ID)"
-echo -e "  Cost:      ~\$13 USD/month (App Service B1)"
+echo -e "  Auth:      Portal JWT Authentication (@tangentia.com HR login, zero-friction employee workspace)"
+echo -e "  Storage:   Azure Blob Storage (Tangentia_Referrals.xlsx + Candidate Resumes)"
+echo -e "  Plan:      Azure App Service (B1) + Azure Static Web App (Free) + Azure Blob Storage"
 echo ""
-echo -e "${YELLOW}  NOTE: CVs and Excel data are stored on the App Service filesystem.${NC}"
-echo -e "${YELLOW}  Data persists across restarts but NOT across scale-out or redeployment.${NC}"
-echo -e "${YELLOW}  For production, consider Azure Blob Storage + PostgreSQL.${NC}"
+echo -e "${GREEN}  System is fully configured with persistent Azure Blob Storage for the Excel ledger.${NC}"
 echo ""

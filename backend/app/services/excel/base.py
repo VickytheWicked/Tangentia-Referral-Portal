@@ -4,8 +4,7 @@ from typing import Dict, List, Any, Optional
 
 class ExcelServiceInterface(ABC):
     """
-    Abstract interface for Microsoft Excel Online & local .xlsx workbook persistence.
-    Decouples storage logic from Microsoft Graph API implementation.
+    Abstract interface for Excel workbook persistence (Azure Blob Storage & local .xlsx).
     """
 
     @abstractmethod

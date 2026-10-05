@@ -57,20 +57,25 @@ az webapp show \
   --output none 2>/dev/null \
   || err "App Service '$BACKEND_APP_NAME' not found in '$RESOURCE_GROUP'. Run deploy-azure.sh first."
 
-# Ensure production security & enterprise infrastructure settings on App Service
-log "Verifying and updating production security and infrastructure settings..."
+# Ensure production settings on App Service
+log "Verifying production App Service configuration..."
 az webapp config appsettings set \
   --name "$BACKEND_APP_NAME" \
   --resource-group "$RESOURCE_GROUP" \
   --settings \
     DEV_MODE="False" \
     ALLOW_DEV_TOKENS="False" \
-    DATABASE_URL="@Microsoft.KeyVault(SecretUri=https://tangentia-kv-ref.vault.azure.net/secrets/DATABASE-URL/)" \
-    JWT_SECRET_KEY="@Microsoft.KeyVault(SecretUri=https://tangentia-kv-ref.vault.azure.net/secrets/JWT-SECRET-KEY/)" \
-    AZURE_STORAGE_CONNECTION_STRING="@Microsoft.KeyVault(SecretUri=https://tangentia-kv-ref.vault.azure.net/secrets/AZURE-STORAGE-CONNECTION-STRING/)" \
-    GEMINI_API_KEY="@Microsoft.KeyVault(SecretUri=https://tangentia-kv-ref.vault.azure.net/secrets/GEMINI-API-KEY/)" \
+    DATABASE_URL="sqlite:///:memory:" \
+    EXCEL_STORAGE_TYPE="blob" \
+    STORAGE_TYPE="blob" \
+    CV_STORAGE_TYPE="azure" \
+    BLOB_DATA_CONTAINER="referral-data" \
+    BLOB_CV_CONTAINER="referral-cvs" \
+    BLOB_CV_INTELLIGENCE_NAME="cv_intelligence.db" \
+    WEBSITES_PORT="8000" \
+    SCM_DO_BUILD_DURING_DEPLOYMENT="true" \
   --output none 2>/dev/null
-ok "Production enterprise infrastructure active (PostgreSQL Flexible Server, Key Vault, Application Insights)."
+ok "Production App Service settings verified (In-memory SQLite + Azure Blob Storage persistence)."
 
 
 # ==============================================================================
@@ -140,9 +145,9 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}  PERSISTENCE: Azure Database for PostgreSQL Flexible Server (tangentia-pg-server)${NC}"
-echo -e "${GREEN}  SECRETS:     Managed Identity + Azure Key Vault (tangentia-kv-ref)${NC}"
-echo -e "${GREEN}  MONITORING:  Azure Application Insights (tangentia-referral-insights)${NC}"
-echo -e "${GREEN}  All data is now permanently persisted across restarts and redeployments.${NC}"
+echo -e "${GREEN}  PERSISTENCE: Azure Blob Storage (referral-data/Tangentia_Referrals.xlsx)${NC}"
+echo -e "${GREEN}  RESUMES:     Azure Blob Storage (referral-cvs/)${NC}"
+echo -e "${GREEN}  ENGINE:      In-Memory SQLite (sqlite:///:memory:) with Blob Write-Through${NC}"
+echo -e "${GREEN}  All data is persistently synced across restarts and redeployments.${NC}"
 echo ""
 

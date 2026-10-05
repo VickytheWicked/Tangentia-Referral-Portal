@@ -9,28 +9,28 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Tangentia Employee Referral Portal"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    DEV_MODE: bool = True  # Allows local dev testing with simulated Entra user and local mock storage
+    DEV_MODE: bool = True  # Allows local dev testing with simulated users and local mock storage
     
     # API Prefix
     API_V1_STR: str = "/api"
 
-    # Database (In-Memory Query Engine; Persistent Storage is Microsoft Excel)
+    # Database (In-Memory Query Engine; Persistent Storage is Microsoft Excel in Azure Blob Storage)
     DATABASE_URL: str = "sqlite:///:memory:"
 
-    # Microsoft Excel Online Storage
-    EXCEL_STORAGE_TYPE: str = Field(default="mock", description="'graph' for real Microsoft Graph Excel Online, 'mock' for local development Excel file")
+    # Excel Ledger Storage (Azure Blob Storage or Local)
+    EXCEL_STORAGE_TYPE: str = Field(default="mock", description="'blob' for Azure Blob Storage Excel ledger, 'mock' for local development Excel file")
     EXCEL_FILE_PATH: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "Tangentia_Referrals.xlsx")
-    EXCEL_DRIVE_ID: str = Field(default="", description="Drive ID where the Excel workbook is stored")
-    EXCEL_FILE_ITEM_ID: str = Field(default="", description="Microsoft Graph item ID for the Excel workbook")
+    EXCEL_DRIVE_ID: str = Field(default="", description="Optional legacy Drive ID if configured")
+    EXCEL_FILE_ITEM_ID: str = Field(default="", description="Optional legacy item ID")
     EXCEL_WORKBOOK_NAME: str = Field(default="Tangentia_Referrals.xlsx", description="Name of the Excel workbook file")
     
-    # Microsoft Entra ID (Azure AD) & Authentication
+    # Authentication & JWT (Portal HR Admin Login & Employee Zero-Friction)
     JWT_SECRET_KEY: str = Field(default="", description="Secret key for signing JWT tokens")
     ALLOW_DEV_TOKENS: bool = Field(default=False, description="Explicitly allow dev/test tokens. NEVER allowed in production")
-    AZURE_TENANT_ID: str = Field(default="common", description="Azure AD Tenant ID")
-    AZURE_CLIENT_ID: str = Field(default="", description="Azure AD App Registration Client ID")
-    AZURE_CLIENT_SECRET: str = Field(default="", description="Azure AD Client Secret")
-    AZURE_HR_GROUP_ID: str = Field(default="", description="Entra ID Security Group ID for HR Admins")
+    AZURE_TENANT_ID: str = Field(default="common", description="Azure Tenant ID (if applicable)")
+    AZURE_CLIENT_ID: str = Field(default="", description="Azure App Client ID (if applicable)")
+    AZURE_CLIENT_SECRET: str = Field(default="", description="Azure Client Secret (if applicable)")
+    AZURE_HR_GROUP_ID: str = Field(default="", description="Security Group ID for HR Admins (if applicable)")
     
     @property
     def jwt_secret_key(self) -> str:
