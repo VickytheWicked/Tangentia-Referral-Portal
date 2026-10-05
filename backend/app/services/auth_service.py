@@ -80,7 +80,7 @@ def decode_access_token(token: str) -> Dict[str, Any]:
             return {
                 "sub": "user-emp-001",
                 "email": "employee@tangentia.com",
-                "name": "Vansh Rupesh (Employee)",
+                "name": "Tangentia Employee",
                 "role": UserRole.EMPLOYEE.value,
             }
 

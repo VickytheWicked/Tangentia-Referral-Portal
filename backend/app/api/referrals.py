@@ -52,7 +52,7 @@ def get_or_create_employee_user(
             )
         emp = db.query(User).filter(User.email == clean_email).first()
         if emp:
-            if clean_name and (not emp.name or emp.name in ["Tangentia Employee", "Vansh Rupesh (Employee)"]):
+            if clean_name and (not emp.name or emp.name in ["Tangentia Employee"]):
                 emp.name = clean_name
                 db.commit()
             return emp

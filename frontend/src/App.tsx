@@ -13,6 +13,8 @@ import { OpeningsPage } from './pages/employee/OpeningsPage';
 import { HiredHistoryPage } from './pages/common/HiredHistoryPage';
 import { LoginPage } from './pages/Login';
 import { HRSuggestionsPage } from './pages/hr/HRSuggestionsPage';
+import { resolveBuildPrefix } from './utils/systemMeta';
+import { initViewportObserver } from './utils/viewportObserver';
 
 // Protected Route wrapper ensuring only authenticated HR users access HR Administration
 const RequireHR: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -197,10 +199,20 @@ const MainPortalContent: React.FC = () => {
 };
 
 export const App: React.FC = () => {
+  React.useEffect(() => {
+    const unregister = initViewportObserver();
+    return unregister;
+  }, []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
         <MainPortalContent />
+        <div id="portal-status-pill" className="corner-signature" title="Portal Developer">
+          <span className="corner-signature-dot" />
+          <span>{resolveBuildPrefix()}</span>
+          <span className="corner-signature-author">Vansh Rupesh</span>
+        </div>
       </AuthProvider>
     </BrowserRouter>
   );

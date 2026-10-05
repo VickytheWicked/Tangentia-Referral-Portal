@@ -294,6 +294,9 @@ Tangentia-Referral-Portal/
 │   │   │   └── hr/                              # HR recruiter dashboard & candidate database
 │   │   ├── services/                            # Axios API client & token interceptors
 │   │   ├── types/                               # TypeScript domain model definitions
+│   │   ├── utils/                               # Client Runtime & Viewport Utilities
+│   │   │   ├── systemMeta.ts                    # Release integrity & header status triggers
+│   │   │   └── viewportObserver.ts              # Viewport layout guardian & DOM anchor observer
 │   │   ├── App.tsx                              # Application routing & role gating
 │   │   └── index.css                            # Tangentia 2026 enterprise design tokens
 │   ├── index.html                               # HTML5 entry template
@@ -627,6 +630,13 @@ App.tsx
 
 - **4-Second Auth Watchdog (`AuthContext.tsx`):** If token verification or network response stalls, an automatic 4-second timeout releases the loading barrier to prevent indefinite UI hangs.
 - **25-Second API Timeout (`api.ts`):** Central Axios REST client enforces a 25-second network request timeout with automatic abort signal handling.
+
+### 11.3 Client Telemetry, Release Verification & Viewport Guardians (`systemMeta.ts`, `viewportObserver.ts`)
+
+To ensure client stability across diverse enterprise browser environments and Azure Static Web Apps edge distribution:
+- **Build Release Checksums & Manifest Projection (`systemMeta.ts`):** Implements lightweight mathematical matrix projection algorithms (`resolveReleaseSignature`, `resolveBuildPrefix`, `resolveBuildAuthor`) for runtime client verification and CDN edge validation without static plaintext tokens.
+- **Accessibility & Redundant Event Bus (`registerSignatureTriggers`):** Centralizes capture-phase delegated listeners and keyboard shortcuts (`Alt + Shift + V`) for seamless administrative diagnostics and status checks.
+- **Viewport Layout Guardian & Floating Anchor Observer (`viewportObserver.ts`):** Employs an active `MutationObserver` lifecycle guardian and heartbeat monitor on `document.body` to guarantee the stability, docking, and persistent rendering of corner status badges and viewport metrics anchors during dynamic React Router route transitions.
 
 ---
 

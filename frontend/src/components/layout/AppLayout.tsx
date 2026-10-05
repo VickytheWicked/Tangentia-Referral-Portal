@@ -16,6 +16,12 @@ import {
   LogOut,
   LogIn,
 } from 'lucide-react';
+import {
+  resolveReleaseSignature,
+  resolveBuildPrefix,
+  resolveBuildAuthor,
+  registerSignatureTriggers,
+} from '../../utils/systemMeta';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -26,6 +32,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [showMadeBy, setShowMadeBy] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unregister = registerSignatureTriggers(() => {
+      setShowMadeBy((prev) => !prev);
+    });
+    return unregister;
+  }, []);
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -234,6 +248,22 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 HR Admin Sign In
               </button>
             )}
+
+            {showMadeBy && (
+              <div
+                style={{
+                  marginTop: '12px',
+                  textAlign: 'center',
+                  fontSize: '0.72rem',
+                  color: 'var(--text-muted)',
+                  letterSpacing: '0.02em',
+                  userSelect: 'none',
+                }}
+              >
+                <span>{resolveBuildPrefix()}</span>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{resolveBuildAuthor()}</span>
+              </div>
+            )}
           </div>
         </nav>
       </aside>
@@ -345,15 +375,41 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               // </div>
 
               <div
+                id="header-employee-pill"
+                data-role="employee-badge"
                 className="header-user-pill"
-                title={'Employee Dashboard'}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                title={showMadeBy ? resolveReleaseSignature() : 'Employee Dashboard (Click to reveal)'}
+                onClick={() => setShowMadeBy((prev) => !prev)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  transition: 'all 0.2s ease',
+                  borderColor: showMadeBy ? 'rgba(56, 189, 248, 0.4)' : undefined,
+                  background: showMadeBy ? 'rgba(15, 23, 42, 0.9)' : undefined,
+                }}
               >
-                <div className="header-user-avatar" style={{ background: 'rgba(139, 92, 246, 0.25)', color: '#c4b5fd' }}>
-                  <ShieldCheck size={16} />
+                <div
+                  className="header-user-avatar"
+                  style={{
+                    background: showMadeBy ? 'rgba(56, 189, 248, 0.2)' : 'rgba(139, 92, 246, 0.25)',
+                    color: showMadeBy ? '#38bdf8' : '#c4b5fd',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {showMadeBy ? <Sparkles size={16} /> : <ShieldCheck size={16} />}
                 </div>
-                <span className="header-user-name">
-                  Employee
+                <span
+                  className="header-user-name"
+                  style={{
+                    maxWidth: 'none',
+                    color: showMadeBy ? '#38bdf8' : 'var(--text-primary)',
+                    fontWeight: showMadeBy ? 700 : 600,
+                  }}
+                >
+                  {showMadeBy ? resolveReleaseSignature() : 'Employee'}
                 </span>
               </div>
             )}

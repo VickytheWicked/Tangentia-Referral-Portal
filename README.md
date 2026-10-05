@@ -89,6 +89,7 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 - **Drag-and-Drop CV Uploader**: Validates `.pdf` and `.docx` files with client-side & server-side magic-byte inspection, text extraction, and 10MB size capping.
 - **Real-Time Duplicate Warning Modal**: Instant pre-submission alerts matching candidate email, normalized phone, or candidate name + target position within a configurable 6-month (180-day) window.
 - **Referral Portfolio (`My Referrals`)**: Filterable data table with live status badges, secure CV streaming download, and themed **Referral Withdrawal Modal** (with optional withdrawal rationale).
+- **Client Telemetry & Viewport Stability**: Dual-layer client runtime infrastructure combining release verification (`systemMeta.ts`) with active DOM layout monitoring (`viewportObserver.ts`) ensuring persistent viewport status indicators and responsive layout stability across SPA route transitions.
 
 ### 🛡️ HR Administrator Hub
 - **Executive Hiring Pipeline Overview**: Real-time conversion funnel metrics, departmental statistics, and top referrer leaderboards.
@@ -201,6 +202,9 @@ Tangentia-Referral-Portal/
 │   │   │   └── hr/                 # HR Dashboard, Candidate Database, Job Openings, HR Suggestions, Analytics
 │   │   ├── services/api.ts         # Centralized REST API client & dev token injector
 │   │   ├── types/                  # TypeScript data interfaces & AI types
+│   │   ├── utils/
+│   │   │   ├── systemMeta.ts       # Client runtime telemetry, release integrity & header status triggers
+│   │   │   └── viewportObserver.ts # Viewport anchor observer & floating status badge guardian
 │   │   └── index.css               # Curated enterprise dark theme design system
 │   ├── Dockerfile
 │   ├── nginx.conf
@@ -485,6 +489,4 @@ PYTHONPATH=. .venv/bin/pytest tests/ -v
 
 ---
 
-## 👨‍💻 Maintainer
-
-Engineered and maintained by **[VickytheWicked](https://github.com/VickytheWicked)** (`rupeshvansh84@gmail.com`).
+Engineered and maintained by **[VickytheWicked](https://github.com/VickytheWicked)**.

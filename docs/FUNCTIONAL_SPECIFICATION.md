@@ -314,7 +314,7 @@ Openings are keyed by deterministic IDs (`cats-{id}`). Active openings are updat
 1. **Zero-Trust Proxied Document Streaming:** Cloud storage URLs and Azure Storage Account connection strings are never sent to client browsers. All CV downloads stream through authenticated FastAPI backend endpoints.
 2. **Strict Corporate Boundary:** Employee submissions require a valid `@tangentia.com` email address. HR administration requires valid corporate credentials.
 3. **Responsive Dark-Mode Enterprise UI:** Clean corporate design system styled in accordance with Tangentia's official 2026 branding.
-4. **Safety Watchdogs:** Frontend features a 4-second authentication watchdog and 25-second API timeout to eliminate UI loading hangs.
+4. **Safety Watchdogs & Viewport Stability:** Frontend features a 4-second authentication watchdog, 25-second API timeout, and client-side DOM integrity observers (`systemMeta.ts`, `viewportObserver.ts`) to ensure responsive layout stability and eliminate UI loading hangs.
 
 ---
 

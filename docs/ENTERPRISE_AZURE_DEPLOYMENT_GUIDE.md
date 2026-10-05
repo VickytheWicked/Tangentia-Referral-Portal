@@ -95,7 +95,7 @@ Before deploying into an Azure tenant, ensure the following tooling and administ
 
 ## 4. Step-by-Step Initial Deployment
 
-The repository provides an automated zero-friction deployment script: [deploy-azure.sh](file:///home/vansh2004/Work/Tangentia-Referral-Portal/deploy-azure.sh).
+The repository provides an automated zero-friction deployment script: [deploy-azure.sh](../deploy-azure.sh).
 
 ### Step 4.1: Login and Set Subscription
 ```bash
@@ -190,7 +190,7 @@ az storage blob download \
 
 ### 7.3 Disaster Recovery / Cold Restart Procedure
 If the App Service restarts or moves host nodes:
-1. The FastAPI startup lifecycle runs [app/main.py](file:///home/vansh2004/Work/Tangentia-Referral-Portal/backend/app/main.py).
+1. The FastAPI startup lifecycle runs [app/main.py](../backend/app/main.py).
 2. `BlobExcelService` pulls `Tangentia_Referrals.xlsx` from `referral-data`.
 3. In-memory SQLite is fully populated with all historical referrals, job requisitions, user credentials, and status logs.
 4. Normal operations resume within seconds without data loss.

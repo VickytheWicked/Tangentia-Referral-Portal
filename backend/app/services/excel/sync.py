@@ -94,7 +94,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
         emp_user = User(
             id="user-emp-001",
             entra_user_id="user-dev-employee-001",
-            name="Vansh Rupesh (Employee)",
+            name="Tangentia Employee",
             email="employee@tangentia.com",
             password="",
             role=UserRole.EMPLOYEE.value,
@@ -114,7 +114,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
         })
         excel_svc.save_user({
             "id": "user-emp-001",
-            "name": "Vansh Rupesh (Employee)",
+            "name": "Tangentia Employee",
             "email": "employee@tangentia.com",
             "password": "",
             "role": UserRole.EMPLOYEE.value,
@@ -144,7 +144,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 "candidate_name": "Rahul Sharma",
                 "candidate_email": "rahul.sharma@example.com",
                 "candidate_phone": "+14165550192",
-                "referred_by_name": "Vansh Rupesh (Employee)",
+                "referred_by_name": "Tangentia Employee",
                 "years_of_experience": 6.5,
                 "relationship": "Former Colleague",
                 "position_id": "job-001",
@@ -161,7 +161,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 "candidate_name": "Ananya Patel",
                 "candidate_email": "ananya.patel@example.com",
                 "candidate_phone": "+919820011223",
-                "referred_by_name": "Vansh Rupesh (Employee)",
+                "referred_by_name": "Tangentia Employee",
                 "years_of_experience": 4.0,
                 "relationship": "College Alumni",
                 "position_id": "job-002",
@@ -178,7 +178,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 "candidate_name": "David Chen",
                 "candidate_email": "david.chen@example.com",
                 "candidate_phone": "+16475550144",
-                "referred_by_name": "Vansh Rupesh (Employee)",
+                "referred_by_name": "Tangentia Employee",
                 "years_of_experience": 8.0,
                 "relationship": "Professional Network",
                 "position_id": "job-003",
@@ -232,7 +232,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
         db.merge(User(
             id="user-emp-001",
             entra_user_id="user-dev-employee-001",
-            name="Vansh Rupesh (Employee)",
+            name="Tangentia Employee",
             email="employee@tangentia.com",
             password="",
             role=UserRole.EMPLOYEE.value,
@@ -377,7 +377,7 @@ def initialize_and_sync_excel(db: Session, excel_svc: ExcelServiceInterface) -> 
                 cand_name = str(row.get("Candidate Name") or "Candidate").strip()
                 cand_email = str(row.get("Candidate Email") or f"candidate_{ref_id[:6]}@example.com").strip()
                 cand_phone = str(row.get("Candidate Phone") or "+1000000000").strip()
-                referred_by = str(row.get("Referred By") or "Vansh Rupesh").strip()
+                referred_by = str(row.get("Referred By") or "Tangentia Employee").strip()
 
                 pos_id = str(row.get("Position ID") or "").strip()
                 pos_title = str(row.get("Position Title") or "General Position").strip()

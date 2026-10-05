@@ -1103,3 +1103,57 @@ input[type="number"] {
   }
 }
 
+.corner-signature {
+  position: fixed;
+  bottom: 16px;
+  right: 20px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  font-size: 0.75rem;
+  color: var(--text-muted, #94a3b8);
+  letter-spacing: 0.02em;
+  user-select: none;
+  transition: all var(--transition-normal);
+  pointer-events: auto;
+}
+
+.corner-signature:hover {
+  background: rgba(30, 41, 59, 0.92);
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(99, 102, 241, 0.25);
+  transform: translateY(-2px);
+  color: var(--text-secondary, #cbd5e1);
+}
+
+.corner-signature-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.85);
+  display: inline-block;
+}
+
+.corner-signature-author {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .corner-signature {
+    bottom: 74px;
+    right: 12px;
+    padding: 5px 11px;
+    font-size: 0.7rem;
+  }
+}
+
