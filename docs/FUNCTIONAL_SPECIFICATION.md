@@ -279,7 +279,7 @@ The AI requirement engine evaluates resumes against requisition specifications w
 Whenever a new requisition is created or synced from CATS ATS, the Historical RAG Engine automatically searches past candidate referrals to find qualified applicants who were not hired for prior roles.
 
 ### 6.2 Dual Vectorization & 0.45 Similarity Cutoff
-- **Vector Space:** Generates 768-dimensional embeddings via Gemini `text-embedding-004` combined with a 128-dimensional unit hypersphere projection of extracted skill n-grams.
+- **Vector Space:** Generates 3072-dimensional embeddings via Gemini `gemini-embedding-001` combined with a 128-dimensional unit hypersphere projection of extracted skill n-grams.
 - **Relevance Cutoff:** Only candidates achieving cosine similarity $\ge 0.45$ are surfaced to recruiters, preventing low-relevance noise.
 
 ### 6.3 One-Click Candidate Re-Engagement

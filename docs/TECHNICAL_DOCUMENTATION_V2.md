@@ -83,7 +83,7 @@ The **Tangentia Employee Referral Portal** is an enterprise-grade talent acquisi
 | **Azure Blob Storage Excel Ledger** | Complete persistent audit ledger in `referral-data/Tangentia_Referrals.xlsx`. Every referral submission, status transition, HR note, and job posting writes through via `openpyxl` and syncs immediately to Azure Blob Storage. | `blob_excel_service.py`, `local_excel_service.py`, `sync.py` |
 | **Document Archival & Proxy Streaming** | Candidate CVs (.pdf, .docx) are stored in `referral-cvs/{YEAR}/` with yearly partitioning. Cloud storage URLs are never exposed to clients; downloads stream through authenticated FastAPI endpoints. | `blob_service.py`, `referrals.py` |
 | **AI Evidence-Based Requirement Engine** | Evaluates candidate CVs against requisition requirements with mathematical experience verification (REQ #1), degree matching (REQ #2), and factual quotations. Sequential 4.0s queue pacing prevents LLM rate-limit throttling. | `requirement_analyzer.py`, `queue.py`, `gemini-3.5-flash-lite` |
-| **Historical Candidate RAG Search** | Recovers passive talent from past applications for newly published positions using vector similarity (Gemini `text-embedding-004` + 128-dimensional unit hypersphere projection). | `historical_suggestions/`, `rag_service.py` |
+| **Historical Candidate RAG Search** | Recovers passive talent from past applications for newly published positions using vector similarity (Gemini `gemini-embedding-001` + 128-dimensional unit hypersphere projection). | `historical_suggestions/`, `rag_service.py` |
 | **Automated CATS ATS Synchronization** | Automated 6-hour cron worker scrapes active job openings from Tangentia's CATS Careers ATS, synthesizes 1–2 sentence job summaries, maps corporate taxonomy, and updates databases idempotently. | `cats_scraper.py`, `cats_scheduler.py` |
 
 ---
@@ -211,7 +211,7 @@ sequenceDiagram
 | **Database Migrations** | [Alembic](https://alembic.sqlalchemy.org/) | `1.13.0+` | Schema version control and automated migration execution at server startup. |
 | **Data Validation** | [Pydantic](https://docs.pydantic.dev/) | `2.9.0+` | Strict request parsing, environment variable loading via `pydantic-settings`. |
 | **Cloud Storage** | [Azure Storage Blob SDK](https://pypi.org/project/azure-storage-blob/) | `12.23.0+` | Candidate CV archival (`referral-cvs`) and persistent Excel ledger sync (`referral-data`). |
-| **AI LLM Engine** | [Google GenAI SDK](https://ai.google.dev/) | `0.1.1+` | Gemini API (`gemini-3.5-flash-lite`, `text-embedding-004`) for parsing and RAG embeddings. |
+| **AI LLM Engine** | [Google GenAI SDK](https://ai.google.dev/) | `0.1.1+` | Gemini API (`gemini-3.5-flash-lite`, `gemini-embedding-001`) for parsing and RAG embeddings. |
 | **Document Parsers** | `pdfplumber`, `PyMuPDF (fitz)`, `python-docx` | Latest | Multi-stage fault-tolerant text and table extraction from candidate resumes. |
 | **Spreadsheet Engine** | [openpyxl](https://openpyxl.readthedocs.io/) | `3.1.5+` | Multi-sheet Excel engine supporting 6-worksheet audit ledger formatting and styles. |
 | **Excel Blob Ledger** | `BlobExcelService` | Internal | Write-through synchronization to `Tangentia_Referrals.xlsx` in Azure Blob Storage. |
@@ -566,14 +566,14 @@ When recruiters open a new job requisition, the Historical RAG Engine automatica
 
 ```mermaid
 graph LR
-    NEW_JOB["New Job Opening<br/>Title + Description"] --> EMBED["Gemini text-embedding-004<br/>768-dim Vector"]
+    NEW_JOB["New Job Opening<br/>Title + Description"] --> EMBED["Gemini gemini-embedding-001<br/>3072-dim Vector"]
     EMBED --> HYPER["128-dim Hypersphere<br/>Projection & Normalization"]
     HYPER --> SIM["Cosine Similarity Engine<br/>historical_rag.db"]
     SIM --> FILTER["Similarity Cutoff &ge; 0.45<br/>Relevance Ranking"]
     FILTER --> DOSSIER["Top 5 Ranked Candidates<br/>+ Fit Scores & Reasoning"]
 ```
 
-- **Dual-Embedding Architecture**: Combines semantic embeddings (`text-embedding-004`) with a deterministic 128-dimensional hypersphere projection of extracted technical n-grams.
+- **Dual-Embedding Architecture**: Combines semantic embeddings (`gemini-embedding-001`) with a deterministic 128-dimensional hypersphere projection of extracted technical n-grams.
 - **Threshold Cutoff**: Only candidates achieving a cosine similarity $\ge 0.45$ are surfaced.
 - **Direct Re-engagement**: Recruiters can review the candidate's original evaluation dossier and directly re-assign them to the active requisition with one click.
 

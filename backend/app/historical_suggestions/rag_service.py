@@ -113,11 +113,16 @@ class HistoricalRAGService:
             try:
                 from google import genai
                 client = genai.Client(api_key=settings.GEMINI_API_KEY, http_options={"timeout": 10000})
+                # Gemini Google GenAI SDK embedding model
                 res = client.models.embed_content(
-                    model="text-embedding-004",
+                    model="gemini-embedding-001",
                     contents=clean_text[:4000],
                 )
-                if res and res.embedding and res.embedding.values:
+                if res and getattr(res, "embeddings", None) and len(res.embeddings) > 0:
+                    first_emb = res.embeddings[0]
+                    if getattr(first_emb, "values", None):
+                        return list(first_emb.values)
+                elif res and getattr(res, "embedding", None) and getattr(res.embedding, "values", None):
                     return list(res.embedding.values)
             except Exception as e:
                 logger.debug(f"Gemini embedding API call skipped/fallback ({e})")
