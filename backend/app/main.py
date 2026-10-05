@@ -44,6 +44,7 @@ async def startup_event():
             from alembic import command
             alembic_ini_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
             if os.path.exists(alembic_ini_path):
+                cfg = Config(alembic_ini_path)
                 migration_url = settings.DATABASE_URL
                 if migration_url.startswith("postgresql://"):
                     migration_url = migration_url.replace("postgresql://", "postgresql+psycopg2://", 1)
@@ -53,7 +54,13 @@ async def startup_event():
         except Exception as e:
             logger.warning(f"Alembic auto-migration check note: {e}")
 
-    from app.database import SessionLocal
+    # Ensure all required columns exist in production PostgreSQL
+    from app.database import engine, ensure_db_schema_compatibility, SessionLocal
+    try:
+        ensure_db_schema_compatibility(engine)
+    except Exception as e:
+        logger.warning(f"Database schema compatibility check note: {e}")
+
     from app.services.excel import get_excel_service
     from app.services.excel.sync import initialize_and_sync_excel
     from app.services.cats_scheduler import start_cats_scheduler

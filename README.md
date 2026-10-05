@@ -84,7 +84,7 @@ A production-ready internal **Employee Referral Portal** engineered for enterpri
 ### 👤 Employee Experience
 - **Instant Dashboard Landing**: Direct zero-friction access to candidate referral statistics (*Total*, *In Review*, *Interviewing*, *Hired*) and recent referral updates.
 - **AI-Powered CV Auto-Fill**: Uploading a CV (`.pdf` / `.docx`) automatically extracts candidate name, email, phone, experience, summary, and skills to populate the submission form in seconds.
-- **Submit Candidate Referrals**: Comprehensive submission workflow including target requisition, experience, candidate contact, relationship, and custom recommendation note.
+- **Submit Candidate Referrals**: Streamlined submission workflow including target requisition, experience, candidate contact, relationship, and corporate email verification.
 - **Drag-and-Drop CV Uploader**: Validates `.pdf` and `.docx` files with client-side & server-side magic-byte inspection, text extraction, and 10MB size capping.
 - **Real-Time Duplicate Warning Modal**: Instant pre-submission alerts matching candidate email, normalized phone, or candidate name + target position within a configurable 6-month (180-day) window.
 - **Referral Portfolio (`My Referrals`)**: Filterable data table with live status badges, secure CV streaming download, and themed **Referral Withdrawal Modal** (with optional withdrawal rationale).

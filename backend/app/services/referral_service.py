@@ -328,7 +328,7 @@ async def create_referral_with_cv(
             referral.github_url = form_data.github_url.strip() if form_data.github_url else None
             referral.years_of_experience = form_data.years_of_experience
             referral.relationship = form_data.relationship.strip()
-            referral.referral_note = form_data.referral_note.strip()
+            referral.referral_note = (form_data.referral_note or "").strip()
             referral.position_id = position.id
             referral.referred_by_user_id = current_user.id
             referral.referred_by_name = referral_referrer
@@ -381,7 +381,7 @@ async def create_referral_with_cv(
                 github_url=form_data.github_url.strip() if form_data.github_url else None,
                 years_of_experience=form_data.years_of_experience,
                 relationship=form_data.relationship.strip(),
-                referral_note=form_data.referral_note.strip(),
+                referral_note=(form_data.referral_note or "").strip(),
                 position_id=position.id,
                 referred_by_user_id=current_user.id,
                 referred_by_name=referral_referrer,

@@ -1,6 +1,6 @@
 import io
 import pytest
-from app.models.referral import ReferralStatus
+from app.models.referral import Referral, ReferralStatus
 
 
 def test_duplicate_check_and_submission_workflow(client, seeded_job):
@@ -540,6 +540,38 @@ def test_duplicate_referral_after_six_months_is_treated_as_new(client, seeded_jo
     assert db_alex_refs[0].id == old_referral.id
     assert db_alex_refs[0].referral_note == "Re-submitting Alex after 7 months for new opening."
     assert float(db_alex_refs[0].years_of_experience) == 6.0
+
+
+def test_submission_without_employee_name_and_referral_note(client, seeded_job, db_session):
+    """Verify that employee name and referral recommendation note are not mandatory for referral submission."""
+    dummy_pdf = b"%PDF-1.4\n1 0 obj\n<< /Title (Simple Submission) >>\nendobj\ntrailer\n<<>>\n%%EOF"
+    submit_res = client.post(
+        "/api/referrals",
+        data={
+            "candidate_name": "Maya Lin",
+            "candidate_email": "maya.lin@example.com",
+            "candidate_phone": "+14167778888",
+            "years_of_experience": 4.0,
+            "relationship": "Former Colleague",
+            "position_id": seeded_job.id,
+            "candidate_consent": "true",
+            "employee_email": "priya.nair@tangentia.com",
+        },
+        files={"file": ("maya_lin_cv.pdf", io.BytesIO(dummy_pdf), "application/pdf")},
+    )
+    assert submit_res.status_code == 201, submit_res.text
+    ref_data = submit_res.json()
+    assert ref_data["candidate_name"] == "Maya Lin"
+    # Derived from email since employee_name was omitted
+    assert ref_data["referred_by_name"] == "Priya Nair"
+    assert ref_data["referred_by_email"] == "priya.nair@tangentia.com"
+
+    # Verify DB record
+    db_ref = db_session.query(Referral).filter(Referral.candidate_email == "maya.lin@example.com").first()
+    assert db_ref is not None
+    assert db_ref.referral_note == ""
+    assert db_ref.referred_by_name == "Priya Nair"
+
 
 
 

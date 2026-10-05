@@ -14,7 +14,7 @@ class ReferralCreateForm(BaseModel):
     github_url: Optional[str] = None
     years_of_experience: float = Field(default=0.0, ge=0.0, le=50.0)
     relationship: str = Field(..., min_length=2, max_length=100)
-    referral_note: str = Field(..., min_length=10, max_length=5000)
+    referral_note: Optional[str] = Field(default="", max_length=5000)
     position_id: str
     referred_by_name: Optional[str] = Field(None, max_length=255)
     referred_by_email: Optional[str] = Field(None, max_length=255)
@@ -65,7 +65,7 @@ class ReferralSummaryResponse(BaseModel):
 class ReferralDetailResponse(ReferralSummaryResponse):
     linkedin_url: Optional[str] = None
     github_url: Optional[str] = None
-    referral_note: str
+    referral_note: Optional[str] = ""
     candidate_consent: bool
     position: Optional[JobPositionResponse] = None
     status_history: List[StatusHistoryResponse] = []

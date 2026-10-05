@@ -560,24 +560,26 @@ export const AllReferralsPage: React.FC<AllReferralsPageProps> = ({
             </div>
 
             {/* Referring Employee Note */}
-            <div>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                Referring Employee Recommendation Note:
-              </h4>
-              <div
-                style={{
-                  background: 'rgba(15, 19, 29, 0.4)',
-                  padding: '14px 16px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-subtle)',
-                  fontSize: '0.88rem',
-                  lineHeight: 1.5,
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                {selectedReferral.referral_note}
+            {Boolean(selectedReferral.referral_note && selectedReferral.referral_note.trim()) && (
+              <div>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  Referring Employee Recommendation Note:
+                </h4>
+                <div
+                  style={{
+                    background: 'rgba(15, 19, 29, 0.4)',
+                    padding: '14px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-subtle)',
+                    fontSize: '0.88rem',
+                    lineHeight: 1.5,
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  {selectedReferral.referral_note}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* HR Confidential Notes Thread */}
             <HRNotesSection

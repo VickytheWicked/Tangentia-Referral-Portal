@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+import re
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, Response
@@ -55,6 +56,12 @@ def get_or_create_employee_user(
                 emp.name = clean_name
                 db.commit()
             return emp
+
+        # If name not provided, derive human-readable name from email prefix (e.g. rahul.sharma -> Rahul Sharma)
+        if not clean_name:
+            local_part = clean_email.split("@")[0]
+            name_parts = [p.capitalize() for p in re.split(r'[\._\-]+', local_part) if p]
+            clean_name = " ".join(name_parts) if name_parts else "Tangentia Employee"
 
         # Create a new persistent user for this referring employee
         new_emp = User(
@@ -251,7 +258,7 @@ async def submit_referral(
     github_url: Optional[str] = Form(None),
     years_of_experience: float = Form(0.0),
     relationship: str = Form(...),
-    referral_note: str = Form(...),
+    referral_note: Optional[str] = Form(""),
     position_id: str = Form(...),
     candidate_consent: bool = Form(...),
     file: UploadFile = File(...),
@@ -274,6 +281,8 @@ async def submit_referral(
             detail="Employee email must be an official @tangentia.com corporate email address.",
         )
 
+    clean_referral_note = (referral_note or "").strip()
+
     form_data = ReferralCreateForm(
         candidate_name=candidate_name,
         candidate_email=candidate_email,
@@ -284,7 +293,7 @@ async def submit_referral(
         github_url=github_url,
         years_of_experience=years_of_experience,
         relationship=relationship,
-        referral_note=referral_note,
+        referral_note=clean_referral_note,
         position_id=position_id,
         candidate_consent=candidate_consent,
     )
@@ -294,6 +303,9 @@ async def submit_referral(
         referred_by_name=ref_by_name,
         referred_by_email=effective_emp_email,
     )
+    if not form_data.referred_by_name and effective_user and effective_user.name:
+        form_data.referred_by_name = effective_user.name
+
     storage_svc = get_storage_service()
     referral = await create_referral_with_cv(
         db=db,

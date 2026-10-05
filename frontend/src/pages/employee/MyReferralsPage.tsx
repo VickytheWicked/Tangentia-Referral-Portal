@@ -343,24 +343,26 @@ export const MyReferralsPage: React.FC<MyReferralsPageProps> = ({ onNavigate }) 
               )}
             </div>
 
-            <div>
-              <h5 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                Your Referral Recommendation:
-              </h5>
-              <div
-                style={{
-                  background: 'rgba(15, 19, 29, 0.4)',
-                  padding: '14px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-subtle)',
-                  fontSize: '0.88rem',
-                  lineHeight: 1.5,
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                {selectedReferral.referral_note}
+            {Boolean(selectedReferral.referral_note && selectedReferral.referral_note.trim()) && (
+              <div>
+                <h5 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Your Referral Recommendation:
+                </h5>
+                <div
+                  style={{
+                    background: 'rgba(15, 19, 29, 0.4)',
+                    padding: '14px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-subtle)',
+                    fontSize: '0.88rem',
+                    lineHeight: 1.5,
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  {selectedReferral.referral_note}
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <h5 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '12px' }}>

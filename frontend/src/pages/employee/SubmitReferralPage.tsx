@@ -6,6 +6,7 @@ import { DuplicateModal } from '../../components/common/DuplicateModal';
 import { JobUnavailableModal } from '../../components/common/JobUnavailableModal';
 import { Modal } from '../../components/common/Modal';
 import { notifyReferralUpdated } from '../../services/referralEvents';
+import { useAuth } from '../../auth/AuthContext';
 import {
   UploadCloud,
   FileText,
@@ -59,10 +60,17 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
   const [positions, setPositions] = useState<JobPosition[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState<boolean>(true);
 
+  const { user } = useAuth();
+
   // Form Fields
   // Employee Information
-  const [employeeName, setEmployeeName] = useState<string>('');
-  const [employeeEmail, setEmployeeEmail] = useState<string>('');
+  const [employeeEmail, setEmployeeEmail] = useState<string>(user?.email || '');
+
+  useEffect(() => {
+    if (user?.email && !employeeEmail) {
+      setEmployeeEmail(user.email);
+    }
+  }, [user]);
 
   // Referral Information
   const [referralName, setReferralName] = useState<string>('');
@@ -74,7 +82,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
   const [positionId, setPositionId] = useState<string>(preselectedJobId);
   const [yearsOfExperience, setYearsOfExperience] = useState<string>('3');
   const [relationship, setRelationship] = useState<string>('Former Colleague');
-  const [referralNote, setReferralNote] = useState<string>('');
   const [candidateConsent, setCandidateConsent] = useState<boolean>(false);
 
   // CV File & Extraction State
@@ -329,16 +336,10 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
     e.preventDefault();
     setErrorMessage(null);
 
-    const cleanEmployeeName = employeeName.trim();
     const cleanEmployeeEmail = employeeEmail.trim().toLowerCase();
     const cleanReferralName = referralName.trim();
     const cleanReferralEmail = referralEmail.trim().toLowerCase();
     const cleanReferralPhone = getFullReferralPhone(referralPhone, referralCountryCode);
-
-    if (!cleanEmployeeName) {
-      setErrorMessage('Please enter your Employee Full Name.');
-      return;
-    }
 
     if (!cleanEmployeeEmail) {
       setErrorMessage('Please enter your Employee Email Address.');
@@ -394,8 +395,10 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       formData.append('candidate_name', cleanReferralName);
       formData.append('candidate_email', cleanReferralEmail);
       formData.append('candidate_phone', cleanReferralPhone);
-      formData.append('referred_by_name', cleanEmployeeName);
-      formData.append('referred_by', cleanEmployeeName);
+      if (user?.name) {
+        formData.append('referred_by_name', user.name);
+        formData.append('referred_by', user.name);
+      }
       formData.append('referred_by_email', cleanEmployeeEmail);
       formData.append('employee_email', cleanEmployeeEmail);
       if (linkedinUrl) formData.append('linkedin_url', linkedinUrl);
@@ -403,7 +406,7 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
       formData.append('position_id', positionId);
       formData.append('years_of_experience', numExperience.toString());
       formData.append('relationship', relationship);
-      formData.append('referral_note', referralNote);
+      formData.append('referral_note', '');
       formData.append('candidate_consent', 'true');
       formData.append('file', selectedFile);
 
@@ -432,7 +435,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
     setYearsOfExperience('');
     setLinkedinUrl('');
     setGithubUrl('');
-    setReferralNote('');
     setSelectedFile(null);
     setDuplicateConfirmed(false);
     setCandidateConsent(false);
@@ -494,37 +496,21 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
               1. Your Employee Information
             </h4>
 
-            <div className="responsive-form-row">
-              <div className="form-group">
-                <label className="form-label">
-                  Employee Full Name <span className="required">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="form-input"
-                  placeholder="e.g. Rahul Sharma"
-                  value={employeeName}
-                  onChange={(e) => setEmployeeName(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Employee Email Address (@tangentia.com) <span className="required">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  className="form-input"
-                  placeholder="e.g. rahul.sharma@tangentia.com"
-                  value={employeeEmail}
-                  onChange={(e) => setEmployeeEmail(e.target.value)}
-                />
-                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                  Must be your official <strong style={{ color: '#93c5fd' }}>@tangentia.com</strong> corporate email
-                </span>
-              </div>
+            <div className="form-group" style={{ maxWidth: '520px' }}>
+              <label className="form-label">
+                Employee Email Address (@tangentia.com) <span className="required">*</span>
+              </label>
+              <input
+                type="email"
+                required
+                className="form-input"
+                placeholder="e.g. rahul.sharma@tangentia.com"
+                value={employeeEmail}
+                onChange={(e) => setEmployeeEmail(e.target.value)}
+              />
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                Must be your official <strong style={{ color: '#93c5fd' }}>@tangentia.com</strong> corporate email
+              </span>
             </div>
           </div>
 
@@ -1003,23 +989,6 @@ export const SubmitReferralPage: React.FC<SubmitReferralPageProps> = ({ onReferr
                   onChange={(e) => setGithubUrl(e.target.value)}
                 />
               </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">
-                Referral Recommendation Note <span className="required">*</span>
-              </label>
-              <textarea
-                required
-                className="form-textarea"
-                rows={4}
-                placeholder="Share why you believe this referral is a great fit for Tangentia. Highlight their key technical strengths, work ethic, and past accomplishments..."
-                value={referralNote}
-                onChange={(e) => setReferralNote(e.target.value)}
-              />
-              <span className="form-hint">
-                Min. 10 characters. This note is shared directly with the hiring committee.
-              </span>
             </div>
           </div>
 

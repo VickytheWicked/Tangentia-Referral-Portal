@@ -87,7 +87,7 @@ export interface ReferralSummary {
 export interface ReferralDetail extends ReferralSummary {
   linkedin_url?: string | null;
   github_url?: string | null;
-  referral_note: string;
+  referral_note?: string;
   candidate_consent: boolean;
   position?: JobPosition;
   status_history: StatusHistory[];
